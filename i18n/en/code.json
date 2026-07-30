@@ -1,0 +1,32 @@
+{
+    "基於 Unity 設計於遊戲開發常用的系統工具組，皆為獨立工具，需要什麼安裝什麼，並且支持多平台": {
+        "message": "A Unity-based toolkit of standalone systems commonly used in game development — install only what you need, with multi-platform support"
+    },
+    "快速入門": {
+        "message": "Quick Start"
+    },
+    "獨立模組": {
+        "message": "Standalone Modules"
+    },
+    "皆為獨立工具系統，透過 UPM 可單獨安裝、單獨使用，需要什麼裝什麼，彼此互不強制綁定，隨插即用。": {
+        "message": "Every system is an independent tool that can be installed and used separately via UPM — take only what you need, no forced coupling, plug and play."
+    },
+    "加快開發": {
+        "message": "Accelerate Development"
+    },
+    "涵蓋遊戲開發常用系統：日誌、無限列表、動作序列、紅點通知、輸入控制、補間動畫、時間、物件池、存檔、本地化等，免於重複造輪子，支持 Win, OSX, Android, iOS, WebGL。": {
+        "message": "Covers the everyday systems of game development: logging, infinite scroll view, action sequences, red-dot notices, input control, tweening, time, object pooling, saving, localization, and more — no wheel reinventing. Supports Win, OSX, Android, iOS, and WebGL."
+    },
+    "調用容易": {
+        "message": "Easy Integration"
+    },
+    "高內聚低耦合，各系統透過簡潔 API 進行操作，並附有完整 Example 與 AI Agent Skills，上手即用，提升可讀性、維護性。": {
+        "message": "Highly cohesive and loosely coupled — each system is operated through a concise API and ships with complete Examples and AI Agent Skills, improving readability and maintainability."
+    },
+    "博客": {
+        "message": "Blog"
+    },
+    "文檔": {
+        "message": "Documentation"
+    }
+}

@@ -1,0 +1,68 @@
+---
+sidebar_position: 1
+description: LoggingHelper is the Editor helper tool of LoggingSystem, providing config file creation, writing, and BYTES/JSON format conversion.
+---
+
+# LoggingHelper
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`LoggingHelper` is the Editor helper tool of **LoggingSystem**, providing **config file creation, writing, and format conversion** (BYTES [Cipher] and JSON [Plaintext]); it can additionally be called if you need to write your own BuildTool.
+
+|  |  |
+| :--- | :--- |
+| **Namespace** | `OxGKit.LoggingSystem.Editor` |
+| **Type** | `public static class LoggingHelper` |
+| **Source** | [LoggingHelper.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/LoggingSystem/Scripts/Editor/LoggingHelper.cs) |
+
+```csharp
+using OxGKit.LoggingSystem.Editor;
+```
+
+## Menu Items {#menu-items}
+
+| Menu | Description |
+| :--- | :--- |
+| `Assets/Create/OxGKit/Logging System/[JSON - Plaintext] Create LoggerConfig.dat (In StreamingAssets)` | Creates a **JSON (plaintext)** config file in StreamingAssets. |
+| `Assets/Create/OxGKit/Logging System/[BYTES - Cipher] Create LoggerConfig.dat (In StreamingAssets)` | Creates a **BYTES (cipher)** config file in StreamingAssets. |
+| `Assets/OxGKit/Logging System/Convert LoggerConfig.dat (BYTES [Cipher] <-> JSON [Plaintext])` | Converts the selected StreamingAssets config file **between formats**. |
+
+<Highlight color="#00d679">Reminder</Highlight> **Cipher** is recommended for release builds; the config file name and extension can be customized via [LoggingSettings](../Runtime/LoggersConfig.mdx#loggingsettings).
+
+## Methods {#methods}
+
+### WriteConfig {#writeconfig}
+
+```csharp
+public static void WriteConfig(LoggersConfig loggersConfig, ConfigFileType configFileType = ConfigFileType.Bytes)
+```
+
+Writes the [LoggersConfig](../Runtime/LoggersConfig.mdx) to the StreamingAssets config file with the specified [ConfigFileType](../Runtime/LoggersConfig.mdx#configfiletype).
+
+```csharp
+using OxGKit.LoggingSystem;
+using OxGKit.LoggingSystem.Editor;
+
+// BuildTool example: output the cipher config before building
+var loggersConfig = new LoggersConfig();
+LoggingLauncher.ReloadLoggersConfigAndSet(loggersConfig, (result) =>
+{
+    LoggingHelper.WriteConfig(result, ConfigFileType.Bytes);
+});
+```

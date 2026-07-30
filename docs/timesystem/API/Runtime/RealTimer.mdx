@@ -1,0 +1,370 @@
+---
+sidebar_position: 2
+description: RealTimer 是以系統時鐘計算的真實時間計時器 (查詢式自驅動)，不受 Time.timeScale 與遊戲暫停影響，支持 Timer (單次計時)、Tick (循環計時)、Mark (時間標記) 三種模式。
+---
+
+# RealTimer
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`RealTimer` 是以**系統時鐘 (`DateTime.Now`) 計算的真實時間計時器**，實例建立當下即為時間基準點，**查詢式自驅動 (不需外部 Update 餵入)**；不受 `Time.timeScale`、遊戲暫停與幀率卡頓影響。支持 **Timer (單次計時)**、**Tick (循環計時)**、**Mark (時間標記)** 三種模式與時間速度調整。
+
+|  |  |
+| :--- | :--- |
+| **命名空間** | `OxGKit.TimeSystem` |
+| **類型** | `public class RealTimer` |
+| **原始碼** | [RealTimer.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/TimeSystem/Scripts/Runtime/Core/Timer/RealTimer.cs) |
+
+```csharp
+using OxGKit.TimeSystem;
+```
+
+## 快速上手 {#quick-start}
+
+```csharp
+using OxGKit.TimeSystem;
+using UnityEngine;
+
+public class RealCooldown : MonoBehaviour
+{
+    private RealTimer _cooldown;
+
+    private void Start()
+    {
+        // 建立並自動播放 (autoPlay: true)
+        this._cooldown = new RealTimer(true);
+        // 設置 10 秒冷卻 (真實時間)
+        this._cooldown.SetTimer(10f);
+    }
+
+    private void Update()
+    {
+        // 查詢式檢查，不需餵入 deltaTime
+        if (this._cooldown.IsTimerTimeout())
+        {
+            // 冷卻結束 (即使期間 Time.timeScale = 0 仍照常倒數)
+        }
+    }
+}
+```
+
+## 通用規則 {#general-rules}
+
+### RealTimer vs DeltaTimer {#realtimer-vs-deltatimer}
+
+<Highlight color="#0373fc">注意</Highlight> `RealTimer` 以**系統時鐘**為基準，**即使遊戲暫停 (`Time.timeScale = 0`) 或程式卡頓仍持續計時**；若需要跟隨遊戲暫停與變速的計時，請改用 [DeltaTimer](./DeltaTimer.mdx) (詳見[模組選型](../../intro.mdx#模組選型-依時間基準區分))。
+
+### 播放狀態 {#playback-state}
+
+<Highlight color="#ff2f00">重要</Highlight> 計時器建構後**預設為停止狀態**，需呼叫 [Play](#play) (或使用建構子 `autoPlay: true`) 才會開始計時。
+
+<Highlight color="#00d679">提醒</Highlight> [Stop](#stop) 會清空所有計時數據 (保留時間速度)；[Reset](#reset) 會連同時間速度一併重置為預設值；[Pause](#pause) 僅暫停，可由 [Play](#play) 續播。
+
+---
+
+## 建構子 {#constructors}
+
+```csharp
+public RealTimer()
+
+public RealTimer(bool autoPlay)
+```
+
+建立計時器並**以建立當下的系統時間作為基準點** (內部會先執行 `Reset`)，`autoPlay` 為 true 時建立後立即開始計時。
+
+---
+
+## 播放控制 {#playback-control}
+
+### 方法總覽 {#playback-overview}
+
+| 方法 | 說明 |
+| :--- | :--- |
+| [GetRealTime](#getrealtime) | 取得自實例建立以來的真實經過秒數。 |
+| [Play](#play) | 開始或續播計時。 |
+| [Pause](#pause) | 暫停計時 (可續播)。 |
+| [Stop](#stop) | 停止並清空計時數據。 |
+| [Reset](#reset) | 重置所有狀態 (含時間速度)。 |
+| [IsPlaying](#isplaying) | 是否正在計時。 |
+| [IsPause](#ispause) | 是否為暫停 (停止) 狀態。 |
+| [GetTime](#gettime) | 取得計時器當前時間 (秒)。 |
+| [SetTimeSpeed](#settimespeed) | 設置時間運轉速度。 |
+| [GetTimeSpeed](#gettimespeed) | 取得時間運轉速度。 |
+
+---
+
+### GetRealTime {#getrealtime}
+
+```csharp
+public float GetRealTime()
+```
+
+取得**自計時器實例建立以來**的真實經過秒數 (以系統時鐘 `DateTime.Now` 計算，不受播放狀態與時間速度影響)。
+
+### Play {#play}
+
+```csharp
+public void Play()
+```
+
+開始計時或自暫停狀態**續播** (會扣除暫停期間的真實時間，不會跳段)。
+
+### Pause {#pause}
+
+```csharp
+public void Pause()
+```
+
+暫停計時，記錄暫停時間點，可由 [Play](#play) 續播。
+
+### Stop {#stop}
+
+```csharp
+public void Stop()
+```
+
+停止計時並**清空所有計時數據** (Timer / Tick / Mark 設置皆歸零)，但**保留時間速度** (timeSpeed)。
+
+### Reset {#reset}
+
+```csharp
+public void Reset()
+```
+
+重置所有狀態為預設值 (含**時間速度重置為 1**)，並回到停止狀態。
+
+### IsPlaying {#isplaying}
+
+```csharp
+public bool IsPlaying()
+```
+
+返回是否正在計時中。
+
+### IsPause {#ispause}
+
+```csharp
+public bool IsPause()
+```
+
+返回是否為暫停 (非播放) 狀態。
+
+### GetTime {#gettime}
+
+```csharp
+public float GetTime()
+```
+
+取得計時器的**當前累計時間 (秒)**，計時中會受 [SetTimeSpeed](#settimespeed) 影響；暫停時返回暫停當下的時間。
+
+### SetTimeSpeed {#settimespeed}
+
+```csharp
+public void SetTimeSpeed(float timeSpeed)
+```
+
+設置時間運轉速度 (預設 1)，影響 [GetTime](#gettime) 的時間流速 (連帶影響 Timer / Tick / Mark 判斷)。
+
+### GetTimeSpeed {#gettimespeed}
+
+```csharp
+public float GetTimeSpeed()
+```
+
+取得當前時間運轉速度。
+
+---
+
+## Timer 單次計時 {#timer}
+
+依照設置的秒數進行**單次倒數計時**。
+
+### 方法總覽 {#timer-overview}
+
+| 方法 | 說明 |
+| :--- | :--- |
+| [SetTimer](#settimer) | 設置要計時的秒數。 |
+| [TimerCountdown](#timercountdown) | 取得倒數剩餘秒數 (到時返回 0)。 |
+| [IsTimerTimeout](#istimertimeout) | 返回計時時間是否已經到了。 |
+| [GetTimerCountdownRatio](#gettimercountdownratio) | 取得倒數時間比率 (1 遞減至 0)。 |
+
+---
+
+### SetTimer {#settimer}
+
+```csharp
+public void SetTimer(float timeSeconds)
+```
+
+設置要計時的秒數 (以當前時間 + 秒數作為觸發時間點)。
+
+```csharp
+this._realTimer.SetTimer(10f);
+this._realTimer.Play();
+```
+
+### TimerCountdown {#timercountdown}
+
+```csharp
+public float TimerCountdown()
+```
+
+計算觸發時間的倒數剩餘秒數，如果已超過設置的觸發時間將直接返回 0。
+
+### IsTimerTimeout {#istimertimeout}
+
+```csharp
+public bool IsTimerTimeout()
+```
+
+返回計時時間是否已經到了 (超過觸發時間點返回 true)。
+
+<Highlight color="#00d679">提醒</Highlight> 時間到後 `IsTimerTimeout()` 會**持續返回 true**，一次性行為請於觸發後自行 [Stop](#stop) 或重新 [SetTimer](#settimer)。
+
+### GetTimerCountdownRatio {#gettimercountdownratio}
+
+```csharp
+public float GetTimerCountdownRatio()
+```
+
+取得 Timer 倒數計時的時間比率，**1 遞減至 0，0 = 時間到** (適合驅動進度條 UI)。
+
+---
+
+## Tick 循環計時 {#tick}
+
+持續依照設置的間隔秒數**循環觸發** (Timeout 後自動重新裝填)。
+
+### 方法總覽 {#tick-overview}
+
+| 方法 | 說明 |
+| :--- | :--- |
+| [SetTick](#settick) | 設置 Tick 間隔秒數。 |
+| [GetTick](#gettick) | 取得設置的 Tick 間隔秒數。 |
+| [TickCountdown](#tickcountdown) | 取得本次 Tick 的倒數剩餘秒數。 |
+| [IsTickTimeout](#isticktimeout) | 返回 Tick 時間是否已經到了 (自動重新裝填)。 |
+| [GetTickCountdownRatio](#gettickcountdownratio) | 取得 Tick 倒數時間比率 (1 遞減至 0)。 |
+
+---
+
+### SetTick {#settick}
+
+```csharp
+public void SetTick(float tickSeconds)
+```
+
+設置 Tick 間隔秒數，當 [IsTickTimeout](#isticktimeout) 觸發後仍會**持續循環 Tick**。
+
+```csharp
+// 每 2 秒觸發一次 (真實時間)
+this._realTimer.SetTick(2f);
+this._realTimer.Play();
+```
+
+### GetTick {#gettick}
+
+```csharp
+public float GetTick()
+```
+
+取得設置的 Tick 間隔秒數。
+
+### TickCountdown {#tickcountdown}
+
+```csharp
+public float TickCountdown()
+```
+
+取得本次 Tick 觸發時間的倒數剩餘秒數，如果已超過觸發時間將直接返回 0。
+
+### IsTickTimeout {#isticktimeout}
+
+```csharp
+public bool IsTickTimeout()
+```
+
+返回 Tick 時間是否已經到了；返回 true 時會**自動以當前時間重新裝填下一次 Tick**，形成循環觸發。
+
+```csharp
+private void Update()
+{
+    if (this._realTimer.IsPlaying() &&
+        this._realTimer.IsTickTimeout())
+    {
+        // 每個 Tick 週期觸發一次
+    }
+}
+```
+
+<Highlight color="#ff2f00">重要</Highlight> `IsTickTimeout()` 返回 true 時會**自動重新裝填**，該次觸發即被「消耗」，**同一週期內請僅由單一呼叫端檢查一次**，否則觸發會被其他呼叫端吃掉。
+
+### GetTickCountdownRatio {#gettickcountdownratio}
+
+```csharp
+public float GetTickCountdownRatio()
+```
+
+取得 Tick 倒數計時的時間比率，**1 遞減至 0，0 = 時間到**。
+
+---
+
+## Mark 時間標記 {#mark}
+
+標記某個時間點，用於計算經過時間 (碼表用途)。
+
+### 方法總覽 {#mark-overview}
+
+| 方法 | 說明 |
+| :--- | :--- |
+| [SetMark](#setmark) | 以當前時間設置標記。 |
+| [GetMark](#getmark) | 取得標記時間。 |
+| [GetElapsedMarkTime](#getelapsedmarktime) | 取得自標記以來的經過時間 (秒)。 |
+
+---
+
+### SetMark {#setmark}
+
+```csharp
+public void SetMark()
+```
+
+以計時器的當前時間設置標記時間。
+
+### GetMark {#getmark}
+
+```csharp
+public float GetMark()
+```
+
+取得標記時間。
+
+### GetElapsedMarkTime {#getelapsedmarktime}
+
+```csharp
+public float GetElapsedMarkTime()
+```
+
+取得自上次標記以來的經過時間 (秒)，尚未超過標記時間點時返回 0。
+
+```csharp
+this._realTimer.SetMark();
+
+// ... 一段時間後
+float elapsed = this._realTimer.GetElapsedMarkTime();
+```

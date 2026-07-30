@@ -1,0 +1,58 @@
+---
+sidebar_position: 3
+description: SymlinkUtility 提供在專案中建立資料夾符號連結 (Junction/Symlink) 的選單工具，並於 Project 視窗顯示連結標記。
+---
+
+# SymlinkUtility
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`SymlinkUtility` 提供在專案中**建立資料夾符號連結**的選單工具，可將**專案外部的共用資料夾**以 **Junction / 絕對 Symlink / 相對 Symlink** 連結進專案使用 (例如共用美術資源、跨專案共用模組)，並於 **Project 視窗**對符號連結資料夾顯示 `<=>` 標記 (修改自 [karl-/unity-symlink-utility](https://github.com/karl-/unity-symlink-utility))。
+
+|  |  |
+| :--- | :--- |
+| **命名空間** | `OxGKit.Utilities.Symlink.Editor` |
+| **類型** | `public static class SymlinkUtility` |
+| **原始碼** | [SymlinkUtility.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/Utilities/Scripts/Editor/SymlinkUtility/SymlinkUtility.cs) |
+
+## 選單功能 (Menu Items) {#menu-items}
+
+於 **Project 視窗 Right-Click** (或 Assets 選單) 操作，會開啟資料夾選擇視窗選取**來源資料夾**，並於**當前選取的資料夾** (未選取時為 `Assets`) 之下建立連結：
+
+| 選單 | 說明 |
+| :--- | :--- |
+| `Assets/Create/Folder (Junction)` | 建立 **Junction** 連結 (**僅 Windows**，不需系統管理員權限)。 |
+| `Assets/Create/Folder (Absolute Symlink)` | 建立**絕對路徑**符號連結。 |
+| `Assets/Create/Folder (Relative Symlink)` | 建立**相對路徑**符號連結。 |
+
+<Highlight color="#0373fc">注意</Highlight> **Windows** 上建立 Symlink (Absolute / Relative) 需要**系統管理員權限** (會跳出 UAC 提示)，**Junction 則不需要**；macOS 透過 `ln -s` 建立。
+
+## 通用規則 {#general-rules}
+
+### 限制條件 {#constraints}
+
+- **來源資料夾不可位於本專案內** (`Application.dataPath` 之下)，否則會輸出警告並中止。
+- 目標位置**已存在同名資料夾**時會中止連結。
+- 建立完成後會自動 `AssetDatabase.Refresh`。
+
+### 連結標記 {#symlink-marker}
+
+- **Project 視窗**中，符號連結 (含 Junction) 的資料夾右側會顯示 `<=>` 標記，方便辨識。
+
+<Highlight color="#00d679">提醒</Highlight> 符號連結資料夾內的資源會被 Unity **視為專案內資源**匯入；團隊協作時，請確保成員本機皆有對應的來源資料夾，並留意版本控制 (VCS) 對符號連結的處理方式。

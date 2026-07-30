@@ -1,0 +1,186 @@
+---
+sidebar_position: 1
+---
+
+# Getting Started
+
+export const Highlight = ({ children, color }) => (
+  <span
+    style={{
+      backgroundColor: color,
+      borderRadius: '5px',
+      color: '#fff',
+      padding: '2.5px'
+    }}>
+    {children}
+  </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+**Installing OxGKit**
+
+<Highlight color="#0373fc">Attention</Highlight> OxGKit systems are **all standalone tools** — there is no need to install everything at once. **Install only what you need**, along with the dependencies required by those modules.
+
+## Step 1. (Install Dependencies)
+
+**Based on the modules you plan to install**, install their third-party dependencies first (see the [dependency notes in Step 2](#install-modules)).
+
+- <Highlight color="#ff2f00">1</Highlight> **[UniTask](https://github.com/Cysharp/UniTask)** (required by InfiniteScrollView, ActionSystem, TimeSystem, PoolSystem, Utilities)
+
+Install via Package Manager **(Install via git)**
+
+```
+https://github.com/Cysharp/UniTask.git?path=src/UniTask/Assets/Plugins/UniTask
+```
+
+- <Highlight color="#ff2f00">2</Highlight> **[LWMyBox](https://github.com/michael811125/LWMyBox)** (required by LoggingSystem, TweenSystem, PoolSystem, Utilities)
+
+Install via Package Manager **(Install via git)**
+
+```
+https://github.com/michael811125/LWMyBox.git
+```
+
+- <Highlight color="#ff2f00">3</Highlight> **[Unity New InputSystem](https://docs.unity3d.com/Packages/com.unity.inputsystem@1.8/manual/index.html)** (required by InputSystem)
+
+Install via Package Manager **(Install by name)**
+
+```
+com.unity.inputsystem
+```
+
+- <Highlight color="#ff2f00">4</Highlight> **[DoTween Pro](https://assetstore.unity.com/packages/tools/visual-scripting/dotween-pro-32416)** (required by TweenSystem, **must be purchased separately**)
+
+- <Highlight color="#00d679">Reminder</Highlight> **OxGKit.LoggingSystem** is a shared dependency of most modules (InfiniteScrollView, ActionSystem, NoticeSystem, InputSystem, TimeSystem, PoolSystem, Utilities) — **it is recommended to install it first**.
+
+```
+https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/LoggingSystem/Scripts
+```
+
+---
+
+## Step 2. (Install Modules) {#install-modules}
+
+### Method 1
+
+Install the modules you need one by one via Package Manager **(Install via git)**.
+
+<Highlight color="#ff2f00">Important</Highlight> Package Manager does **NOT** automatically install git dependencies declared inside a package — before installing any module, **install its dependencies first** (noted below).
+
+- [LoggingSystem](/docs/loggingsystem/intro) (depends on LWMyBox)
+```
+https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/LoggingSystem/Scripts
+```
+- [InfiniteScrollView](/docs/infinitescrollview/intro) (depends on UniTask, OxGKit.LoggingSystem)
+```
+https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/InfiniteScrollView/Scripts
+```
+- [ActionSystem](/docs/actionsystem/intro) (depends on UniTask, OxGKit.LoggingSystem)
+```
+https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/ActionSystem/Scripts
+```
+- [NoticeSystem](/docs/noticesystem/intro) (depends on OxGKit.LoggingSystem)
+```
+https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/NoticeSystem/Scripts
+```
+- [InputSystem](/docs/inputsystem/intro) (depends on Unity New InputSystem, OxGKit.LoggingSystem)
+```
+https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/InputSystem/Scripts
+```
+- [TweenSystem](/docs/tweensystem/intro) (depends on DoTween Pro, LWMyBox, OxGKit.TimeSystem)
+```
+https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/TweenSystem/Scripts
+```
+- [ButtonSystem](/docs/buttonsystem/intro)
+```
+https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/ButtonSystem/Scripts
+```
+- [TimeSystem](/docs/timesystem/intro) (depends on UniTask, OxGKit.LoggingSystem)
+```
+https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/TimeSystem/Scripts
+```
+- [CursorSystem](/docs/cursorsystem/intro)
+```
+https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/CursorSystem/Scripts
+```
+- [PoolSystem](/docs/poolsystem/intro) (depends on UniTask, LWMyBox, OxGKit.LoggingSystem)
+```
+https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/PoolSystem/Scripts
+```
+- [SingletonSystem](/docs/singletonsystem/intro)
+```
+https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/SingletonSystem/Scripts
+```
+- [SaverSystem](/docs/saversystem/intro)
+```
+https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/SaverSystem/Scripts
+```
+- [LocalizationSystem](/docs/localizationsystem/intro)
+```
+https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/LocalizationSystem/Scripts
+```
+- [VirtualJoystick](/docs/virtualjoystick/intro)
+```
+https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/VirtualJoystick/Scripts
+```
+- [Utilities](/docs/utilities/intro) (depends on UniTask, LWMyBox, OxGKit.LoggingSystem)
+```
+https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/Utilities/Scripts
+```
+
+### Method 2
+
+**Download the source directly ([Code Download ZIP](https://github.com/michael811125/OxGKit))**
+
+Copy the folders of the modules you need (Assets/OxGKit/[ModuleName]) into your Unity project's Assets folder.
+
+<Highlight color="#00d679">Reminder</Highlight> **If you don't need to modify the toolkit yourself, installing via Package Manager is recommended.**
+
+---
+
+## Importing Samples
+
+Every module ships with **Examples** and **AI Agent Skills** — import them via **Package Manager -> select the module -> Samples**.
+
+<Highlight color="#00d679">Reminder</Highlight> There are many ways to call the APIs — check each module's Samples for complete examples.
+
+---
+
+## Build Activation Symbol
+
+- **OXGKIT_LOGGER_ON** (the [LoggingSystem](/docs/loggingsystem/intro) output switch — **for builds, add it to Player Settings -> Scripting Define Symbols or no logs will be output**)
+
+---
+
+## AI-Assisted Development (AI Agent Skills) {#ai-agent-skills}
+
+Every OxGKit system module supports development assisted by **AI coding agents** (Claude Code, OpenAI Codex CLI, Cursor, Copilot, etc.). Each module's Samples include built-in **AI Agent Skills** (SKILL.md) that teach the agent how to use that module's API correctly.
+
+<Highlight color="#0373fc">Attention</Highlight> For the full import and usage guide, see [AI Agent Skills](/docs/agent-skills).
+
+---
+
+## Toolkit API
+
+- [LoggingSystem](/docs/loggingsystem/intro) (using OxGKit.LoggingSystem)
+- [InfiniteScrollView](/docs/infinitescrollview/intro) (using OxGKit.InfiniteScrollView)
+- [ActionSystem](/docs/actionsystem/intro) (using OxGKit.ActionSystem)
+- [NoticeSystem](/docs/noticesystem/intro) (using OxGKit.NoticeSystem)
+- [InputSystem](/docs/inputsystem/intro) (using OxGKit.InputSystem)
+- [TweenSystem](/docs/tweensystem/intro) (using OxGKit.TweenSystem)
+- [ButtonSystem](/docs/buttonsystem/intro) (using OxGKit.ButtonSystem)
+- [TimeSystem](/docs/timesystem/intro) (using OxGKit.TimeSystem)
+- [CursorSystem](/docs/cursorsystem/intro) (using OxGKit.CursorSystem)
+- [PoolSystem](/docs/poolsystem/intro) (using OxGKit.PoolSystem)
+- [SingletonSystem](/docs/singletonsystem/intro) (using OxGKit.SingletonSystem)
+- [SaverSystem](/docs/saversystem/intro) (using OxGKit.SaverSystem)
+- [LocalizationSystem](/docs/localizationsystem/intro) (using OxGKit.LocalizationSystem)
+- [VirtualJoystick](/docs/virtualjoystick/intro) (using OxGKit.VirtualJoystick)
+- [Utilities](/docs/utilities/intro) (using OxGKit.Utilities.*)
+
+<Highlight color="#ff2f00">Important</Highlight> It is recommended to study each module's Examples and API chapters.

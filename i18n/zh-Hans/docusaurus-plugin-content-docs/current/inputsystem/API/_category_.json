@@ -1,0 +1,8 @@
+{
+  "label": "API",
+  "key": "inputsystem-api",
+  "position": 99,
+  "link": {
+    "type": "generated-index"
+  }
+}

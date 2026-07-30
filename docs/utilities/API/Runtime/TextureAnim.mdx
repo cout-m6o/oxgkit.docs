@@ -1,0 +1,146 @@
+---
+sidebar_position: 3
+description: TextureAnimation 是以 CPU 計算的圖片序列動畫組件，支援 SpriteRenderer 與 Image，具有多種播放模式並可於編輯模式預覽。
+---
+
+# TextureAnim
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`TextureAnimation` 是以 **CPU 計算 (CPU computation)** 的**圖片序列動畫 (Image Sequence Animation)** 組件，於 Inspector 配置 Sprite 序列與播放參數即可播放，支援 **SpriteRenderer 與 Image**，具有 **Normal、Reverse、PingPong、PingPongReverse** 播放模式，並支援**編輯模式預覽 (ExecuteInEditMode)**。
+
+|  |  |
+| :--- | :--- |
+| **命名空間** | `OxGKit.Utilities.TextureAnim` |
+| **類型** | `public class TextureAnimation : MonoBehaviour` |
+| **原始碼** | [TextureAnimation.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/Utilities/Scripts/Runtime/TextureAnim/TextureAnimation.cs) |
+
+```csharp
+using OxGKit.Utilities.TextureAnim;
+```
+
+<Highlight color="#0373fc">注意</Highlight> 組件需掛載於**含有 `SpriteRenderer` 或 `Image`** 的物件上 (於 `Awake` 自動偵測，**SpriteRenderer 優先**)，透過 **AddComponentMenu: OxGKit/Utilities/TextureAnim/TextureAnimation** 加入。
+
+## 快速上手 {#quick-start}
+
+```csharp
+using OxGKit.Utilities.TextureAnim;
+using UnityEngine;
+
+public class TextureAnimDemo : MonoBehaviour
+{
+    public TextureAnimation texAnim;
+
+    private void Start()
+    {
+        // 設置幀率
+        this.texAnim.SetFrameRate(12);
+
+        // 設置動畫結束回呼 (非循環播放完成時觸發)
+        this.texAnim.SetAnimationEnd(() =>
+        {
+            Debug.Log("Animation Complete");
+        });
+    }
+
+    public void Replay()
+    {
+        // 重置動畫從頭播放
+        this.texAnim.ResetAnim();
+    }
+}
+```
+
+## 通用規則 {#general-rules}
+
+### Inspector 配置 {#inspector-options}
+
+| 欄位 | 說明 |
+| :--- | :--- |
+| `Sprites` | 圖片序列 (`List` of `Sprite`)，依序作為動畫幀。 |
+| `Is Loop` | 是否循環播放 (預設 `false`)。 |
+| `Play Mode` | 播放模式：**Normal** (正序)、**Reverse** (倒序)、**PingPong** (正序來回)、**PingPongReverse** (倒序來回)。 |
+| `Frame Rate` | 播放幀率 (預設 `30`)。 |
+| `Ignore Time Scale` | 是否忽略 `Time.timeScale` (預設 `true`，使用 `unscaledDeltaTime`)。 |
+
+### 播放行為 {#play-behaviours}
+
+- 動畫由 `Update` 驅動，依 `Frame Rate` 換算幀時間切換 Sprite。
+- **非循環 (Is Loop = false)** 播放完成時，會停在結尾幀並觸發 [SetAnimationEnd](#setanimationend) 設置的回呼；**PingPong / PingPongReverse** 需完成**一次來回 (兩趟)** 才視為播放完成。
+- 組件 **OnDisable** 與 Inspector 數值變更 (Editor) 時會自動 [ResetAnim](#resetanim)。
+
+<Highlight color="#00d679">提醒</Highlight> **編輯模式**下即可預覽動畫效果 (ExecuteInEditMode)，無需進入 Play Mode。
+
+---
+
+## 方法總覽 {#method-overview}
+
+| 方法 | 說明 |
+| :--- | :--- |
+| [IsAnimationComplete](#isanimationcomplete) | 檢查動畫是否已播放完成。 |
+| [SetAnimationEnd](#setanimationend) | 設置動畫結束回呼。 |
+| [SetIgnoreScale](#setignorescale) | 設置是否忽略 TimeScale。 |
+| [SetFrameRate](#setframerate) | 設置播放幀率。 |
+| [ResetAnim](#resetanim) | 重置動畫至初始狀態。 |
+
+---
+
+### IsAnimationComplete {#isanimationcomplete}
+
+```csharp
+public bool IsAnimationComplete()
+```
+
+檢查動畫是否已播放完成 (僅**非循環**播放會進入完成狀態)。
+
+### SetAnimationEnd {#setanimationend}
+
+```csharp
+public void SetAnimationEnd(Action endCallback)
+```
+
+設置**動畫結束回呼**，於非循環播放完成時觸發。
+
+```csharp
+texAnim.SetAnimationEnd(() => Debug.Log("Done"));
+```
+
+### SetIgnoreScale {#setignorescale}
+
+```csharp
+public void SetIgnoreScale(bool ignore)
+```
+
+設置是否忽略 `Time.timeScale` (`true` 使用 `unscaledDeltaTime`；`false` 使用 `deltaTime`)。
+
+### SetFrameRate {#setframerate}
+
+```csharp
+public void SetFrameRate(int frameRate)
+```
+
+設置播放幀率 (最小值為 `0`；幀率為 `0` 時動畫不會更新)。
+
+### ResetAnim {#resetanim}
+
+```csharp
+public void ResetAnim()
+```
+
+重置動畫至**初始狀態** (時間、幀索引、完成狀態、來回計數)，並立即顯示起始幀。

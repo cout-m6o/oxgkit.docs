@@ -1,0 +1,294 @@
+---
+sidebar_position: 1
+description: ButtonPlus 是基于继承 Unity UGUI 的 Button 进行扩展的按钮组件，支持 Once、Continuous、PressedAndReleased 各长按模式与 Scale 按压缩放过渡。
+---
+
+# ButtonPlus
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`ButtonPlus` 是基于继承 Unity UGUI 的 **`Button`** 进行扩展的按钮组件，**完整保留 Button 原有功能** (onClick、interactable、Transition、Navigation 等)，并扩展支持各 **Long Click (长按)** 行为模式 (**Once、Continuous、PressedAndReleased**) 与 **Scale (按压缩放)** 过渡效果；可通过 **GameObject -> UI** 菜单直接创建，或以 **Add Component** 挂载 (菜单路径 **OxGKit -> ButtonSystem -> Button -> ButtonPlus**)。
+
+|  |  |
+| :--- | :--- |
+| **命名空间** | `OxGKit.ButtonSystem` |
+| **类型** | `public class ButtonPlus : UnityEngine.UI.Button` |
+| **源码** | [ButtonPlus.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/ButtonSystem/Scripts/Runtime/Core/Button/ButtonPlus.cs) |
+
+```csharp
+using OxGKit.ButtonSystem;
+```
+
+## 快速上手 {#quick-start}
+
+```csharp
+using OxGKit.ButtonSystem;
+using UnityEngine;
+
+public class ControlPanel : MonoBehaviour
+{
+    public ButtonPlus button;
+
+    private void Awake()
+    {
+        // 一般点击 (继承自 Button)
+        this.button.onClick.AddListener(() => Debug.Log("Click"));
+
+        // 切换长按模式并订阅长按事件
+        this.button.extdLongClick = ButtonPlus.ExtdLongClick.PressedAndReleased;
+        this.button.triggerTime = 1f;
+        this.button.onLongClickPressed.AddListener(() => Debug.Log("Long Click Pressed"));
+        this.button.onLongClickReleased.AddListener(() => Debug.Log("Long Click Released"));
+    }
+}
+```
+
+## 通用规则 {#general-rules}
+
+### 创建方式 {#creation}
+
+1. **Hierarchy 菜单**：**GameObject -> UI -> Button Plus - TextMeshPro** 或 **GameObject -> UI -> Legacy -> Button Plus** (自动附带 Image 与对应的文本标签)。
+2. **Add Component**：菜单路径 **OxGKit -> ButtonSystem -> Button -> ButtonPlus**；要替换原有 Button 时，移除 Button 组件后改挂 ButtonPlus 并重新指定事件。
+3. **代码动态挂载**：`gameObject.AddComponent<ButtonPlus>()`，另可导入 **ButtonPlus Demo** Sample 参考完整示例 (详见[模块介绍](../../intro.mdx#demo))。
+
+<Highlight color="#0373fc">注意</Highlight> `ButtonPlus` 重写的 `Awake` 仅记录缩放原始尺寸，**未调用 `base.Awake()`**；以代码动态挂载且需要 UGUI Transition 视觉效果时，请自行指定 `targetGraphic`。
+
+### 长按模式 {#long-click-modes}
+
+| 模式 | 行为 |
+| :--- | :--- |
+| `None` | 无长按行为 (等同一般 Button)。 |
+| `Once` | 按住达 [triggerTime](#triggertime) 后，触发一次 [onLongClickPressed](#onlongclickpressed)。 |
+| `Continuous` | 按住达 [triggerTime](#triggertime) 后首次触发 [onLongClickPressed](#onlongclickpressed)，并在按住期间每 [intervalTime](#intervaltime) 连续触发。 |
+| `PressedAndReleased` | 按住达 [triggerTime](#triggertime) 触发 [onLongClickPressed](#onlongclickpressed)；松开 (Pointer Up) 或指针移出按钮 (Pointer Exit) 时触发 [onLongClickReleased](#onlongclickreleased)。 |
+
+<Highlight color="#0373fc">注意</Highlight> **长按与点击互斥**：任一长按模式下，长按触发后该次松开**不会**再触发 `onClick` (内部会暂时替换 `onClick` 事件避免误触发)，一次按压要么是点击、要么是长按。
+
+<Highlight color="#0373fc">注意</Highlight> `PressedAndReleased` 的 [onLongClickReleased](#onlongclickreleased) 在**指针移出按钮**时也会触发，回调需容许「未回到按钮上就释放」的情况。
+
+### 计时规则 {#timing-rules}
+
+- [ignoreTimeScale](#ignoretimescale) (默认 `true`) 决定 **Continuous 连发计时**采用 `Time.unscaledDeltaTime` 或 `Time.deltaTime` 累加。
+- [triggerTime](#triggertime) 的触发延迟是通过 `MonoBehaviour.Invoke` 调度，**受 `Time.timeScale` 影响** (与 [ignoreTimeScale](#ignoretimescale) 无关)。
+
+<Highlight color="#ff2f00">重要</Highlight> 游戏暂停 (`Time.timeScale = 0`) 时，长按的**初始触发 (triggerTime)** 不会发生；`ignoreTimeScale` 仅保证**已触发后的 Continuous 连发间隔**不受时间缩放影响。
+
+### Inspector 配置 {#inspector}
+
+自定义 Inspector 由上而下依序为：
+
+1. **Extd Long Click**：长按模式下拉菜单，依模式显示 **Ignore Time Scale、Trigger Time、Interval Time (仅 Continuous)** 字段。
+2. **Extd Transition**：扩展过渡下拉菜单，选择 **Scale** 时显示 **Size** 字段。
+3. **UGUI Button 原生区块**：Interactable、Transition、Navigation、**On Click ()**。
+4. **长按事件槽** (模式不为 None 时显示)：**On Long Click Pressed ()**；**PressedAndReleased** 模式额外显示 **On Long Click Released ()**。
+
+<Highlight color="#00d679">提醒</Highlight> **Scale 过渡**与 UGUI 原生 **Transition** (Color Tint 等) 可叠加使用；请避免在运行时覆盖美术已在 Inspector 调好的过渡设置。
+
+---
+
+## 扩展设置 {#extended-settings}
+
+### 成员总览 {#settings-overview}
+
+| 成员 | 说明 |
+| :--- | :--- |
+| [extdTransition](#extdtransition) | 扩展过渡模式 (None / Scale)。 |
+| [transScale](#transscale) | Scale 过渡设置 (缩放比例)。 |
+| [extdLongClick](#extdlongclick) | 长按模式 (None / Once / Continuous / PressedAndReleased)。 |
+| [ignoreTimeScale](#ignoretimescale) | Continuous 连发计时是否忽略 Time.timeScale。 |
+| [triggerTime](#triggertime) | 长按触发时间 (秒)。 |
+| [intervalTime](#intervaltime) | Continuous 连发间隔时间 (秒)。 |
+
+---
+
+### extdTransition {#extdtransition}
+
+```csharp
+public ExtdTransition extdTransition = ExtdTransition.None
+```
+
+扩展过渡模式 (Inspector: **Extd Transition**)，详见 [ExtdTransition](#extdtransition-enum)：
+
+- `None`：无扩展过渡。
+- `Scale`：按下时依 [transScale](#transscale) 的 `size` 等比缩放按钮，在点击完成或指针移出时恢复原尺寸 (组件停用/销毁时也会重置)。
+
+### transScale {#transscale}
+
+```csharp
+public TransScale transScale = new TransScale()
+```
+
+Scale 过渡设置 ([TransScale](#transscale-class))，`size` 为按下时的缩放比例 (默认 **0.95**，Inspector: **Size**)。
+
+```csharp
+button.extdTransition = ButtonPlus.ExtdTransition.Scale;
+button.transScale.size = 0.9f; // 按下时缩至 90%
+```
+
+<Highlight color="#0373fc">注意</Highlight> 原始尺寸在 `Awake` 以 `transform.localScale.x` 记录，并以**等比 (XYZ 同值)** 缩放与复原，非等比缩放的按钮不适用。
+
+### extdLongClick {#extdlongclick}
+
+```csharp
+public ExtdLongClick extdLongClick = ExtdLongClick.None
+```
+
+长按模式 (Inspector: **Extd Long Click**)，详见[长按模式](#long-click-modes)与 [ExtdLongClick](#extdlongclick-enum)。
+
+### ignoreTimeScale {#ignoretimescale}
+
+```csharp
+public bool ignoreTimeScale = true
+```
+
+**Continuous 连发计时**是否忽略 `Time.timeScale` (默认 `true`，以 `Time.unscaledDeltaTime` 累加)；设为 `false` 时改用 `Time.deltaTime`，连发间隔将随游戏时间缩放，详见[计时规则](#timing-rules)。
+
+### triggerTime {#triggertime}
+
+```csharp
+public float triggerTime = 1f
+```
+
+长按触发时间 (秒，默认 **1**，Inspector: **Trigger Time**)，按住超过此时间即触发长按 (适用 Once / Continuous / PressedAndReleased)。
+
+### intervalTime {#intervaltime}
+
+```csharp
+public float intervalTime = 0.1f
+```
+
+**Continuous** 模式的连发间隔时间 (秒，默认 **0.1**，Inspector: **Interval Time**)，长按触发后在按住期间每隔此时间触发一次 [onLongClickPressed](#onlongclickpressed)。
+
+---
+
+## 长按事件 {#long-click-events}
+
+### 事件总览 {#events-overview}
+
+| 事件 | 说明 |
+| :--- | :--- |
+| [onLongClickPressed](#onlongclickpressed) | 长按触发事件 (Once / Continuous / PressedAndReleased)。 |
+| [onLongClickReleased](#onlongclickreleased) | 长按释放事件 (仅 PressedAndReleased)。 |
+
+事件类型皆为继承自 `Button` 的 **`ButtonClickedEvent`** (`UnityEvent`)，与 `onClick` 相同，可在 Inspector 事件槽指定，或以 `AddListener` / `RemoveListener` / `RemoveAllListeners` 操作。
+
+---
+
+### onLongClickPressed {#onlongclickpressed}
+
+```csharp
+public ButtonClickedEvent onLongClickPressed { get; set; }
+```
+
+长按触发事件 (Inspector: **On Long Click Pressed ()**)：
+
+- `Once`：按住达 [triggerTime](#triggertime) 时触发**一次**。
+- `Continuous`：首次触发后，按住期间每 [intervalTime](#intervaltime) **连续触发**。
+- `PressedAndReleased`：按住达 [triggerTime](#triggertime) 时触发**一次**。
+
+```csharp
+// 长按连发 (例如按住不放，每 0.1 秒 +1)
+button.extdLongClick = ButtonPlus.ExtdLongClick.Continuous;
+button.triggerTime = 0.5f;
+button.intervalTime = 0.1f;
+button.onLongClickPressed.AddListener(this.OnIncrease);
+```
+
+### onLongClickReleased {#onlongclickreleased}
+
+```csharp
+public ButtonClickedEvent onLongClickReleased { get; set; }
+```
+
+长按释放事件 (Inspector: **On Long Click Released ()**)，仅 **PressedAndReleased** 模式使用；长按触发后，在**松开 (Pointer Up)** 或**指针移出按钮 (Pointer Exit)** 时触发。
+
+```csharp
+// 长按预览 (按住显示、松开关闭)
+button.extdLongClick = ButtonPlus.ExtdLongClick.PressedAndReleased;
+button.onLongClickPressed.AddListener(this.OnShowPreview);
+button.onLongClickReleased.AddListener(this.OnHidePreview);
+```
+
+<Highlight color="#00d679">提醒</Highlight> 监听器请在**绑定阶段注册一次**即可 (`ButtonClickedEvent` 会累积重复注册)；对象池或常驻 UI 在回收/销毁时，记得以 `RemoveAllListeners` 清理。
+
+---
+
+## 类型定义 {#type-definitions}
+
+### ExtdTransition {#extdtransition-enum}
+
+```csharp
+public enum ExtdTransition
+{
+    None,
+    Scale
+}
+```
+
+扩展过渡模式枚举。
+
+### ExtdLongClick {#extdlongclick-enum}
+
+```csharp
+public enum ExtdLongClick
+{
+    None,
+    Once,
+    Continuous,
+    PressedAndReleased
+}
+```
+
+长按模式枚举，详见[长按模式](#long-click-modes)。
+
+### TransScale {#transscale-class}
+
+```csharp
+[Serializable]
+public class TransScale
+{
+    [HideInInspector]
+    public float originSize;
+    public float size = 0.95f;
+}
+```
+
+Scale 过渡设置：
+
+| 成员 | 说明 |
+| :--- | :--- |
+| `originSize` | 原始尺寸 (在 `Awake` 自动记录 `transform.localScale.x`，不显示在 Inspector)。 |
+| `size` | 按下时的缩放比例 (默认 **0.95**，Inspector: **Size**)。 |
+
+---
+
+## 指针事件重写 {#pointer-overrides}
+
+`ButtonPlus` 重写以下 UGUI 指针事件以实现扩展行为 (由 EventSystem 自动调用，一般**无需自行调用**；`interactable` 为 `false` 时不处理扩展行为)：
+
+| 方法 | 扩展行为 |
+| :--- | :--- |
+| `public override void OnPointerDown(PointerEventData eventData)` | 套用 Scale 过渡；依 [triggerTime](#triggertime) 调度长按触发。 |
+| `public override void OnPointerUp(PointerEventData eventData)` | PressedAndReleased：长按已触发时，触发 [onLongClickReleased](#onlongclickreleased)。 |
+| `public override void OnPointerClick(PointerEventData eventData)` | 长按已触发时抑制 `onClick`；并重置长按状态与过渡。 |
+| `public override void OnPointerExit(PointerEventData eventData)` | 按住期间移出：PressedAndReleased 触发 [onLongClickReleased](#onlongclickreleased)；并重置长按状态与过渡。 |
+
+另有 `protected` 辅助方法可供子类扩展使用：`ResetExtdLongClick()` (取消长按调度与计时)、`ResetExtdTransition()` (恢复原尺寸)、`OnLongClick()` (长按触发入口)；组件在 `OnDisable` / `OnDestroy` 时会自动重置长按状态与过渡。
+
+<Highlight color="#0373fc">注意</Highlight> 继承 `ButtonPlus` 再重写上述指针事件时，请记得调用 `base` 版本，否则长按与过渡行为将失效。

@@ -1,0 +1,98 @@
+---
+sidebar_position: 5
+description: UISafeAreaAdapter automatically adjusts UI panel anchors based on the screen Safe Area to fit notches and irregular screens.
+---
+
+# UISafeAreaAdapter
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`UISafeAreaAdapter` is a **UI safe area adaptation component** that automatically adjusts the **anchors (anchorMin / anchorMax)** of a target panel (`RectTransform`) based on `Screen.safeArea`, fitting **notches, punch holes, and irregular screens**. It re-applies automatically on resolution changes, and `refreshAlways` can be enabled for per-frame refresh (e.g. for screen rotation).
+
+|  |  |
+| :--- | :--- |
+| **Namespace** | `OxGKit.Utilities.Adapter` |
+| **Type** | `public class UISafeAreaAdapter : MonoBehaviour` |
+| **Source** | [UISafeAreaAdapter.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/Utilities/Scripts/Runtime/Adapter/UISafeAreaAdapter.cs) |
+
+```csharp
+using OxGKit.Utilities.Adapter;
+```
+
+<Highlight color="#00d679">Reminder</Highlight> Add the component via **AddComponentMenu: OxGKit/Utilities/Adapter/UISafeAreaAdapter** (one per object, DisallowMultipleComponent).
+
+## Quick Start {#quick-start}
+
+1. Attach `UISafeAreaAdapter` to the **UI panel** to be adapted.
+2. When `panel` is not assigned, `Awake` automatically uses the object's **own `RectTransform`**.
+3. The first adaptation runs in `Start`; it re-adapts automatically on **resolution changes**.
+
+```csharp
+using OxGKit.Utilities.Adapter;
+using UnityEngine;
+
+public class SafeAreaDemo : MonoBehaviour
+{
+    public UISafeAreaAdapter adapter;
+
+    private void Start()
+    {
+        // Enable per-frame refresh when handling screen rotation
+        this.adapter.refreshAlways = true;
+
+        // Or refresh manually at specific moments
+        this.adapter.RefreshViewSize();
+    }
+}
+```
+
+## General Rules {#general-rules}
+
+### Refresh Timing {#refresh-timing}
+
+- **Start**: performs the first adaptation automatically.
+- **LateUpdate**: adapts automatically when a **resolution change** is detected; with `refreshAlways = true`, it adapts **every frame**.
+- **Manual**: call [RefreshViewSize](#refreshviewsize).
+
+<Highlight color="#00d679">Reminder</Highlight> The safe area and resolution logs are **emitted only when the values actually change** (avoiding per-frame string allocations); logs go through **OxGKit.LoggingSystem**.
+
+---
+
+## Members {#members}
+
+| Member | Description |
+| :--- | :--- |
+| `public bool refreshAlways` | Whether to refresh the adaptation every frame (default `false`), for scenarios such as screen rotation. |
+| `public RectTransform panel` | The target panel to adapt; defaults to the object's own `RectTransform` when unassigned. |
+
+---
+
+## Methods {#methods}
+
+### RefreshViewSize {#refreshviewsize}
+
+```csharp
+public void RefreshViewSize()
+```
+
+Recomputes and applies the panel's `anchorMin` and `anchorMax` based on the current `Screen.safeArea` (normalized by the screen width and height).
+
+```csharp
+adapter.RefreshViewSize();
+```

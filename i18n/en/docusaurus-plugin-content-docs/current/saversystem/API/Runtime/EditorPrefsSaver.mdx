@@ -1,0 +1,168 @@
+---
+sidebar_position: 3
+description: EditorPrefsSaver is the built-in editor saver of the SaverSystem. It uses UnityEditor.EditorPrefs as the storage backend and is for editor scripts only (e.g., editor tool preferences).
+---
+
+# EditorPrefsSaver
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`EditorPrefsSaver` is the built-in **editor saver** of the **SaverSystem** (inherits [Saver](./Saver.mdx)). It uses `UnityEditor.EditorPrefs` as the storage backend and is suited for storing **editor tool preferences** (EditorWindow, custom Inspectors, etc.); the base class [text-content data feature (Data Map)](./Saver.mdx#data-map) is available directly.
+
+|  |  |
+| :--- | :--- |
+| **Namespace** | `OxGKit.SaverSystem.Editor` |
+| **Type** | `public class EditorPrefsSaver : Saver` |
+| **Source** | [EditorPrefsSaver.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/SaverSystem/Scripts/Editor/Core/Saver/Implements/EditorPrefsSaver.cs) |
+
+```csharp
+using OxGKit.SaverSystem;
+using OxGKit.SaverSystem.Editor;
+```
+
+<Highlight color="#ff2f00">Important</Highlight> `EditorPrefsSaver` lives in the **Editor Assembly** (`OxGKit.SaverSystem.Editor`) and can **only be referenced from editor scripts (Editor folders or Editor asmdefs)** — never from runtime scripts (builds would fail to compile).
+
+## Quick Start {#quick-start}
+
+```csharp
+using OxGKit.SaverSystem;
+using OxGKit.SaverSystem.Editor;
+
+// Create a saver in an editor tool (EditorPrefs backend)
+Saver editorSaver = new EditorPrefsSaver();
+
+// Store editor tool preferences
+editorSaver.SaveString("MyProject.MyTool.lastExportPath", "Assets/Exports");
+string path = editorSaver.GetString("MyProject.MyTool.lastExportPath", "");
+```
+
+## General Rules {#general-rules}
+
+### Scope {#scope}
+
+| Saver | Storage Backend | Scope |
+| :--- | :--- | :--- |
+| [PlayerPrefsSaver](./PlayerPrefsSaver.mdx) | `UnityEngine.PlayerPrefs` | **Runtime** (in-game settings, stored per application/platform) |
+| `EditorPrefsSaver` | `UnityEditor.EditorPrefs` | **Editor only** (editor tool preferences) |
+
+(See the [Module Intro](../../intro.mdx) for an overview)
+
+### Storage Scope and Write Timing {#storage-scope}
+
+<Highlight color="#0373fc">Attention</Highlight> `EditorPrefs` is **user-level** storage, **shared by ALL Unity projects on the same machine** — prefix keys with a project or tool name (e.g., `MyProject.MyTool.someKey`) to avoid collisions.
+
+<Highlight color="#00d679">Reminder</Highlight> Unlike [PlayerPrefsSaver](./PlayerPrefsSaver.mdx), `EditorPrefs` is **persisted automatically by the editor** — there is no (and no need for a) `Save()` call.
+
+---
+
+## Overridden Members {#overrides}
+
+### Method Overview {#overview}
+
+| Method | Description |
+| :--- | :--- |
+| [SaveString](#savestring) | Saves a string. |
+| [GetString](#getstring) | Gets a string. |
+| [SaveInt](#saveint) | Saves an int. |
+| [GetInt](#getint) | Gets an int. |
+| [SaveFloat](#savefloat) | Saves a float. |
+| [GetFloat](#getfloat) | Gets a float. |
+| [HasKey](#haskey) | Checks whether a key exists. |
+| [DeleteKey](#deletekey) | Deletes a key. |
+| [DeleteAll](#deleteall) | Deletes all EditorPrefs keys. |
+
+---
+
+### SaveString {#savestring}
+
+```csharp
+public override void SaveString(string key, string value)
+```
+
+Saves a string via `EditorPrefs.SetString`.
+
+```csharp
+editorSaver.SaveString("MyProject.MyTool.lastExportPath", "Assets/Exports");
+```
+
+### GetString {#getstring}
+
+```csharp
+public override string GetString(string key, string defaultValue = "")
+```
+
+Gets a string via `EditorPrefs.GetString`; returns `defaultValue` when the key does not exist.
+
+### SaveInt {#saveint}
+
+```csharp
+public override void SaveInt(string key, int value)
+```
+
+Saves an int via `EditorPrefs.SetInt`.
+
+### GetInt {#getint}
+
+```csharp
+public override int GetInt(string key, int defaultValue = 0)
+```
+
+Gets an int via `EditorPrefs.GetInt`; returns `defaultValue` when the key does not exist.
+
+### SaveFloat {#savefloat}
+
+```csharp
+public override void SaveFloat(string key, float value)
+```
+
+Saves a float via `EditorPrefs.SetFloat`.
+
+### GetFloat {#getfloat}
+
+```csharp
+public override float GetFloat(string key, float defaultValue = 0f)
+```
+
+Gets a float via `EditorPrefs.GetFloat`; returns `defaultValue` when the key does not exist.
+
+### HasKey {#haskey}
+
+```csharp
+public override bool HasKey(string key)
+```
+
+Checks whether the specified key exists via `EditorPrefs.HasKey`.
+
+### DeleteKey {#deletekey}
+
+```csharp
+public override void DeleteKey(string key)
+```
+
+Deletes the specified key via `EditorPrefs.DeleteKey`.
+
+### DeleteAll {#deleteall}
+
+```csharp
+public override void DeleteAll()
+```
+
+Deletes keys via `EditorPrefs.DeleteAll`.
+
+<Highlight color="#ff2f00">Important</Highlight> `EditorPrefs.DeleteAll` deletes **ALL user-level editor preferences of the whole machine** (including settings of Unity itself and other tools) — **strongly discouraged** in normal situations.

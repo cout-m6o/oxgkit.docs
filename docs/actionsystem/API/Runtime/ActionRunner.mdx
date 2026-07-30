@@ -1,0 +1,192 @@
+---
+sidebar_position: 1
+description: ActionRunner 是 ActionSystem 的動作運行器，負責動作的啟動、排隊、移除與釋放，並由擁有者呼叫 DriveUpdate 驅動更新。
+---
+
+# ActionRunner
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`ActionRunner` 是 **ActionSystem** 的動作運行器 (純 C# 類，非 MonoBehaviour)，負責**動作的啟動 (RunAction)、排隊 (QueueAction)、移除 (RemoveAction) 與釋放 (Release)**；本身沒有更新循環，必須由擁有者 (MonoBehaviour `Update`、Updater 等) 呼叫 `DriveUpdate(dt)` 驅動更新。
+
+|  |  |
+| :--- | :--- |
+| **命名空間** | `OxGKit.ActionSystem` |
+| **類型** | `public class ActionRunner` |
+| **原始碼** | [ActionRunner.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/ActionSystem/Scripts/Runtime/Core/ActionRunner.cs) |
+
+```csharp
+using OxGKit.ActionSystem;
+```
+
+<Highlight color="#00d679">提醒</Highlight> **v1.0.3** 起公開更新入口統一為 `DriveUpdate(dt)` (與 OxGKit 各系統的 Drive 系列命名一致)，`OnUpdate(dt)` 已改為 `protected` 並由 `DriveUpdate` 驅動。
+
+## 快速上手 {#quick-start}
+
+```csharp
+using OxGKit.ActionSystem;
+using UnityEngine;
+
+public class FeatureController : MonoBehaviour
+{
+    private ActionRunner _runner;
+
+    private void Awake()
+    {
+        // 建立運行器 (命名以利日誌識別)
+        this._runner = new ActionRunner("FeatureRunner");
+    }
+
+    private void Start()
+    {
+        // 組合序列動作
+        var seqAction = new SequenceAction("OpenFlow");
+        seqAction
+            .AddAction(DelegateAction.CreateDelegateAction(() => Debug.Log("Step 1")))
+            .AddAction(DelayAction.CreateDelayAction(1f))
+            .AddAction(DelegateAction.CreateDelegateAction(() => Debug.Log("Step 2")));
+
+        // 啟動動作 (會重置運行器)
+        this._runner.RunAction(seqAction);
+    }
+
+    private void Update()
+    {
+        // 由擁有者驅動更新
+        this._runner.DriveUpdate(Time.deltaTime);
+    }
+
+    private void OnDestroy()
+    {
+        // 離場時釋放，避免回調打到已釋放的物件
+        this._runner.Release();
+    }
+}
+```
+
+## 通用規則 {#general-rules}
+
+### 驅動規則 {#drive-rules}
+
+<Highlight color="#ff2f00">重要</Highlight> 運行器必須由**單一擁有者**驅動 `DriveUpdate`：沒有驅動則動作不會前進；同一幀被驅動兩次則會**雙倍速**運行。
+
+<Highlight color="#ff2f00">重要</Highlight> 擁有者 (場景/UI/功能) 離場時，必須呼叫 [Release](#release) 清空動作，避免未完成的回調打到已釋放的物件。
+
+### 完成日誌 {#done-log}
+
+<Highlight color="#00d679">提醒</Highlight> 動作完成與移除會透過 **LoggingSystem** 的 **OxGKit.ActionSystem.Logger** 日誌器輸出，可透過 [LoggingSystem](/docs/loggingsystem/intro) 的開關配置進行追蹤。
+
+---
+
+## 成員 {#members}
+
+| 成員 | 說明 |
+| :--- | :--- |
+| `public string name` | 運行器名稱 (預設 `ActionRunner`)，用於日誌輸出識別。 |
+
+### 建構子 {#constructors}
+
+```csharp
+public ActionRunner()
+
+public ActionRunner(string name)
+```
+
+建立運行器，可指定 `name` 作為日誌輸出識別。
+
+---
+
+## 動作管理 {#action-management}
+
+### 方法總覽 {#action-management-overview}
+
+| 方法 | 說明 |
+| :--- | :--- |
+| [DriveUpdate](#driveupdate) | 由擁有者呼叫以驅動運行器更新。 |
+| [RunAction](#runaction) | 重置運行器並立即啟動動作。 |
+| [QueueAction](#queueaction) | 排隊動作 (下一次更新時啟動)。 |
+| [RemoveAction](#removeaction) | 依 UID 移除動作。 |
+| [Release](#release) | 清空所有動作。 |
+
+---
+
+### DriveUpdate {#driveupdate}
+
+```csharp
+public void DriveUpdate(float dt)
+```
+
+由擁有者 (MonoBehaviour `Update` 等) 呼叫以驅動運行器更新：更新所有運行中的動作、將已完成 (`IsAllDone`) 的動作移出並輸出完成日誌，最後啟動排隊中的動作。
+
+```csharp
+private void Update()
+{
+    this._runner.DriveUpdate(Time.deltaTime);
+}
+```
+
+### RunAction {#runaction}
+
+```csharp
+public void RunAction(ActionBase action)
+```
+
+**重置運行器** (清空運行中/排隊中的動作) 後，立即啟動傳入的動作。
+
+<Highlight color="#0373fc">注意</Highlight> `RunAction` 會**重置運行器**再啟動動作 (替換行為)；若要**追加**動作而不清空現有動作，請改用 [QueueAction](#queueaction)。
+
+### QueueAction {#queueaction}
+
+```csharp
+public ActionRunner QueueAction(ActionBase action)
+```
+
+將動作排入佇列 (同一動作實例不會重複排入)，於**下一次 `DriveUpdate`** 時啟動並轉入運行中；回傳運行器本身，可**鏈式呼叫**。
+
+```csharp
+this._runner
+    .QueueAction(actionA)
+    .QueueAction(actionB);
+```
+
+### RemoveAction {#removeaction}
+
+```csharp
+public void RemoveAction(int uid)
+```
+
+依 `uid` 從**運行中**與**排隊中**的快取移除動作，移除時會將該動作標記為全部完成 (`MarkAllDone`) 並輸出移除日誌。
+
+```csharp
+var action = new SequenceAction("Flow", 1001);
+this._runner.QueueAction(action);
+
+// 依 UID 移除
+this._runner.RemoveAction(1001);
+```
+
+### Release {#release}
+
+```csharp
+public void Release()
+```
+
+清空所有動作 (運行中/排隊中/完成快取)。
+
+<Highlight color="#ff2f00">重要</Highlight> 擁有者離場 (OnDestroy 等) 時必須呼叫 `Release()` 進行釋放。

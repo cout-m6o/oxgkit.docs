@@ -1,0 +1,233 @@
+---
+sidebar_position: 1
+description: Inputs is the static input-dispatch facade of InputSystem, managing Unity New InputSystem control maps via Inputs.CM and registering/driving Input Actions (universal signal dispatchers) via Inputs.IA.
+---
+
+# Inputs
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`Inputs` is the **static input-dispatch facade** of **InputSystem**. Internally, the `InputCenter` singleton (internal) manages the registration caches, split into two API groups: **Inputs.CM** (Control Map — manages Unity New InputSystem `IInputActionCollection` control maps) and **Inputs.IA** (Input Action — registers and drives [IInputAction](./IInputAction.mdx) universal signal dispatchers).
+
+|  |  |
+| :--- | :--- |
+| **Namespace** | `OxGKit.InputSystem` |
+| **Type** | `public static class Inputs` (contains nested `public static class CM` and `public static class IA`) |
+| **Source** | [InputCenter.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/InputSystem/Scripts/Runtime/InputCenter/InputCenter.cs) |
+
+```csharp
+using OxGKit.InputSystem;
+```
+
+## Quick Start {#quick-start}
+
+```csharp
+using OxGKit.InputSystem;
+
+// 1. Register the Control Map (Unity New InputSystem generated class, auto-Enabled on registration)
+Inputs.CM.RegisterControlMap<PlayerControls>();
+
+// 2. Register the Input Action (OnCreate is called automatically on registration to bind events)
+Inputs.IA.RegisterInputAction<PlayerAction>();
+
+// 3. Subscribe to the input signals dispatched by the Input Action
+Inputs.IA.GetInputAction<PlayerAction>().onMoveAction += OnMoveActionHandler;
+
+// 4. Drive updates every frame from the main MonoBehaviour (Update)
+Inputs.IA.DriveUpdate(Time.unscaledDeltaTime);
+```
+
+## General Rules {#general-rules}
+
+### Registration Order {#register-order}
+
+<Highlight color="#ff2f00">Important</Highlight> **Register Control Maps first, then Input Actions**: an Input Action's `OnCreate` usually fetches a control map via [GetControlMap](#getcontrolmap) for binding; if the Control Map is not registered yet, it returns null and the bindings are silently skipped.
+
+### Driving Updates {#drive-update}
+
+<Highlight color="#ff2f00">Important</Highlight> Exactly **one** main MonoBehaviour should call [DriveUpdate](#driveupdate): forgetting it disables every `OnUpdate`-based polling behavior, while calling it from several places double-ticks them.
+
+### Duplicate Registration {#duplicate-register}
+
+<Highlight color="#0373fc">Attention</Highlight> The registries use a **static cache**: registering the same type twice logs a warning and **keeps the first registered instance**; restart flows (scene reloads) should account for this behavior.
+
+---
+
+## Inputs.CM (Control Map) {#inputs-cm}
+
+Manages **Unity New InputSystem** control maps (Input Action Asset generated classes, constrained to `IInputActionCollection`).
+
+### Method Overview {#cm-overview}
+
+| Method | Description |
+| :--- | :--- |
+| [RegisterControlMap](#registercontrolmap) | Registers a control map (auto-Enabled on registration). |
+| [GetControlMap](#getcontrolmap) | Gets a registered control map. |
+| [SetActive](#setactive) | Toggles a control map (Enable / Disable). |
+| [IsActive](#isactive) | Checks a control map's active state. |
+
+---
+
+### RegisterControlMap {#registercontrolmap}
+
+```csharp
+public static void RegisterControlMap<TIInputActionCollection>() where TIInputActionCollection : IInputActionCollection, new()
+```
+
+Registers a control map (Input Action Asset); internally creates an instance via `new()` and **automatically Enables it** (input is received right after registration).
+
+```csharp
+Inputs.CM.RegisterControlMap<PlayerControls>();
+```
+
+<Highlight color="#0373fc">Attention</Highlight> Registering the same type twice logs the warning `[ControlMap] <TypeName> already exist.` and keeps the first registered instance.
+
+### GetControlMap {#getcontrolmap}
+
+```csharp
+public static TIInputActionCollection GetControlMap<TIInputActionCollection>() where TIInputActionCollection : IInputActionCollection
+```
+
+Gets the registered control map instance; **returns `default` (null) when not registered** — combine with a null check.
+
+```csharp
+var ctrls = Inputs.CM.GetControlMap<PlayerControls>();
+if (ctrls != null)
+{
+    ctrls.Player.Move.performed += this.OnMoveAction;
+}
+```
+
+### SetActive {#setactive}
+
+```csharp
+public static void SetActive<TIInputActionCollection>(bool active) where TIInputActionCollection : IInputActionCollection
+```
+
+Toggles the control map: `true` calls `Enable()`, `false` calls `Disable()` (e.g., mute player input during UI modes or cutscenes); logs the error `[ControlMap] <TypeName> cannot found.` when not registered.
+
+```csharp
+// Disable the whole control map
+Inputs.CM.SetActive<PlayerControls>(false);
+
+// Toggle a single Action Map only (using native Unity New InputSystem API)
+Inputs.CM.GetControlMap<PlayerControls>()?.Player.Disable();
+Inputs.CM.GetControlMap<PlayerControls>()?.Player.Enable();
+```
+
+### IsActive {#isactive}
+
+```csharp
+public static bool IsActive<TIInputActionCollection>() where TIInputActionCollection : IInputActionCollection
+```
+
+Checks the control map's active state; logs an error and returns `false` when not registered.
+
+```csharp
+bool isActive = Inputs.CM.IsActive<PlayerControls>();
+```
+
+---
+
+## Inputs.IA (Input Action) {#inputs-ia}
+
+Registers and drives [IInputAction](./IInputAction.mdx) (universal signal dispatchers that do not depend on any input plugin).
+
+### Method Overview {#ia-overview}
+
+| Method | Description |
+| :--- | :--- |
+| [RegisterInputAction](#registerinputaction) | Registers an Input Action (OnCreate is called automatically on registration). |
+| [GetInputAction](#getinputaction) | Gets a registered Input Action. |
+| [DriveUpdate](#driveupdate) | Drives every Input Action's OnUpdate (call from the main Update). |
+| [UpdateInputActions](#updateinputactions) | (Obsolete) Deprecated, use DriveUpdate instead. |
+
+---
+
+### RegisterInputAction {#registerinputaction}
+
+```csharp
+public static void RegisterInputAction<TInputAction>() where TInputAction : IInputAction, new()
+```
+
+Registers an Input Action; internally creates an instance via `new()` and **automatically calls [OnCreate](./IInputAction.mdx#oncreate)** (usually where the Control Map is fetched for event binding).
+
+```csharp
+// Register Control Maps first, then Input Actions
+Inputs.CM.RegisterControlMap<PlayerControls>();
+Inputs.IA.RegisterInputAction<PlayerAction>();
+```
+
+<Highlight color="#0373fc">Attention</Highlight> Registering the same type twice logs the warning `[InputAction] <TypeName> already exist.` and keeps the first registered instance.
+
+### GetInputAction {#getinputaction}
+
+```csharp
+public static TInputAction GetInputAction<TInputAction>() where TInputAction : IInputAction
+```
+
+Gets the registered Input Action instance (for subscribing and unsubscribing events); returns `default` (null) when not registered.
+
+```csharp
+// Subscribe to input signals
+Inputs.IA.GetInputAction<PlayerAction>().onMoveAction += this._OnMoveAction;
+
+// Unsubscribe from input signals
+Inputs.IA.GetInputAction<PlayerAction>().onMoveAction -= this._OnMoveAction;
+```
+
+### DriveUpdate {#driveupdate}
+
+```csharp
+public static void DriveUpdate(float dt)
+```
+
+Drives the [OnUpdate](./IInputAction.mdx#onupdate) of **all** registered Input Actions (passing dt); call it from the main MonoBehaviour (Update).
+
+```csharp
+private void Update()
+{
+    // Call by Main MonoBehaviour (Main Program)
+    Inputs.IA.DriveUpdate(Time.unscaledDeltaTime);
+}
+```
+
+<Highlight color="#ff2f00">Important</Highlight> Exactly **one** owner should call it: if an `OnUpdate`-based polling behavior is dead, first check that `DriveUpdate` is being called every frame.
+
+### UpdateInputActions {#updateinputactions}
+
+```csharp
+[Obsolete("UpdateInputActions is deprecated. Use DriveUpdate instead.")]
+public static void UpdateInputActions(float dt)
+```
+
+(Obsolete) Behaves the same as [DriveUpdate](#driveupdate); use `DriveUpdate` instead (deprecated since v1.0.3).
+
+---
+
+## Logger {#logger}
+
+This module's logger (a `Logging` implementation of **OxGKit.LoggingSystem**) with the logger name `OxGKit.InputSystem.Logger`; its toggle and level can be configured through [LoggingLauncher](/docs/loggingsystem/API/Runtime/LoggingLauncher).
+
+|  |  |
+| :--- | :--- |
+| **Type** | `[LoggerName("OxGKit.InputSystem.Logger")] public class Logger : Logging` |
+| **Source** | [Logger.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/InputSystem/Scripts/Runtime/Logger.cs) |
+
+<Highlight color="#00d679">Reminder</Highlight> For builds, add the **OXGKIT_LOGGER_ON** symbol following the [LoggingSystem](/docs/loggingsystem/intro) rules, otherwise this module's logs are not printed.

@@ -1,0 +1,338 @@
+---
+sidebar_position: 2
+description: Requester 是基于 UniTask 与 UnityWebRequest 的资源请求器，支持 AudioClip、Texture2D、Sprite、Bytes、Text 请求与 ARC/LRU 缓存。
+---
+
+# Requester
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`Requester` 是基于 **UniTask + UnityWebRequest** 的资源请求器，支持 **AudioClip、Texture2D、Sprite、byte[]、string** 的网络/文件请求，并可搭配 **ARC 或 LRU 缓存** (以 **URL 为 Key**)，具有**超时 (默认 180 秒)** 与**取消 (CancellationTokenSource)** 机制；失败时通过 `errorAction` 返回 [ErrorInfo](#errorinfo)。
+
+|  |  |
+| :--- | :--- |
+| **命名空间** | `OxGKit.Utilities.Requester` |
+| **类型** | `public class Requester`、`public struct ErrorInfo` |
+| **源码** | [Requester.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/Utilities/Scripts/Runtime/Requester/Requester.cs) |
+
+```csharp
+using Cysharp.Threading.Tasks;
+using OxGKit.Utilities.Requester;
+```
+
+<Highlight color="#0373fc">注意</Highlight> 本页列出的 **static** 方法皆通过**内部懒汉式单例**运作；各方法皆有对应 **Self** 前缀的**实例方法** (例如 `SelfRequestTexture2D`)，可自行 `new Requester()` 创建**独立缓存范围**的实例使用。
+
+## 快速上手 {#quick-start}
+
+```csharp
+using Cysharp.Threading.Tasks;
+using OxGKit.Utilities.Requester;
+using System.Threading;
+using UnityEngine;
+
+// 启动时初始各资源类型的缓存容量 (ARC 或 LRU 择一)
+Requester.InitARCCacheCapacityForAudio(20);
+Requester.InitARCCacheCapacityForTexture2d(60);
+Requester.InitARCCacheCapacityForText(100);
+
+// 请求 Texture2D (cached = true 时以 URL 为 Key 缓存)
+Texture2D t2d = await Requester.RequestTexture2D
+(
+    url,
+    (texture) => Debug.Log($"Loaded: {texture.width}x{texture.height}"),
+    (error) => Debug.Log($"Error: {error.message}")
+);
+
+// 请求 AudioClip (需指定正确的 AudioType)
+AudioClip clip = await Requester.RequestAudio(url, AudioType.OGGVORBIS);
+
+// 搭配 CancellationTokenSource 绑定生命周期
+var cts = new CancellationTokenSource();
+string text = await Requester.RequestText(url, null, null, cts);
+// 对象销毁时取消请求
+cts.Cancel();
+```
+
+## 通用规则 {#general-rules}
+
+### 缓存机制 {#cache-mechanism}
+
+- 缓存以 **URL 为 Key**，命中时**直接返回并触发 `successAction`** (不再发出请求)。
+- 每种资源类型 (**Audio / Texture2d / Text**) **只允许一种缓存策略**：初始 **ARC** 会清除并停用 **LRU**，反之亦然。
+- 未初始任何缓存时，`cached` 参数不会有作用 (**不做缓存**)。
+- **RequestBytes 不提供缓存** (每次皆重新请求)。
+
+<Highlight color="#00d679">提醒</Highlight> **RequestSprite** 底层缓存的是 **Texture2D**，**Sprite 本身每次调用都会重新 `Sprite.Create`**，频繁使用时建议自行持有创建出的 Sprite。
+
+<Highlight color="#0373fc">注意</Highlight> 重新调用 **Init 系列方法**会**清除并重建**该类型的缓存 (已缓存项目将被淘汰处理)，建议于启动时初始一次即可。
+
+### 超时与取消 {#timeout-cancellation}
+
+- **未传入 `cts`**：内部会自行创建 `CancellationTokenSource` 并应用 `timeoutSeconds` (未指定时默认 **180 秒**) 作为超时保护。
+- **传入自定义 `cts`**：**`timeoutSeconds` 不会生效**，完全由调用端控制取消时机。
+
+<Highlight color="#ff2f00">重要</Highlight> 持有请求结果的对象销毁时，请记得 `cts.Cancel()` 取消尚未完成的请求，避免回调触发在已释放的对象上。
+
+### 错误处理 {#error-handling}
+
+- URL 为 **null 或空字符串**、请求失败 (**ConnectionError / ProtocolError / DataProcessingError**) 或发生异常时，会通过 `errorAction` 返回 [ErrorInfo](#errorinfo)，且**返回值为 `null` (default)**。
+- 错误同时会通过 **OxGKit.LoggingSystem** 输出 (日志器名称 `OxGKit.Utilities.Logger`)。
+
+---
+
+## ErrorInfo {#errorinfo}
+
+```csharp
+public struct ErrorInfo
+{
+    public string url;
+    public string message;
+    public Exception exception;
+}
+```
+
+请求失败时通过 `errorAction` 返回的错误信息。
+
+| 成员 | 说明 |
+| :--- | :--- |
+| `url` | 请求的 URL (URL 缺失时为 `null`)。 |
+| `message` | 错误信息 (`UnityWebRequest.error`)。 |
+| `exception` | 异常信息 (非异常错误时为 `null`)。 |
+
+---
+
+## 请求方法 {#request-methods}
+
+### 方法总览 {#request-overview}
+
+| 方法 | 说明 |
+| :--- | :--- |
+| [RequestAudio](#requestaudio) | 请求 AudioClip (可缓存)。 |
+| [RequestTexture2D](#requesttexture2d) | 请求 Texture2D (可缓存)。 |
+| [RequestSprite](#requestsprite) | 请求并创建 Sprite (底层缓存 Texture2D)。 |
+| [RequestBytes](#requestbytes) | 请求文件 byte[] (不缓存)。 |
+| [RequestText](#requesttext) | 请求文本内容 (可缓存)。 |
+
+---
+
+### RequestAudio {#requestaudio}
+
+```csharp
+public static async UniTask<AudioClip> RequestAudio(string url, AudioType audioType = AudioType.MPEG, Action<AudioClip> successAction = null, Action<ErrorInfo> errorAction = null, CancellationTokenSource cts = null, bool cached = true, int? timeoutSeconds = null)
+```
+
+请求 **AudioClip** (流式下载)，需依音频文件格式指定正确的 `audioType` (默认 `AudioType.MPEG`)。
+
+```csharp
+AudioClip clip = await Requester.RequestAudio
+(
+    "https://example.com/audio.ogg",
+    AudioType.OGGVORBIS,
+    (audioClip) => audioSource.PlayOneShot(audioClip),
+    (error) => Debug.Log($"Error: {error.message}")
+);
+```
+
+<Highlight color="#0373fc">注意</Highlight> `audioType` 与文件格式不符会导致解码失败；**WebGL** 平台对流式音频有限制，请自行验证支持格式。
+
+### RequestTexture2D {#requesttexture2d}
+
+```csharp
+public static async UniTask<Texture2D> RequestTexture2D(string url, Action<Texture2D> successAction = null, Action<ErrorInfo> errorAction = null, CancellationTokenSource cts = null, bool cached = true, int? timeoutSeconds = null)
+```
+
+请求 **Texture2D**，`cached = true` 且已初始缓存时，同 URL 的第二次请求将直接返回缓存。
+
+```csharp
+Texture2D t2d = await Requester.RequestTexture2D
+(
+    "https://example.com/image.png",
+    (texture) => rawImage.texture = texture
+);
+```
+
+### RequestSprite {#requestsprite}
+
+```csharp
+public static async UniTask<Sprite> RequestSprite(string url, Action<Sprite> successAction = null, Action<ErrorInfo> errorAction = null, Vector2 position = default, Vector2 pivot = default, float pixelPerUnit = 100, uint extrude = 0, SpriteMeshType meshType = SpriteMeshType.FullRect, CancellationTokenSource cts = null, bool cached = true, int? timeoutSeconds = null)
+```
+
+请求 **Texture2D** 后以 `Sprite.Create` 创建 **Sprite** 返回；`pivot` 未指定 (为 `Vector2.zero`) 时自动应用中心点 `(0.5f, 0.5f)`。
+
+```csharp
+Sprite sprite = await Requester.RequestSprite
+(
+    "https://example.com/icon.png",
+    (sp) => image.sprite = sp
+);
+```
+
+### RequestBytes {#requestbytes}
+
+```csharp
+public static async UniTask<byte[]> RequestBytes(string url, Action<byte[]> successAction = null, Action<ErrorInfo> errorAction = null, CancellationTokenSource cts = null, int? timeoutSeconds = null)
+```
+
+请求文件的 **byte[]** 内容，**不提供缓存** (无 `cached` 参数)。
+
+```csharp
+byte[] bytes = await Requester.RequestBytes("https://example.com/file.bin");
+```
+
+### RequestText {#requesttext}
+
+```csharp
+public static async UniTask<string> RequestText(string url, Action<string> successAction = null, Action<ErrorInfo> errorAction = null, CancellationTokenSource cts = null, bool cached = true, int? timeoutSeconds = null)
+```
+
+请求**文本内容** (`string`)，`cached = true` 且已初始缓存时以 URL 为 Key 缓存。
+
+```csharp
+string json = await Requester.RequestText("https://example.com/config.json");
+```
+
+---
+
+## 缓存管理 {#cache-management}
+
+### 方法总览 {#cache-overview}
+
+| 方法 | 说明 |
+| :--- | :--- |
+| [InitARCCacheCapacityFor...](#init-arc) | 初始指定资源类型的 **ARC 缓存**容量 (会停用该类型的 LRU 缓存)。 |
+| [InitLRUCacheCapacityFor...](#init-lru) | 初始指定资源类型的 **LRU 缓存**容量 (会停用该类型的 ARC 缓存)。 |
+| [RemoveFromARCCacheFor...](#remove-arc) | 从指定资源类型的 ARC 缓存中移除 URL。 |
+| [RemoveFromLRUCacheFor...](#remove-lru) | 从指定资源类型的 LRU 缓存中移除 URL。 |
+| [ClearARCCacheCapacityFor...](#clear-arc) | 清空指定资源类型的 ARC 缓存。 |
+| [ClearLRUCacheCapacityFor...](#clear-lru) | 清空指定资源类型的 LRU 缓存。 |
+| [AutoRemoveFromCaches](#autoremovefromcaches) | 搜索所有缓存并移除指定 URL。 |
+| [ClearAllCaches](#clearallcaches) | 清空所有缓存。 |
+| [Release](#release) | 清空并释放所有缓存容器。 |
+
+---
+
+### InitARCCacheCapacityFor... {#init-arc}
+
+```csharp
+public static void InitARCCacheCapacityForAudio(int capacity = 20)
+
+public static void InitARCCacheCapacityForTexture2d(int capacity = 60)
+
+public static void InitARCCacheCapacityForText(int capacity = 100)
+```
+
+初始指定资源类型的 **ARC 缓存**容量；同类型**仅允许一种缓存策略**，调用后会**清除并停用**该类型的 LRU 缓存。
+
+```csharp
+Requester.InitARCCacheCapacityForTexture2d(60);
+```
+
+### InitLRUCacheCapacityFor... {#init-lru}
+
+```csharp
+public static void InitLRUCacheCapacityForAudio(int capacity = 20)
+
+public static void InitLRUCacheCapacityForTexture2d(int capacity = 60)
+
+public static void InitLRUCacheCapacityForText(int capacity = 80)
+```
+
+初始指定资源类型的 **LRU 缓存**容量；调用后会**清除并停用**该类型的 ARC 缓存。
+
+```csharp
+Requester.InitLRUCacheCapacityForTexture2d(60);
+```
+
+### RemoveFromARCCacheFor... {#remove-arc}
+
+```csharp
+public static bool RemoveFromARCCacheForAudio(string url)
+
+public static bool RemoveFromARCCacheForTexture2d(string url)
+
+public static bool RemoveFromARCCacheForText(string url)
+```
+
+从指定资源类型的 **ARC 缓存**中移除 URL 项目，移除成功返回 `true`。
+
+### RemoveFromLRUCacheFor... {#remove-lru}
+
+```csharp
+public static bool RemoveFromLRUCacheForAudio(string url)
+
+public static bool RemoveFromLRUCacheForTexture2d(string url)
+
+public static bool RemoveFromLRUCacheForText(string url)
+```
+
+从指定资源类型的 **LRU 缓存**中移除 URL 项目，移除成功返回 `true`。
+
+### ClearARCCacheCapacityFor... {#clear-arc}
+
+```csharp
+public static void ClearARCCacheCapacityForAudio()
+
+public static void ClearARCCacheCapacityForTexture2d()
+
+public static void ClearARCCacheCapacityForText()
+```
+
+清空指定资源类型的 **ARC 缓存** (逐一触发淘汰处理)。
+
+### ClearLRUCacheCapacityFor... {#clear-lru}
+
+```csharp
+public static void ClearLRUCacheCapacityForAudio()
+
+public static void ClearLRUCacheCapacityForTexture2d()
+
+public static void ClearLRUCacheCapacityForText()
+```
+
+清空指定资源类型的 **LRU 缓存** (逐一触发淘汰处理)。
+
+### AutoRemoveFromCaches {#autoremovefromcaches}
+
+```csharp
+public static bool AutoRemoveFromCaches(string url)
+```
+
+**搜索所有缓存** (ARC 与 LRU 的 Audio / Texture2d / Text)，找到指定 URL 即移除并返回 `true`。
+
+```csharp
+Requester.AutoRemoveFromCaches(url);
+```
+
+### ClearAllCaches {#clearallcaches}
+
+```csharp
+public static void ClearAllCaches()
+```
+
+清空**所有已初始的缓存** (ARC 与 LRU 的 Audio / Texture2d / Text)。
+
+### Release {#release}
+
+```csharp
+public static void Release()
+```
+
+清空所有缓存并**释放缓存容器** (归 `null`)，需再次调用 Init 系列方法才会恢复缓存功能。
+
+<Highlight color="#00d679">提醒</Highlight> 被缓存的 Unity 对象 (AudioClip / Texture2D) 于**淘汰或移除时会自动 Destroy** (详见 [Cacher](./Cacher.mdx#remove-handler))；未缓存 (`cached = false`) 的对象不再使用时，需**自行 Destroy** 释放内存。

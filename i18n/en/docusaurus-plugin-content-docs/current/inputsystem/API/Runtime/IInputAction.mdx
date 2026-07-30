@@ -1,0 +1,157 @@
+---
+sidebar_position: 2
+description: IInputAction is the input-action interface of InputSystem (universal signal dispatcher) — implementations convert device or plugin input into C# events for subscribers, registered and driven through Inputs.IA.
+---
+
+# IInputAction
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`IInputAction` is the **input-action interface** of **InputSystem** (universal signal dispatcher): implementations convert input from **Unity New InputSystem** or **any other input plugin** into **C# events**, so in-game control logic only subscribes to events and **does not need to know about platform or device differences**; registered via [Inputs.IA.RegisterInputAction](./Inputs.mdx#registerinputaction) and driven by [Inputs.IA.DriveUpdate](./Inputs.mdx#driveupdate).
+
+|  |  |
+| :--- | :--- |
+| **Namespace** | `OxGKit.InputSystem` |
+| **Type** | `public interface IInputAction` |
+| **Source** | [IInputAction.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/InputSystem/Scripts/Runtime/Interface/IInputAction.cs) |
+
+```csharp
+using OxGKit.InputSystem;
+```
+
+## Quick Start {#quick-start}
+
+```csharp
+using System;
+using OxGKit.InputSystem;
+using UnityEngine;
+using UnityEngine.InputSystem;
+
+public class PlayerAction : IInputAction
+{
+    // Custom input event (subscribed to by subscribers)
+    public event Action<Vector2> onMove;
+
+    public void OnCreate()
+    {
+        // Bind events on registration (Unity New InputSystem as an example)
+        var ctrls = Inputs.CM.GetControlMap<PlayerControls>();
+        if (ctrls == null) return;
+        ctrls.Player.Move.performed += this._OnMove;
+        ctrls.Player.Move.canceled += this._OnMove;
+    }
+
+    public void OnUpdate(float dt)
+    {
+        // Optional polling-style input detection (driven by Inputs.IA.DriveUpdate)
+    }
+
+    public void RemoveAllListeners()
+    {
+        this.onMove = null;
+    }
+
+    private void _OnMove(InputAction.CallbackContext ctx)
+    {
+        // Re-dispatch as a game-level input signal
+        this.onMove?.Invoke(ctx.ReadValue<Vector2>());
+    }
+}
+```
+
+## General Rules {#general-rules}
+
+### Lifecycle {#lifecycle}
+
+1. **OnCreate**: called **once automatically** by [RegisterInputAction](./Inputs.mdx#registerinputaction) on registration — bind Control Maps or initialize other input plugins here.
+2. **OnUpdate**: driven **every frame** by [DriveUpdate](./Inputs.mdx#driveupdate), used for polling-style input detection (can be left empty).
+3. **RemoveAllListeners**: **must be called manually at the appropriate time** (e.g., scene transitions or feature exit) to clear all subscribed events.
+
+<Highlight color="#0373fc">Attention</Highlight> Gameplay/feature code should **only subscribe to the events dispatched by IInputAction** — avoid scattering raw `InputAction` reads through the project, so the control logic stays decoupled from platforms and devices.
+
+<Highlight color="#00d679">Reminder</Highlight> Remember to **unsubscribe events** when a feature exits; on scene/domain transitions call `RemoveAllListeners()` to clear subscriptions and avoid stale delegates.
+
+## Method Overview {#overview}
+
+| Method | Description |
+| :--- | :--- |
+| [OnCreate](#oncreate) | Called on registration (bind Control Maps or plugin input here). |
+| [OnUpdate](#onupdate) | Polled every frame (driven by Inputs.IA.DriveUpdate). |
+| [RemoveAllListeners](#removealllisteners) | Clears all subscribed events. |
+
+---
+
+### OnCreate {#oncreate}
+
+```csharp
+void OnCreate()
+```
+
+Called **automatically on registration** by [Inputs.IA.RegisterInputAction](./Inputs.mdx#registerinputaction); usually fetches a control map via [Inputs.CM.GetControlMap](./Inputs.mdx#getcontrolmap) for event binding, or initializes signal sources of other input plugins.
+
+<Highlight color="#ff2f00">Important</Highlight> If `OnCreate` fetches a Control Map, **that Control Map must be registered first**, otherwise `GetControlMap` returns null and the bindings are silently skipped.
+
+### OnUpdate {#onupdate}
+
+```csharp
+void OnUpdate(float dt)
+```
+
+Driven **every frame** by [Inputs.IA.DriveUpdate](./Inputs.mdx#driveupdate) (passing dt); use it for polling-style input detection (e.g., sampling input from non-event plugins), or leave it empty when polling is not needed.
+
+### RemoveAllListeners {#removealllisteners}
+
+```csharp
+void RemoveAllListeners()
+```
+
+Clears all subscribed events (sets the events to null); **must be called manually at the appropriate time** (e.g., scene transitions or feature exit).
+
+```csharp
+Inputs.IA.GetInputAction<PlayerAction>().RemoveAllListeners();
+```
+
+---
+
+## Script Templates {#script-templates}
+
+### Template Input Action.cs {#tpl-input-action}
+
+Use Right-Click **Create/OxGKit/Input System/Template Input Action.cs (Input Interface For Any)** to quickly create an `IInputAction` implementation script (universal signal dispatcher — any input source can be implemented freely).
+
+### Template Input Binding Composite.cs {#tpl-input-binding-composite}
+
+Use Right-Click **Create/OxGKit/Input System/New Input System (Extension)/Template Input Binding Composite.cs (For Unity New Input System)** to create a **Binding Composite** script for **Unity New InputSystem**, synthesizing several input parts into a single custom input value (e.g., "modifier key + direction keys" combined into a move input):
+
+- The template inherits `InputBindingComposite<TValue>` and defines a custom value struct.
+- Composite parts are declared with `[InputControl(layout = "...")]` (Button / Integer / Vector2 / Axis).
+- `ReadValue` reads each part, processes them, and returns the custom value.
+- `[InitializeOnLoad]` (Editor) and `[RuntimeInitializeOnLoadMethod]` trigger the static constructor that calls `InputSystem.RegisterBindingComposite` for automatic registration.
+
+```csharp
+// Read the custom composite value inside the Input Action's callback (demo's MoveInputComposite as an example)
+protected void OnMoveAction(InputAction.CallbackContext context)
+{
+    // Read your composite values
+    var moveInput = context.ReadValue<MoveInputComposite.MoveInput>();
+    this.onMoveAction?.Invoke(moveInput);
+}
+```
+
+<Highlight color="#00d679">Reminder</Highlight> A composite must be **registered before it is first used in a binding**; for it to show up in the Input Action Asset editor, it has to be registered from code that runs in Edit Mode. See the Samples **InputSystem Demo** (`MoveInputComposite` and `PlayerControls.inputactions`) for a complete example.

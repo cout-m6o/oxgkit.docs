@@ -1,0 +1,247 @@
+---
+sidebar_position: 1
+description: Cacher 提供 ARC、LRU、LRU-K 三種容量控制的泛型快取容器，支援自定義移除處理器與執行緒安全操作。
+---
+
+# Cacher
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+**Cacher** 為 **Utilities** 的**容量控制快取容器**，提供三種淘汰策略的泛型快取：`ARCCache<TKey, TValue>` (自適應替換)、`LRUCache<TKey, TValue>` (最近最少使用)、`LRUKCache<TKey, TValue>` (LRU-K 掃描防護)，所有操作皆有**執行緒鎖 (Thread Lock)**，並支援**自定義移除處理器** `IRemoveCacheHandler<TKey, TValue>` 於淘汰或移除時對快取值進行特殊處理。
+
+|  |  |
+| :--- | :--- |
+| **命名空間** | `OxGKit.Utilities.Cacher` |
+| **類型** | `public class ARCCache<TKey, TValue>`、`public class LRUCache<TKey, TValue>`、`public class LRUKCache<TKey, TValue>` |
+| **原始碼** | [ARCCache.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/Utilities/Scripts/Runtime/Cacher/ARCCache.cs)、[LRUCache.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/Utilities/Scripts/Runtime/Cacher/LRUCache.cs)、[LRUKCache.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/Utilities/Scripts/Runtime/Cacher/LRUKCache.cs) |
+
+```csharp
+using OxGKit.Utilities.Cacher;
+```
+
+<Highlight color="#ff2f00">重要</Highlight> 三種快取的**預設移除處理器**皆為 `UnityObjectRemoveCacheHandler<TKey, TValue>`，當快取值為 `UnityEngine.Object` 時，**淘汰或移除會自動 Destroy 該物件**；若快取值仍會被外部持有使用，請自定義 `IRemoveCacheHandler<TKey, TValue>` 更換處理行為。
+
+## 快速上手 {#quick-start}
+
+```csharp
+using OxGKit.Utilities.Cacher;
+using UnityEngine;
+
+// 建立容量 60 的 LRU 快取
+var cache = new LRUCache<string, Texture2D>(60);
+
+// 加入快取
+cache.Add("key", texture);
+
+// 取得快取 (未命中回傳 default)
+Texture2D t2d = cache.Get("key");
+
+// 檢查是否存在
+bool contains = cache.Contains("key");
+
+// 移除快取 (預設處理器會自動 Destroy Unity 物件)
+cache.Remove("key");
+
+// 清空快取
+cache.Clear();
+
+// 自定義移除處理器 (取代預設的 UnityObjectRemoveCacheHandler)
+public class MyRemoveCacheHandler : IRemoveCacheHandler<string, Texture2D>
+{
+    public void RemoveCache(string key, Texture2D value)
+    {
+        // 自行決定淘汰時的處理 (例如不進行 Destroy)
+    }
+}
+
+var customCache = new LRUCache<string, Texture2D>(60, new MyRemoveCacheHandler());
+```
+
+## 通用規則 {#general-rules}
+
+### 策略選擇 {#strategy}
+
+| 快取 | 策略 | 適用情境 |
+| :--- | :--- | :--- |
+| `ARCCache<TKey, TValue>` | Adaptive Replacement Cache | **兼顧新近性與頻率**的混合存取模式。 |
+| `LRUCache<TKey, TValue>` | Least Recently Used | 單純**以新近性淘汰** (最久未使用先淘汰)。 |
+| `LRUKCache<TKey, TValue>` | LRU-K | **掃描防護**，需累積 K 次存取才視為熱門，淘汰時優先移除**最久未使用且人氣最低**的項目。 |
+
+### 淘汰處理器 {#remove-handler}
+
+- 淘汰 (容量滿) 與 `Remove`、`Clear` 時，會呼叫 `IRemoveCacheHandler<TKey, TValue>.RemoveCache(key, value)` 對移除的快取值進行處理。
+- 未指定時，預設為 [UnityObjectRemoveCacheHandler](#unityobjectremovecachehandler) (自動 Destroy Unity 物件)。
+
+### 執行緒安全 {#thread-safety}
+
+- 三種快取的 `GetKeys`、`Contains`、`Get`、`Add`、`Remove`、`Clear` 與 `Count` 操作皆有 **lock** 保護，可於多執行緒環境下操作。
+
+<Highlight color="#0373fc">注意</Highlight> `ARCCache` 與 `LRUCache` 的建構子在 **capacity 小於等於 0** 時會拋出 `ArgumentException`；`LRUKCache` 則無此檢查，請自行傳入合理的容量與 K 值。
+
+---
+
+## ARCCache {#arccache}
+
+### 建構子 {#arccache-constructors}
+
+```csharp
+public ARCCache(int capacity)
+
+public ARCCache(int capacity, IRemoveCacheHandler<TKey, TValue> removeCacheHandler)
+```
+
+建立指定容量的 **ARC 快取**，可額外指定移除處理器。
+
+- **行為說明**：內部以 **T1 (新近)** 與 **T2 (頻率)** 雙鏈結串列管理，新加入的 Key 進入 T1，**再次命中 (Get) 或更新 (Add) 會提升至 T2**；容量滿時優先淘汰 T1 尾端，其次 T2 尾端。
+
+```csharp
+var arc = new ARCCache<string, Texture2D>(60);
+```
+
+## LRUCache {#lrucache}
+
+### 建構子 {#lrucache-constructors}
+
+```csharp
+public LRUCache(int capacity)
+
+public LRUCache(int capacity, IRemoveCacheHandler<TKey, TValue> removeCacheHandler)
+```
+
+建立指定容量的 **LRU 快取**，可額外指定移除處理器。
+
+- **行為說明**：`Get` 與 `Add` (更新) 會將節點移至列表**最前端**；容量滿時淘汰**最久未使用** (列表尾端) 的項目。
+
+```csharp
+var lru = new LRUCache<string, Texture2D>(60);
+```
+
+## LRUKCache {#lrukcache}
+
+### 建構子 {#lrukcache-constructors}
+
+```csharp
+public LRUKCache(int capacity, int k)
+
+public LRUKCache(int capacity, int k, IRemoveCacheHandler<TKey, TValue> removeCacheHandler)
+```
+
+建立指定容量的 **LRU-K 快取**，`k` 為存取次數門檻，可額外指定移除處理器。
+
+- **行為說明**：每次 `Get` / `Add` 會累加該 Key 的計數器 (上限為 K) 並移至列表尾端 (最新使用)；淘汰時從最久未使用端開始，移除**計數最低**的項目，並對其餘項目進行**計數衰減**。
+
+```csharp
+var lruk = new LRUKCache<string, Texture2D>(60, 3);
+```
+
+---
+
+## 共用成員與方法 {#common-members}
+
+以下成員與方法於 `ARCCache<TKey, TValue>`、`LRUCache<TKey, TValue>`、`LRUKCache<TKey, TValue>` **皆相同**。
+
+### 成員 {#members}
+
+| 成員 | 說明 |
+| :--- | :--- |
+| `public int Count` | 當前快取數量。 |
+
+### 方法總覽 {#method-overview}
+
+| 方法 | 說明 |
+| :--- | :--- |
+| [GetKeys](#getkeys) | 取得當前所有快取的 Key 陣列。 |
+| [Contains](#contains) | 檢查指定 Key 是否存在於快取中。 |
+| [Get](#get) | 取得指定 Key 的快取值 (會更新使用狀態)。 |
+| [Add](#add) | 加入或更新快取 (容量滿時觸發淘汰)。 |
+| [Remove](#remove) | 移除指定 Key 的快取 (會觸發移除處理器)。 |
+| [Clear](#clear) | 清空所有快取 (逐一觸發移除處理器)。 |
+
+---
+
+### GetKeys {#getkeys}
+
+```csharp
+public TKey[] GetKeys()
+```
+
+取得當前所有快取的 **Key 陣列**。
+
+### Contains {#contains}
+
+```csharp
+public bool Contains(TKey key)
+```
+
+檢查指定 Key 是否存在於快取中。
+
+### Get {#get}
+
+```csharp
+public TValue Get(TKey key)
+```
+
+取得指定 Key 的快取值，**未命中回傳 `default`**；命中時會依策略更新使用狀態 (ARC 提升至 T2 / LRU 移至最前端 / LRU-K 計數累加並移至尾端)。
+
+### Add {#add}
+
+```csharp
+public void Add(TKey key, TValue value)
+```
+
+加入或更新快取；**容量滿時會先淘汰**再加入，淘汰的快取值會交由移除處理器處理。
+
+### Remove {#remove}
+
+```csharp
+public bool Remove(TKey key)
+```
+
+移除指定 Key 的快取，移除成功回傳 `true`；移除的快取值會交由**移除處理器**處理 (預設會 Destroy Unity 物件)。
+
+### Clear {#clear}
+
+```csharp
+public void Clear()
+```
+
+清空所有快取，**逐一觸發移除處理器**後重置內部結構。
+
+---
+
+## IRemoveCacheHandler {#iremovecachehandler}
+
+```csharp
+public interface IRemoveCacheHandler<TKey, TValue>
+{
+    void RemoveCache(TKey key, TValue value);
+}
+```
+
+移除處理器介面 ([IRemoveCacheHandler.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/Utilities/Scripts/Runtime/Cacher/Interface/IRemoveCacheHandler.cs))，當快取項目被**淘汰或移除**時呼叫，可實作此介面自定義處理行為 (例如歸還物件池、釋放資源或不做任何處理)。
+
+## UnityObjectRemoveCacheHandler {#unityobjectremovecachehandler}
+
+```csharp
+public class UnityObjectRemoveCacheHandler<TKey, TValue> : IRemoveCacheHandler<TKey, TValue>
+```
+
+**預設的移除處理器** ([UnityObjectRemoveCacheHandler.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/Utilities/Scripts/Runtime/Cacher/Implement/UnityObjectRemoveCacheHandler.cs))，當快取值為 `UnityEngine.Object` 時，直接呼叫 `UnityEngine.Object.Destroy` 銷毀。
+
+<Highlight color="#00d679">提醒</Highlight> 若快取值**非 Unity 物件** (例如 `string`、自定義類別)，預設處理器不會有任何動作，僅移出快取交由 GC 回收。

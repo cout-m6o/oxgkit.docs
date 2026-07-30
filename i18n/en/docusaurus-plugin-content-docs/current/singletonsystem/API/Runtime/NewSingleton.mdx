@@ -1,0 +1,133 @@
+---
+sidebar_position: 2
+description: NewSingleton is the plain C# class singleton base class of SingletonSystem, lazily creating the instance with double-checked locking, suitable for non-MonoBehaviour data or logic manager classes.
+---
+
+# NewSingleton
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`NewSingleton<T>` is the **plain C# class singleton base class** of **SingletonSystem** (non-`MonoBehaviour`). It uses **double-checked locking** with lazy creation (`new T()`) to ensure the instance is created only once under multi-threading, suitable for data or logic manager classes that **do not need to live on a GameObject**.
+
+|  |  |
+| :--- | :--- |
+| **Namespace** | `OxGKit.SingletonSystem` |
+| **Type** | `public class NewSingleton<T> where T : class, new()` |
+| **Source** | [NewSingleton.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/SingletonSystem/Scripts/Runtime/Core/NewSingleton.cs) |
+
+```csharp
+using OxGKit.SingletonSystem;
+```
+
+<Highlight color="#0373fc">Attention</Highlight> The generic constraint is `where T : class, new()` — type `T` must have a **public parameterless constructor**.
+
+<Highlight color="#00d679">Reminder</Highlight> For manager classes that need the Unity lifecycle and scene objects, use [MonoSingleton](./MonoSingleton.mdx) instead.
+
+## Quick Start {#quick-start}
+
+```csharp
+using OxGKit.SingletonSystem;
+
+// Option 1: use by inheritance
+public class ScoreManager : NewSingleton<ScoreManager>
+{
+    public int score = 0;
+
+    public static void AddScore()
+    {
+        GetInstance().score++;
+    }
+}
+
+// Get the instance (lazy new T() creation)
+var scoreManager = ScoreManager.GetInstance();
+ScoreManager.AddScore();
+```
+
+```csharp
+// Option 2: without inheritance, use directly as a generic holder
+public class ScoreService
+{
+    public int score = 0;
+}
+
+NewSingleton<ScoreService>.GetInstance().score++;
+```
+
+## Methods Overview {#methods-overview}
+
+| Method | Description |
+| :--- | :--- |
+| [GetInstance](#getinstance) | Gets the singleton instance (lazy creation). |
+| [InitInstance](#initinstance) | Initializes the singleton instance (same as calling GetInstance). |
+| [CheckInstanceExists](#checkinstanceexists) | Checks if an instance exists. |
+| [DestroyInstance](#destroyinstance) | Destroys the singleton instance (only clears the static reference). |
+
+---
+
+### GetInstance {#getinstance}
+
+```csharp
+public static T GetInstance()
+```
+
+Gets the singleton instance; if no instance exists yet, **double-checked locking** ensures it is created only once with `new T()` under race conditions.
+
+```csharp
+var scoreManager = ScoreManager.GetInstance();
+```
+
+### InitInstance {#initinstance}
+
+```csharp
+public static void InitInstance()
+```
+
+Initializes the singleton instance (same as calling [GetInstance](#getinstance)); suitable for **explicitly controlling the creation order** during boot (warm-up).
+
+```csharp
+ScoreManager.InitInstance();
+```
+
+### CheckInstanceExists {#checkinstanceexists}
+
+```csharp
+public static bool CheckInstanceExists()
+```
+
+Checks if an instance exists (does **not** trigger creation).
+
+```csharp
+if (ScoreManager.CheckInstanceExists())
+    ScoreManager.AddScore();
+```
+
+### DestroyInstance {#destroyinstance}
+
+```csharp
+public static void DestroyInstance()
+```
+
+Destroys the singleton instance (**only clears the static reference**); if the old instance is still referenced elsewhere, that object is not released by this call — it is **not a disposal mechanism**.
+
+```csharp
+ScoreManager.DestroyInstance();
+```
+
+<Highlight color="#0373fc">Attention</Highlight> After clearing, the next [GetInstance](#getinstance) call creates a **brand-new instance** — the old instance's state is not preserved.

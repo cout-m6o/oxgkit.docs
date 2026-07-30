@@ -1,0 +1,430 @@
+---
+sidebar_position: 1
+description: InfiniteScrollView 是无限列表的抽象基类，基于 UGUI ScrollRect 以对象池概念循环利用 Cell，提供初始对象池、数据增删、刷新、滚动状态与 Snap 定位等 API。
+---
+
+# InfiniteScrollView
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`InfiniteScrollView` 为**无限列表的抽象基类** (继承 `UIBehaviour`，并以 `RequireComponent` 要求同对象上挂载 UGUI 的 `ScrollRect`)，以**对象池**概念对 Cell ([InfiniteCell](./InfiniteCell.mdx)) 进行**有效循环利用**，仅需少量 GameObject 即可承载大量列表数据；内置四种实现 ([ScrollView Variants](./ScrollViewVariants.mdx))，也可自行继承扩展定制列表。
+
+|  |  |
+| :--- | :--- |
+| **命名空间** | `OxGKit.InfiniteScrollView` |
+| **类型** | `[RequireComponent(typeof(ScrollRect))] public abstract class InfiniteScrollView : UIBehaviour` |
+| **源码** | [InfiniteScrollView.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/InfiniteScrollView/Scripts/Runtime/Core/ScrollView/InfiniteScrollView.cs) |
+
+```csharp
+using OxGKit.InfiniteScrollView;
+```
+
+## 快速上手 {#quick-start}
+
+```csharp
+using Cysharp.Threading.Tasks;
+using OxGKit.InfiniteScrollView;
+using UnityEngine;
+
+public class ListLauncher : MonoBehaviour
+{
+    // 场景上挂载于 ScrollRect 对象的列表组件 (以垂直列表为例)
+    public VerticalInfiniteScrollView scrollView;
+
+    private async void Start()
+    {
+        // 1. 初始对象池 (若已于 Inspector 勾选 initializePoolOnAwake 则可省略)
+        await this.scrollView.InitializePool();
+
+        // 2. 批量添加数据后统一刷新 (Add 默认不刷新)
+        for (int i = 0; i < 1000; i++)
+            this.scrollView.Add(new InfiniteCellData(new Vector2(100f, 100f), $"Item {i}"));
+        this.scrollView.Refresh();
+
+        // 3. Cell 点击事件 (Cell 端需调用 base.OnClick() 触发)
+        this.scrollView.onCellSelected += (cell) => Debug.Log($"Selected index: {cell.cellData.index}");
+
+        // 4. 移动至指定索引 (0.1 秒补间)
+        this.scrollView.Snap(50, 0.1f);
+    }
+}
+```
+
+## 通用规则 {#general-rules}
+
+### 初始流程 {#init-flow}
+
+1. **Initialize Pool On Awake**：于 Inspector 勾选 `initializePoolOnAwake`，列表会在 `Awake` 自动初始对象池。
+2. **手动初始**：自行 `await InitializePool(args)` (`args` 会转传给每个 Cell 的 [OnCreate](./InfiniteCell.mdx#oncreate))。
+
+<Highlight color="#ff2f00">重要</Highlight> 所有操作 (Add / Insert / Remove / Clear / Refresh / Snap) 皆须于**初始完成后**才有效，未初始会输出警告 `Please InitializePool first!!!`。
+
+### 对象池循环 {#cell-pooling}
+
+- 初始时依 [cellPoolSize](#members) 预先实例化 Cell，滚动时仅对**可视范围内** (含 `extendVisibleRange` 的延伸) 的数据配置 Cell，滚出范围即回收回池循环利用。
+- **数据与显示分离**：数据 ([InfiniteCellData](./InfiniteCell.mdx#infinitecelldata)) 由列表持有，Cell 于配置显示时才绑定数据并触发 [OnRefresh](./InfiniteCell.mdx#onrefresh)。
+
+<Highlight color="#0373fc">注意</Highlight> `cellPoolSize` 需足够覆盖**可视数量 + extendVisibleRange 的预留量**，对象池不足时会输出错误 `The cell display error occurred, not enough cells in the cell pool!!!`。
+
+<Highlight color="#00d679">提醒</Highlight> `content` 节点**不需要**挂载 LayoutGroup / ContentSizeFitter，Cell 位置由列表自行计算；`ScrollRect` 的滚动轴向 (Vertical / Horizontal) 请自行与所用实现对应。
+
+---
+
+## 成员 {#members}
+
+| 成员 | 说明 |
+| :--- | :--- |
+| `public bool initializePoolOnAwake` | 是否于 `Awake` 自动初始对象池，默认 `false`。 |
+| `public int cellPoolSize` | 对象池的 Cell 数量，默认 `20`；需足够覆盖可视数量与 `extendVisibleRange` 的预留量。 |
+| `public InfiniteCell cellPrefab` | Cell 预制体 (挂载 [InfiniteCell](./InfiniteCell.mdx) 子类的 Prefab)。 |
+| `public DataOrder dataOrder` | 数据排列顺序 ([DataOrder](#dataorder))，默认 `Normal`；`Reverse` 会反转数据索引的显示顺序。 |
+| `public float extendVisibleRange` | 可视范围的延伸距离，于可视范围外预先配置 Cell，滚动显示更平滑。 |
+| `public ScrollRect scrollRect { get; protected set; }` | 同对象上的 UGUI `ScrollRect` (于初始时获取)。 |
+| `public SnapAlign snapAlign` | Snap 对齐方式 ([SnapAlign](#snapalign))，默认 `Start`。 |
+| `public Padding padding` | 内容边距 ([Padding](#padding))。 |
+| `public int visibleCount { get; protected set; }` | 当前可视范围内的 Cell 数量。 |
+| `public int lastMaxVisibleCount { get; protected set; }` | 曾出现过的最大可视数量。 |
+| `public float lastVisibleRangeSize { get; protected set; }` | 上次计算的可视范围尺寸 (含 `extendVisibleRange`)。 |
+| `public bool isVisibleRangeFilled { get; protected set; }` | 可视范围是否已被 Cell 填满 (可用于判断数据量是否足以填满画面)。 |
+| `public bool isInitialized { get; protected set; }` | 对象池是否已初始完成。 |
+
+## 事件 {#events}
+
+| 事件 | 说明 |
+| :--- | :--- |
+| `public Action<Vector2> onValueChanged` | 列表滚动时触发 (参数为 `ScrollRect` 的 normalizedPosition)。 |
+| `public Action onRectTransformDimensionsChanged` | 列表的 `RectTransform` 尺寸变更时触发 (可用于重新刷新布局)。 |
+| `public Action onRefreshed` | 每次完整刷新 ([Refresh](#refresh)) 执行完成后触发。 |
+| `public Action<InfiniteCell> onCellSelected` | Cell 被点击选中时触发 (Cell 端需调用 `base.OnClick()`，详见 [InfiniteCell.OnClick](./InfiniteCell.mdx#onclick))。 |
+
+---
+
+## 初始与数据操作 {#init-and-data}
+
+### 方法总览 {#data-overview}
+
+| 方法 | 说明 |
+| :--- | :--- |
+| [InitializePool](#initializepool) | 初始对象池 (所有操作的前置条件)。 |
+| [DataCount](#datacount) | 获取数据数量 (等同 Cell 总数)。 |
+| [Add](#add) | 添加 Cell 数据至末尾 (默认不刷新)。 |
+| [Insert](#insert) | 插入 Cell 数据至指定索引。 |
+| [Remove](#remove) | 移除指定索引的 Cell 数据。 |
+| [Clear](#clear) | 清空所有数据并刷新。 |
+
+---
+
+### InitializePool {#initializepool}
+
+```csharp
+public virtual async UniTask InitializePool(object args = null)
+```
+
+初始对象池：依 [cellPoolSize](#members) 将 `cellPrefab` 实例化至 `content` 下，并逐一 `await` Cell 的 [OnCreate](./InfiniteCell.mdx#oncreate) (`args` 会转传给每个 Cell)；同时会清空 `content` 已有子对象与数据清单，并注册滚动监听。已初始过 (`isInitialized` 为 `true`) 时再次调用会直接返回。
+
+```csharp
+// 基本初始
+await this.scrollView.InitializePool();
+
+// 传递自定义参数给每个 Cell 的 OnCreate
+await this.scrollView.InitializePool(myCellInitArgs);
+```
+
+<Highlight color="#0373fc">注意</Highlight> `cellPrefab` 为 null 时初始会失败并输出错误。
+
+### DataCount {#datacount}
+
+```csharp
+public int DataCount()
+```
+
+获取数据数量 (等同 Cell 总数)。
+
+### Add {#add}
+
+```csharp
+public virtual void Add(InfiniteCellData data, bool refresh = false)
+```
+
+添加一条 [InfiniteCellData](./InfiniteCell.mdx#infinitecelldata) 至末尾。
+
+<Highlight color="#00d679">提醒</Highlight> `refresh` 默认为 `false` — 批量添加后统一调用一次 [Refresh](#refresh) 效率较佳。
+
+```csharp
+for (int i = 0; i < 100; i++)
+    this.scrollView.Add(new InfiniteCellData(new Vector2(100f, 100f), $"Item {i}"));
+this.scrollView.Refresh();
+```
+
+### Insert {#insert}
+
+```csharp
+public virtual bool Insert(int index, InfiniteCellData data, bool refresh = true)
+```
+
+插入数据至指定索引 (`index` 可等于 `DataCount()`，相当于添加至末尾)，后续数据的索引会自动更新；索引超出范围返回 `false`。`refresh` 为 `true` 时会以「先回收所有活动中的 Cell」的方式刷新 (`Refresh(false, true)`)。
+
+### Remove {#remove}
+
+```csharp
+public virtual bool Remove(int index, bool refresh = true)
+```
+
+移除指定索引的数据 (该条数据会被 `Dispose`)，后续数据的索引自动前移；索引超出范围返回 `false`。
+
+<Highlight color="#0373fc">注意</Highlight> `VerticalInfiniteScrollView` 与 `HorizontalInfiniteScrollView` 有覆写此方法，移除后会**同步校正 content 位置**，详见 [ScrollView Variants](./ScrollViewVariants.mdx)。
+
+### Clear {#clear}
+
+```csharp
+public virtual void Clear()
+```
+
+停止滚动并将 content 位置归零，回收所有活动中的 Cell、`Dispose` 所有数据后刷新视图。
+
+---
+
+## 刷新 {#refreshing}
+
+### 方法总览 {#refresh-overview}
+
+| 方法 | 说明 |
+| :--- | :--- |
+| [Refresh](#refresh) | 完整刷新 (重算 content 尺寸并刷新可视 Cell)。 |
+| [RefreshVisibleCells](#refreshvisiblecells) | 仅重新计算并刷新可视范围内的 Cell。 |
+
+---
+
+### Refresh {#refresh}
+
+```csharp
+public abstract void Refresh(bool refreshOnNextScroll = false, bool recycleActiveCells = false)
+```
+
+完整刷新：重算 content 尺寸 → 刷新可视 Cell → 触发 [onRefreshed](#events) 事件。
+
+| 参数 | 说明 |
+| :--- | :--- |
+| `refreshOnNextScroll` | `true` 时不立即刷新，仅标记于**下一次滚动时**才执行完整刷新 (此时不会触发 `onRefreshed`)。 |
+| `recycleActiveCells` | `true` 时会先将所有活动中的 Cell 回收回对象池再刷新 (不清除数据)。 |
+
+<Highlight color="#00d679">提醒</Highlight> 若 viewport 尺寸尚未就绪 (为 0，常见于 UI 首帧)，会自动延迟至 `LastPostLateUpdate` 再执行刷新。
+
+### RefreshVisibleCells {#refreshvisiblecells}
+
+```csharp
+public void RefreshVisibleCells()
+```
+
+仅重新计算可视范围并配置/回收 Cell (不重算 content 尺寸)；列表滚动时内部会自动调用。
+
+---
+
+## 滚动与状态 {#scroll-operation}
+
+### 方法总览 {#scroll-overview}
+
+| 方法 | 说明 |
+| :--- | :--- |
+| [ScrollToTop / ScrollToBottom](#scrollto-vertical) | 立即滚动至顶部/底部 (垂直)。 |
+| [ScrollToLeft / ScrollToRight](#scrollto-horizontal) | 立即滚动至最左/最右 (水平)。 |
+| [VerticalNormalizedPosition / HorizontalNormalizedPosition](#normalized-position) | 获取标准化滚动位置。 |
+| [IsAtTop / IsAtBottom / IsAtLeft / IsAtRight](#boundary-check) | 是否已滚动至各边界。 |
+
+---
+
+### ScrollToTop / ScrollToBottom {#scrollto-vertical}
+
+```csharp
+public void ScrollToTop()
+public void ScrollToBottom()
+```
+
+直接设置 `verticalNormalizedPosition` 滚动至顶部 (1) / 底部 (0)，适用垂直列表。
+
+### ScrollToLeft / ScrollToRight {#scrollto-horizontal}
+
+```csharp
+public void ScrollToLeft()
+public void ScrollToRight()
+```
+
+直接设置 `horizontalNormalizedPosition` 滚动至最左 (0) / 最右 (1)，适用水平列表。
+
+### VerticalNormalizedPosition / HorizontalNormalizedPosition {#normalized-position}
+
+```csharp
+public float VerticalNormalizedPosition()
+public float HorizontalNormalizedPosition()
+```
+
+获取 `ScrollRect` 的标准化滚动位置 (0~1)；`scrollRect` 尚未获取时返回 `-1`。
+
+### IsAtTop / IsAtBottom / IsAtLeft / IsAtRight {#boundary-check}
+
+```csharp
+public bool IsAtTop()
+public bool IsAtBottom()
+public bool IsAtLeft()
+public bool IsAtRight()
+```
+
+是否已滚动至顶/底/左/右边界 (内部已依 content 方向 pivot 自动校正判断)；边界状态于可视刷新时更新 — 垂直实现更新 Top / Bottom、水平实现更新 Left / Right。
+
+```csharp
+// 滚动至底部时加载更多 (垂直列表)
+this.scrollView.onValueChanged += (pos) =>
+{
+    if (this.scrollView.IsAtBottom())
+        this.LoadMore();
+};
+```
+
+---
+
+## Snap 定位 {#snapping}
+
+### 方法总览 {#snap-overview}
+
+| 方法 | 说明 |
+| :--- | :--- |
+| [Snap](#snap) | 移动至指定索引的 Cell。 |
+| [SnapFirst](#snapfirst) | 移动至第一个 Cell。 |
+| [SnapMiddle](#snapmiddle) | 移动至中间的 Cell。 |
+| [SnapLast](#snaplast) | 移动至最后一个 Cell。 |
+
+---
+
+### Snap {#snap}
+
+```csharp
+public abstract void Snap(int index, float duration)
+```
+
+移动至指定索引的 Cell，对齐方式依 [snapAlign](#members) (Start / Center / End)：
+
+- `duration` 小于等于 0 → **同步**，立即定位。
+- `duration` 大于 0 → **异步补间** (UniTask)，于 `duration` 秒内平滑移动 (重复调用会中断前一次补间)。
+
+到位后若目标 Cell 为显示状态，会触发其 [OnSnap](./InfiniteCell.mdx#onsnap)；`dataOrder` 为 `Reverse` 时索引会自动转换。
+
+```csharp
+// 立即跳至索引 10
+this.scrollView.Snap(10, 0);
+
+// 0.1 秒平滑移动至索引 10
+this.scrollView.Snap(10, 0.1f);
+```
+
+### SnapFirst {#snapfirst}
+
+```csharp
+public void SnapFirst(float duration)
+```
+
+移动至第一个 Cell (等同 `Snap(0, duration)`)。
+
+### SnapMiddle {#snapmiddle}
+
+```csharp
+public void SnapMiddle(float duration)
+```
+
+移动至中间的 Cell (索引为 `(DataCount() - 1) / 2`)。
+
+### SnapLast {#snaplast}
+
+```csharp
+public void SnapLast(float duration)
+```
+
+移动至最后一个 Cell (等同 `Snap(DataCount() - 1, duration)`)。
+
+```csharp
+// 聊天室类应用：新增消息后自动滚动至最新
+this.chatScrollView.Add(cellData);
+this.chatScrollView.Refresh();
+this.chatScrollView.SnapLast(0.1f);
+```
+
+---
+
+## 类型定义 {#type-definitions}
+
+### DataOrder {#dataorder}
+
+```csharp
+public enum DataOrder
+{
+    Normal,
+    Reverse
+}
+```
+
+数据排列顺序；`Reverse` 会反转数据索引的显示顺序 (由反方向开始排列)。
+
+### SnapAlign {#snapalign}
+
+```csharp
+public enum SnapAlign
+{
+    Start = 1,
+    Center = 2,
+    End = 3,
+}
+```
+
+Snap 对齐方式：将目标 Cell 对齐可视范围的**起始端 / 中央 / 结尾端**。
+
+### Padding {#padding}
+
+```csharp
+[Serializable]
+public class Padding
+{
+    public int top;
+    public int bottom;
+    public int left;
+    public int right;
+}
+```
+
+内容边距 (上 / 下 / 左 / 右)。
+
+---
+
+## 继承扩展 (protected) {#inheritance}
+
+自行继承 `InfiniteScrollView` (或内置实现) 定制列表时，可运用以下 `protected` 成员：
+
+| 成员 | 说明 |
+| :--- | :--- |
+| `protected List<InfiniteCellData> _dataList` | 数据清单。 |
+| `protected List<InfiniteCell> _cellList` | 与数据对应的活动 Cell 清单 (未显示的索引为 `null`)。 |
+| `protected Queue<InfiniteCell> _cellPool` | Cell 对象池。 |
+| `protected abstract void DoRefreshVisibleCells()` | 实现可视范围的 Cell 配置/回收逻辑。 |
+| `protected abstract void DoRefresh(bool refreshOnNextScroll, bool recycleActiveCells)` | 实现完整刷新逻辑。 |
+| `protected abstract UniTask DoDelayRefresh(bool refreshOnNextScroll, bool recycleActiveCells)` | 实现延迟刷新 (viewport 尺寸未就绪时)。 |
+| `protected void SetupCell(InfiniteCell cell, int index, Vector2 pos)` | 将 Cell 绑定数据并配置至指定位置显示。 |
+| `protected void RecycleCell(int index)` | 回收指定索引的 Cell 回对象池 (触发 `OnRecycle`)。 |
+| `protected void RecycleActiveCells()` | 回收所有活动中的 Cell (不清除数据)。 |
+| `protected void ClearAllData()` | `Dispose` 所有数据。 |
+| `protected void DoSnapping(int index, Vector2 target, float duration)` | 执行 Snap 位移补间。 |
+| `protected float CalculateSnapPos(ScrollType scrollType, SnapAlign snapPosType, float originValue, InfiniteCellData cellData)` | 依对齐方式计算 Snap 目标位置。 |
+| `protected bool IsInitialized()` | 检查是否已初始 (未初始会输出警告)。 |

@@ -1,0 +1,379 @@
+---
+sidebar_position: 2
+description: CursorManager is the cursor manager of CursorSystem (MonoBehaviour singleton) that manages the CursorState list and drives dynamic cursor frame animation, covering CursorState parameters and runtime adjustment APIs.
+---
+
+# CursorManager
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`CursorManager` is the **cursor manager** of **CursorSystem** (a `MonoBehaviour` singleton) that manages the [CursorState](#cursorstate) list configured in the Inspector and drives the **frame animation of dynamic cursors** in `Update`. Import the **CursorManager Prefab** via Samples and drop it into the boot scene, or let the [Cursors](./Cursors.mdx) facade create it automatically.
+
+|  |  |
+| :--- | :--- |
+| **Namespace** | `OxGKit.CursorSystem` |
+| **Type** | `[DisallowMultipleComponent] public class CursorManager : MonoBehaviour` |
+| **Source** | [CursorManager.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/CursorSystem/Scripts/Runtime/Core/CursorManager.cs) |
+
+```csharp
+using OxGKit.CursorSystem;
+```
+
+<Highlight color="#00d679">Reminder</Highlight> The instance methods of `CursorManager` correspond **one-to-one** with the [Cursors](./Cursors.mdx) static facade (the singleton accessor is `internal`); route calls through `Cursors` — there is no need to hold an instance reference yourself.
+
+## Quick Start {#quick-start}
+
+```csharp
+using OxGKit.CursorSystem;
+
+// The CursorManager is automatically found or created by the Cursors facade (singleton)
+Cursors.InitInstance();
+
+// After authoring Cursor States in the Inspector, switch by name
+Cursors.SetCursorState("Loading");
+```
+
+## General Rules {#general-rules}
+
+### Singleton and Lifecycle {#singleton-lifecycle}
+
+1. The first access through [Cursors](./Cursors.mdx) automatically finds the `CursorManager` in the scene; if none exists, a `[CursorManager]` node is created automatically.
+2. In `Awake`, it parents itself under the `OxGKit` container node and persists with **DontDestroyOnLoad**, and initializes the current state to the first element in the list.
+3. In `Start`, it resets the rendering (applies the default state); in `Update`, it drives the current state's dynamic cursor animation according to the **Ignore Time Scale** setting.
+4. `OnEnable` resets back to the default state; `OnDisable` removes the cursor rendering (restores the system cursor).
+
+### Inspector Members {#inspector-members}
+
+| Member | Description |
+| :--- | :--- |
+| `Ignore Time Scale` | Whether the dynamic cursor animation ignores `Time.timeScale` (default `true`, driven by `Time.unscaledDeltaTime`). |
+| `List Cursor States` | The [CursorState](#cursorstate) list; **the first entry is the default state** (a built-in `Default` state with frameRate 30). |
+
+---
+
+## Methods Overview {#methods-overview}
+
+| Method | Description |
+| :--- | :--- |
+| [SetIgnoreScale](#setignorescale) | Sets whether dynamic cursor animation ignores Time.timeScale. |
+| [GetCurrentCursorLockState](#getcurrentcursorlockstate) | Gets the current cursor lock mode. |
+| [SetCursorLockState](#setcursorlockstate) | Sets the cursor lock mode. |
+| [IsCursorVisible](#iscursorvisible) | Checks whether the cursor is visible. |
+| [SetCursorVisible](#setcursorvisible) | Sets the cursor visibility. |
+| [SetScaleToAllCursors](#setscaletoallcursors) | Sets the scale for all cursor states and resets the rendering. |
+| [GetAllCursorStates](#getallcursorstates) | Gets all cursor states. |
+| [GetCursorState](#getcursorstate) | Gets the cursor state with the given name. |
+| [GetCurrentCursorState](#getcurrentcursorstate) | Gets the current cursor state. |
+| [SetCursorState](#setcursorstate) | Switches the cursor state by name. |
+| [ResetCursorState](#resetcursorstate) | Resets back to the default state (first element). |
+| [ResetRender](#resetrender) | Resets the rendering of the current cursor state. |
+| [RemoveCursorRender](#removecursorrender) | Removes the cursor rendering (restores the system cursor). |
+
+---
+
+### SetIgnoreScale {#setignorescale}
+
+```csharp
+public void SetIgnoreScale(bool ignore)
+```
+
+Sets whether the dynamic cursor animation update ignores `Time.timeScale` (default `true`, driven by `Time.unscaledDeltaTime`).
+
+### GetCurrentCursorLockState {#getcurrentcursorlockstate}
+
+```csharp
+public CursorLockMode GetCurrentCursorLockState()
+```
+
+Gets the current cursor lock mode (i.e., `Cursor.lockState`).
+
+### SetCursorLockState {#setcursorlockstate}
+
+```csharp
+public void SetCursorLockState(CursorLockMode cursorLockMode)
+```
+
+Sets the cursor lock mode (`None`, `Locked`, `Confined`).
+
+### IsCursorVisible {#iscursorvisible}
+
+```csharp
+public bool IsCursorVisible()
+```
+
+Checks whether the cursor is currently visible (i.e., `Cursor.visible`).
+
+### SetCursorVisible {#setcursorvisible}
+
+```csharp
+public void SetCursorVisible(bool visible)
+```
+
+Sets the cursor visibility (i.e., `Cursor.visible`).
+
+### SetScaleToAllCursors {#setscaletoallcursors}
+
+```csharp
+public void SetScaleToAllCursors(Vector2 scale)
+```
+
+Sets the scale for **all** cursor states and resets the rendering (scaling only takes effect with **scalingEnabled + ForceSoftware**).
+
+### GetAllCursorStates {#getallcursorstates}
+
+```csharp
+public CursorState[] GetAllCursorStates()
+```
+
+Gets all configured cursor states ([CursorState](#cursorstate)).
+
+### GetCursorState {#getcursorstate}
+
+```csharp
+public CursorState GetCursorState(string stateName)
+```
+
+Gets the cursor state with the given name; returns `null` if not found.
+
+### GetCurrentCursorState {#getcurrentcursorstate}
+
+```csharp
+public CursorState GetCurrentCursorState()
+```
+
+Gets the current cursor state.
+
+### SetCursorState {#setcursorstate}
+
+```csharp
+public bool SetCursorState(string stateName)
+```
+
+Switches the cursor state by name and resets the rendering; returns `true` on success, or `false` if the name is not found.
+
+### ResetCursorState {#resetcursorstate}
+
+```csharp
+public void ResetCursorState()
+```
+
+Resets the cursor state to the **default state (first element in the list)** and resets the rendering.
+
+### ResetRender {#resetrender}
+
+```csharp
+public void ResetRender()
+```
+
+Resets the rendering of the **current** cursor state.
+
+### RemoveCursorRender {#removecursorrender}
+
+```csharp
+public void RemoveCursorRender()
+```
+
+Removes the cursor rendering (clears the current state and restores the **system default cursor**); to restore the custom cursor rendering, call [ResetCursorState](#resetcursorstate) to re-initialize and reset the rendering.
+
+---
+
+## CursorState {#cursorstate}
+
+Cursor state (serializable, nested in `CursorManager`) that defines a **single cursor state's** render type, textures, hotspot, and animation parameters. Author it in the Inspector, or get it via [Cursors.GetCursorState](./Cursors.mdx#getcursorstate) and adjust it at runtime (e.g., assign textures loaded from an AssetBundle).
+
+|  |  |
+| :--- | :--- |
+| **Type** | `[Serializable] public class CursorState` |
+| **Source** | [CursorManager.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/CursorSystem/Scripts/Runtime/Core/CursorManager.cs) |
+
+### Members {#cursorstate-members}
+
+| Member | Description |
+| :--- | :--- |
+| `public string stateName` | The state name (the key for runtime switching). |
+| `public RenderType renderType` | Static or dynamic cursor type, default `Static`. |
+| `public CursorMode cursorMode` | Cursor rendering mode (`Auto` / `ForceSoftware`), default `Auto`. |
+| `public bool scalingEnabled` | Scaling toggle, default `false` (scaling is only supported in `ForceSoftware` rendering mode). |
+| `public Vector2 scale` | Scale factor, default `(1, 1)` (requires `scalingEnabled` to take effect). |
+| `public Vector2 hotspot` | The cursor hotspot position, default `(0, 0)`. |
+| `public Texture2D staticCursorTexture` | The static cursor texture. |
+| `public List<Texture2D> dynamicCursorTextures` | The dynamic cursor frame sequence. |
+| `public bool isLoop` | Whether the dynamic cursor loops, default `false`. |
+| `public PlayMode playMode` | The dynamic cursor play mode, default `Normal`. |
+| `public int frameRate` | The dynamic cursor frame rate (FPS), field default `0` (**must be greater than 0 for the animation to play**). |
+
+### RenderType {#rendertype}
+
+Defines the static or dynamic cursor type.
+
+```csharp
+public enum RenderType
+{
+    Static, // Static cursor
+    Dynamic // Dynamic cursor (frame animation)
+}
+```
+
+### PlayMode {#playmode}
+
+Defines the animation play mode.
+
+```csharp
+public enum PlayMode
+{
+    Normal,         // Forward
+    Reverse,        // Backward
+    PingPong,       // Forward -> backward
+    PingPongReverse // Backward -> forward
+}
+```
+
+<Highlight color="#0373fc">Attention</Highlight> With `isLoop` off, `Normal` / `Reverse` stop at the last frame; `PingPong` / `PingPongReverse` stop after **one full round trip**.
+
+### Methods Overview {#cursorstate-overview}
+
+| Method | Description |
+| :--- | :--- |
+| [GetStateName](#state-getstatename) | Gets the state name. |
+| [SetStateName](#state-setstatename) | Sets the state name. |
+| [SetRenderType](#state-setrendertype) | Sets the render type (static/dynamic). |
+| [SetCursorMode](#state-setcursormode) | Sets the cursor rendering mode. |
+| [SetCursorScale](#state-setcursorscale) | Sets the scale factor. |
+| [SetCursorOffset](#state-setcursoroffset) | Sets the cursor hotspot position. |
+| [SetStaticCursor](#state-setstaticcursor) | Sets the static cursor texture and applies the render immediately. |
+| [SetDynamicCursor](#state-setdynamiccursor) | Replaces the dynamic cursor frame sequence and resets the animation. |
+| [SetFrameRate](#state-setframerate) | Sets the frame rate. |
+| [SetLoop](#state-setloop) | Sets the loop toggle. |
+| [ResetRender](#state-resetrender) | Resets the render according to the render type. |
+| [DriveUpdate](#state-driveupdate) | Drives the dynamic cursor animation update (called automatically by CursorManager). |
+
+---
+
+### GetStateName {#state-getstatename}
+
+```csharp
+public string GetStateName()
+```
+
+Gets the state name.
+
+### SetStateName {#state-setstatename}
+
+```csharp
+public void SetStateName(string stateName)
+```
+
+Sets the state name.
+
+### SetRenderType {#state-setrendertype}
+
+```csharp
+public void SetRenderType(RenderType renderType)
+```
+
+Sets the render type ([RenderType](#rendertype) static/dynamic).
+
+### SetCursorMode {#state-setcursormode}
+
+```csharp
+public void SetCursorMode(CursorMode cursorMode)
+```
+
+Sets the cursor rendering mode (`Auto` / `ForceSoftware`).
+
+### SetCursorScale {#state-setcursorscale}
+
+```csharp
+public void SetCursorScale(Vector2 scale)
+```
+
+Sets the scale factor (requires `scalingEnabled` and `ForceSoftware` mode to take effect).
+
+### SetCursorOffset {#state-setcursoroffset}
+
+```csharp
+public void SetCursorOffset(Vector2 offset)
+```
+
+Sets the cursor hotspot position.
+
+### SetStaticCursor {#state-setstaticcursor}
+
+```csharp
+public void SetStaticCursor(Texture2D t2d = null)
+```
+
+Sets the static cursor texture and **applies the render immediately**; when `t2d` is `null`, the current `staticCursorTexture` is re-applied directly (in `ForceSoftware` mode with scaling enabled, the scaled texture is applied).
+
+```csharp
+// Assign a texture at runtime (e.g., loaded from an AssetBundle)
+var cursorState = Cursors.GetCursorState("Default");
+cursorState.SetStaticCursor(tex);
+```
+
+### SetDynamicCursor {#state-setdynamiccursor}
+
+```csharp
+public void SetDynamicCursor(Texture2D[] t2ds)
+```
+
+Replaces the dynamic cursor frame sequence and **resets the animation parameters** (plays from the beginning).
+
+```csharp
+// Replace the frame sequence and adjust parameters at runtime
+var cursorState = Cursors.GetCursorState("Loading");
+cursorState.SetDynamicCursor(texture2ds);
+cursorState.SetFrameRate(12);
+cursorState.SetLoop(true);
+cursorState.ResetRender();
+```
+
+<Highlight color="#0373fc">Attention</Highlight> [SetStaticCursor](#state-setstaticcursor) / [SetDynamicCursor](#state-setdynamiccursor) do **not** change `renderType`; to switch the state's render type, call [SetRenderType](#state-setrendertype) and then [ResetRender](#state-resetrender).
+
+### SetFrameRate {#state-setframerate}
+
+```csharp
+public void SetFrameRate(int frameRate)
+```
+
+Sets the dynamic cursor frame rate (FPS).
+
+### SetLoop {#state-setloop}
+
+```csharp
+public void SetLoop(bool isLoop)
+```
+
+Sets the dynamic cursor loop toggle.
+
+### ResetRender {#state-resetrender}
+
+```csharp
+public void ResetRender()
+```
+
+Resets the render according to the render type (`Static` re-applies the static texture; `Dynamic` resets the animation parameters and replays).
+
+### DriveUpdate {#state-driveupdate}
+
+```csharp
+public void DriveUpdate(float dt)
+```
+
+Drives the frame-animation update of the dynamic cursor; called **automatically** by `CursorManager`'s `Update` (normally no need to call it yourself).

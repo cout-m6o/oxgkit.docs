@@ -1,0 +1,209 @@
+---
+sidebar_position: 1
+---
+
+import ReactPlayer from 'react-player'
+
+# 模块介绍
+
+export const Highlight = ({ children, color }) => (
+  <span
+    style={{
+      backgroundColor: color,
+      borderRadius: '5px',
+      color: '#fff',
+      padding: '2.5px'
+    }}>
+    {children}
+  </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+## 基本说明
+
+各种 DeltaTimer, RealTimer, DTUpdater, RTUpdater, IntervalTimer, IntervalSetter, NtpTime (clock sync with NTP server) 关于时间的控制器，涵盖**游戏时间与真实时间的计时器**、**独立于 MonoBehaviour 的更新循环**、**类 JavaScript setInterval 的间隔触发器**，以及**与 NTP 服务器进行时钟同步**的授时工具。
+
+- 版本：**v1.1.3** (`com.michaelo.oxgkit.timesystem`)
+- 命名空间：`OxGKit.TimeSystem`
+
+<Highlight color="#0373fc">注意</Highlight> 本模块依赖 **UniTask** 与 [OxGKit.LoggingSystem](/docs/loggingsystem/intro) (作为日志输出)，需先安装依赖库。
+
+---
+
+## 应用说明
+
+### 模块选型 (依时间基准区分)
+
+<Highlight color="#ff2f00">重要</Highlight> 选择计时器或更新器前，先确认使用场景**是否需要忽略 `Time.timeScale` 与游戏暂停 (真实时间)**，或是**跟随游戏时间**，由此决定 Real 系列或 Delta (DT) 系列。
+
+| 类别 | 时间基准 | 驱动方式 | 适用场景 |
+| :--- | :--- | :--- | :--- |
+| [DeltaTimer](/docs/timesystem/API/Runtime/DeltaTimer) | 外部喂入的 deltaTime 累加 (游戏时间) | 拥有者于 Update 调用 `UpdateTimer(dt)` | 跟随游戏暂停与变速的冷却、倒计时 |
+| [RealTimer](/docs/timesystem/API/Runtime/RealTimer) | 系统时钟 (真实时间) | 自驱动 (查询式) | 不受暂停与 `Time.timeScale` 影响的冷却、倒计时 |
+| [DTUpdater](/docs/timesystem/API/Runtime/DTUpdater) | UniTask 更新循环 (乘算 Unity `Time.timeScale`) | `Start()` | 受 `Time.timeScale` 影响的独立更新循环 |
+| [RTUpdater](/docs/timesystem/API/Runtime/RTUpdater) | UniTask 更新循环 (真实时间) | `Start()` / `StartOnThread()` | 不受 `Time.timeScale` 影响的独立更新循环 (如网络心跳) |
+| [IntervalTimer](/docs/timesystem/API/Runtime/IntervalTimer) / [IntervalSetter](/docs/timesystem/API/Runtime/IntervalSetter) | 毫秒间隔 | `SetInterval` | 每 N 毫秒触发 `Action` (类 JavaScript setInterval) |
+| [RealTime](/docs/timesystem/API/Runtime/RealTime) | 系统时钟 | 主程序调用 `InitStartupTime()` | 记录应用程序启动时间 |
+| [NtpTime](/docs/timesystem/API/Runtime/NtpTime) | NTP 服务器 / HTTP 时间 API | `Synchronize()` | 服务器授时 (防作弊、每日重置等需要可信时间的场景) |
+
+### Timer / Tick / Mark 计时模式
+
+[DeltaTimer](/docs/timesystem/API/Runtime/DeltaTimer) 与 [RealTimer](/docs/timesystem/API/Runtime/RealTimer) 皆提供三种计时模式，可于同一实例上同时使用：
+
+- **Timer (单次计时)**：通过 `SetTimer(秒数)` 设置单次倒计时，以 `IsTimerTimeout()` 检查是否到时。
+- **Tick (循环计时)**：通过 `SetTick(秒数)` 设置循环间隔，`IsTickTimeout()` 返回 true 时会**自动重新装填**，持续循环触发。
+- **Mark (时间标记)**：通过 `SetMark()` 标记当前时间，以 `GetElapsedMarkTime()` 获取自标记以来的经过时间 (秒表用途)。
+
+### 更新循环与间隔触发
+
+- [DTUpdater](/docs/timesystem/API/Runtime/DTUpdater) 与 [RTUpdater](/docs/timesystem/API/Runtime/RTUpdater) 为 **UniTask 驱动**的独立更新循环，提供 `onUpdate`、`onFixedUpdate`、`onLateUpdate` 回调，可自定义 `targetFrameRate` (更新频率) 与 `timeScale` (自身时间尺度，0 ~ 64)，适合驱动**非 MonoBehaviour** 的系统 (例如搭配 ActionSystem 的 Runner)。
+- [IntervalSetter](/docs/timesystem/API/Runtime/IntervalSetter) 为静态管理器，统一创建与管理 [IntervalTimer](/docs/timesystem/API/Runtime/IntervalTimer)，支持 **int id / string id / 匿名 handle** 三种键值管理方式。
+
+<Highlight color="#ff2f00">重要</Highlight> Updater 与 IntervalTimer 皆为 **UniTask 循环**，功能或场景结束时**务必调用 `Stop()` / `StopInterval()` / `TryClearInterval()` 停止**，否则循环会持续运转。
+
+### 模块日志
+
+- 本模块的日志通过 **OxGKit.LoggingSystem** 输出，日志器名称为 `OxGKit.TimeSystem.Logger`，可在 **LoggingLauncher** 进行开关与级别配置。
+
+---
+
+## 简单使用
+
+### RealTimer vs DeltaTimer 计时
+
+```csharp
+using OxGKit.TimeSystem;
+using UnityEngine;
+
+public class TimerExample : MonoBehaviour
+{
+    private RealTimer _realTimer;
+    private DeltaTimer _deltaTimer;
+
+    private void Start()
+    {
+        // RealTimer (真实时间，不受 Time.timeScale 与暂停影响)
+        this._realTimer = new RealTimer();
+        this._realTimer.SetTimer(3f);
+        this._realTimer.Play();
+
+        // DeltaTimer (游戏时间，由 UpdateTimer 喂入 dt 驱动)
+        this._deltaTimer = new DeltaTimer();
+        this._deltaTimer.SetTimer(3f);
+        this._deltaTimer.Play();
+    }
+
+    private void Update()
+    {
+        // DeltaTimer 必须持续喂入 deltaTime
+        this._deltaTimer.UpdateTimer(Time.deltaTime);
+
+        // 检查 RealTimer
+        if (this._realTimer.IsPlaying() &&
+            this._realTimer.IsTimerTimeout())
+        {
+            this._realTimer.Stop();
+            Debug.Log("[RealTimer] Time's up!");
+        }
+
+        // 检查 DeltaTimer
+        if (this._deltaTimer.IsPlaying() &&
+            this._deltaTimer.IsTimerTimeout())
+        {
+            this._deltaTimer.Stop();
+            Debug.Log("[DeltaTimer] Time's up!");
+        }
+    }
+}
+```
+
+### Updater 更新循环
+
+```csharp
+using OxGKit.TimeSystem;
+
+// 独立于 MonoBehaviour 的更新循环 (UniTask 驱动)
+var rtUpdater = new RTUpdater();
+rtUpdater.onUpdate += (dt) => { /* 每次更新 */ };
+rtUpdater.timeScale = 1f;        // 自身时间尺度 (0 ~ 64)
+rtUpdater.targetFrameRate = 60f; // 更新频率 (默认 60)
+rtUpdater.Start();
+
+// 功能结束时务必停止
+rtUpdater.Stop();
+```
+
+### IntervalSetter 间隔触发
+
+```csharp
+using OxGKit.TimeSystem;
+
+// 每 1000 毫秒触发一次 (以 string id 管理)
+IntervalSetter.SetInterval("poll", () => { /* 周期性工作 */ }, 1000);
+
+// 停止并移除
+IntervalSetter.TryClearInterval("poll");
+```
+
+### NtpTime 时钟同步
+
+```csharp
+using OxGKit.TimeSystem;
+
+// 与 NTP 服务器同步 (默认 time.google.com)
+NtpTime.Synchronize();
+
+// 同步完成后获取校正时间
+if (NtpTime.IsSynchronized())
+{
+    var now = NtpTime.GetNow();
+    var utcNow = NtpTime.GetUtcNow();
+}
+```
+
+*[参考 Example]*
+
+---
+
+## Installation
+
+| Install via git URL |
+|:--- |
+| Add https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/TimeSystem/Scripts to Package Manager |
+
+**第三方库 (需自行安装)**
+
+- 使用 [UniTask v2.5.0 or higher](https://github.com/Cysharp/UniTask), Add https://github.com/Cysharp/UniTask.git?path=src/UniTask/Assets/Plugins/UniTask to Package Manager
+- 使用 OxGKit.LoggingSystem, Add https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/LoggingSystem/Scripts to Package Manager
+
+**Samples (Package Manager -> Samples)**
+
+- **AI Agent Skills** (参考 [AI Agent Skills](/docs/agent-skills))
+- **Timer Demo**
+
+---
+
+## 模块 API
+
+- Runtime
+  - [DeltaTimer](/docs/timesystem/API/Runtime/DeltaTimer) (using OxGKit.TimeSystem)
+  - [RealTimer](/docs/timesystem/API/Runtime/RealTimer) (using OxGKit.TimeSystem)
+  - [DTUpdater](/docs/timesystem/API/Runtime/DTUpdater) (using OxGKit.TimeSystem)
+  - [RTUpdater](/docs/timesystem/API/Runtime/RTUpdater) (using OxGKit.TimeSystem)
+  - [IntervalTimer](/docs/timesystem/API/Runtime/IntervalTimer) (using OxGKit.TimeSystem)
+  - [IntervalSetter](/docs/timesystem/API/Runtime/IntervalSetter) (using OxGKit.TimeSystem)
+  - [RealTime](/docs/timesystem/API/Runtime/RealTime) (using OxGKit.TimeSystem)
+  - [NtpTime](/docs/timesystem/API/Runtime/NtpTime) (using OxGKit.TimeSystem)
+
+---
+
+## Demo
+
+**TimeSystem Demo**
+
+<ReactPlayer controls url='/video/timesystem_demo.mp4' />

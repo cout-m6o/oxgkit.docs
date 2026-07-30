@@ -1,0 +1,157 @@
+---
+sidebar_position: 6
+description: IntervalSetter 是 IntervalTimer 的靜態管理器，支持以 int id、string id 或匿名 handle 三種鍵值建立與管理間隔觸發計時器，並提供統一清理 API。
+---
+
+# IntervalSetter
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`IntervalSetter` 是 [IntervalTimer](./IntervalTimer.mdx) 的**靜態管理器**，統一建立與管理間隔觸發計時器，支持 **int id / string id / 匿名 handle** 三種鍵值管理方式，並提供 `TryClearInterval`、`ClearAllIntervalTimers` 統一清理 API。
+
+|  |  |
+| :--- | :--- |
+| **命名空間** | `OxGKit.TimeSystem` |
+| **類型** | `public static class IntervalSetter` |
+| **原始碼** | [IntervalSetter.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/TimeSystem/Scripts/Runtime/Core/Ticker/IntervalSetter.cs) |
+
+```csharp
+using OxGKit.TimeSystem;
+```
+
+## 快速上手 {#quick-start}
+
+```csharp
+using OxGKit.TimeSystem;
+
+// 以 int id 建立，每 1000 毫秒觸發一次
+IntervalSetter.SetInterval(1001, () => { /* ... */ }, 1000);
+
+// 以 string id 建立
+IntervalSetter.SetInterval("poll", () => { /* ... */ }, 1000);
+
+// 匿名建立，返回 IntervalTimer handle
+IntervalTimer handle = IntervalSetter.SetInterval(() => { /* ... */ }, 1000);
+
+// 檢查運轉狀態 (int id)
+bool isRunning = IntervalSetter.CheckIsRunning(1001);
+
+// 依鍵值清除
+IntervalSetter.TryClearInterval(1001);
+IntervalSetter.TryClearInterval("poll");
+IntervalSetter.TryClearInterval(handle);
+
+// 清除全部
+IntervalSetter.ClearAllIntervalTimers();
+```
+
+## 通用規則 {#general-rules}
+
+- **相同 id 已存在**時，再次 `SetInterval` **直接忽略** (不會建立新計時器，也不會擲出例外)；需先 `TryClearInterval` 該 id 才能重新建立。
+- 管理容量上限為 **32768** (`1 << 15`)，超過時擲出 `InvalidOperationException`。
+- `ignoreTimeScale` 與執行緒行為與 [IntervalTimer](./IntervalTimer.mdx#general-rules) 相同。
+
+<Highlight color="#0373fc">注意</Highlight> `CheckIsRunning` **僅提供 int id 版本**；string id 與匿名 handle 可直接透過 `IntervalTimer.IsRunning()` 檢查。
+
+<Highlight color="#ff2f00">重要</Highlight> 擁有者 (功能/場景) 結束時**務必呼叫 [TryClearInterval](#tryclearinterval) 或 [ClearAllIntervalTimers](#clearallintervaltimers) 清理**，否則計時器會持續運轉並佔用管理容量。
+
+---
+
+## 方法 {#methods}
+
+### 方法總覽 {#methods-overview}
+
+| 方法 | 說明 |
+| :--- | :--- |
+| [SetInterval](#setinterval) | 建立並啟動間隔觸發 (int id / string id / 匿名 handle)。 |
+| [SetIntervalOnThread](#setintervalonthread) | 建立並啟動間隔觸發 (切換至執行緒池運轉)。 |
+| [CheckIsRunning](#checkisrunning) | 檢查指定 int id 的計時器是否運轉中。 |
+| [TryClearInterval](#tryclearinterval) | 停止並移除指定的計時器。 |
+| [ClearAllIntervalTimers](#clearallintervaltimers) | 停止並清除所有計時器。 |
+
+---
+
+### SetInterval {#setinterval}
+
+```csharp
+public static void SetInterval(int id, Action action, int milliseconds, bool ignoreTimeScale = false)
+
+public static void SetInterval(string id, Action action, int milliseconds, bool ignoreTimeScale = false)
+
+public static IntervalTimer SetInterval(Action action, int milliseconds, bool ignoreTimeScale = false)
+```
+
+建立 [IntervalTimer](./IntervalTimer.mdx) 並啟動間隔觸發，每隔 `milliseconds` 毫秒觸發一次 `action`：
+
+- **int id / string id 版本**：以指定鍵值管理，相同 id 已存在時直接忽略。
+- **匿名版本**：以計時器的 HashCode 作為鍵值，**返回 `IntervalTimer` handle**，後續以 handle 進行清除。
+
+```csharp
+// 以 string id 管理，每秒輪詢一次
+IntervalSetter.SetInterval("poll", () => Poll(), 1000);
+```
+
+### SetIntervalOnThread {#setintervalonthread}
+
+```csharp
+public static void SetIntervalOnThread(int id, Action action, int milliseconds, bool ignoreTimeScale = false)
+
+public static void SetIntervalOnThread(string id, Action action, int milliseconds, bool ignoreTimeScale = false)
+
+public static IntervalTimer SetIntervalOnThread(Action action, int milliseconds, bool ignoreTimeScale = false)
+```
+
+同 [SetInterval](#setinterval)，但迴圈會**先切換至執行緒池 (`UniTask.SwitchToThreadPool`)** 運轉。
+
+<Highlight color="#ff2f00">重要</Highlight> 回調可能於**非 Unity 主執行緒**執行，**請勿直接存取 UnityEngine 物件** (需自行封送回主執行緒)；**WebGL 平台不支持多執行緒**，於 WebGL 上行為等同 [SetInterval](#setinterval)。
+
+### CheckIsRunning {#checkisrunning}
+
+```csharp
+public static bool CheckIsRunning(int id)
+```
+
+檢查指定 **int id** 的計時器是否正在運轉中，id 不存在時返回 false。
+
+### TryClearInterval {#tryclearinterval}
+
+```csharp
+public static bool TryClearInterval(int id)
+
+public static bool TryClearInterval(string id)
+
+public static bool TryClearInterval(IntervalTimer intervalTimer)
+```
+
+停止並移除指定的計時器，成功返回 true：
+
+- **int id / string id 版本**：依鍵值查找，不存在時返回 false。
+- **handle 版本**：依 handle 的 HashCode 查找並移除；即使不在管理清單中，仍會對該 handle 執行 `StopInterval()` 並返回 true (handle 為 null 時返回 false)。
+
+```csharp
+IntervalSetter.TryClearInterval("poll");
+```
+
+### ClearAllIntervalTimers {#clearallintervaltimers}
+
+```csharp
+public static void ClearAllIntervalTimers()
+```
+
+停止並清除**所有**由 `IntervalSetter` 管理的計時器。

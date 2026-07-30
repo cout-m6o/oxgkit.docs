@@ -1,0 +1,102 @@
+---
+sidebar_position: 2
+description: MissingScriptsFinder 用于搜索场景与 Prefab 中的 Missing Scripts，快速定位丢失脚本的对象。
+---
+
+# MissingScriptsFinder
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`MissingScriptsFinder` 用于**搜索场景与 Prefab 中的 Missing Scripts** (丢失脚本引用)，搜索结果以**可点击定位的日志**输出 (Console 点击即可 Ping 到对应对象/资源)，支持已加载场景、Build Settings 场景、项目全场景与全 Prefabs 的搜索范围 (修改自 [Mr-sB/MissingScriptsFinder](https://github.com/Mr-sB/MissingScriptsFinder))。
+
+|  |  |
+| :--- | :--- |
+| **命名空间** | `OxGKit.Utilities.MissingFinder.Editor` |
+| **类型** | `public static class MissingScriptsFinder` |
+| **源码** | [MissingScriptsFinder.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/Utilities/Scripts/Editor/MissingScriptsFinder/MissingScriptsFinder.cs) |
+
+## 菜单功能 (Menu Items) {#menu-items}
+
+功能位于**主菜单 (Menu Bar) 的 `MissingScriptsFinder`** 之下：
+
+| 菜单 | 说明 |
+| :--- | :--- |
+| `MissingScriptsFinder/Search in loaded scenes` | 搜索**当前已加载场景**中的 Missing Scripts。 |
+| `MissingScriptsFinder/Search in build settings scenes` | 搜索 **Build Settings 中已启用场景**的 Missing Scripts。 |
+| `MissingScriptsFinder/Search in build settings scenes (include disable)` | 搜索 **Build Settings 中所有场景** (含停用) 的 Missing Scripts。 |
+| `MissingScriptsFinder/Search in project all scenes` | 搜索**项目内所有场景**的 Missing Scripts。 |
+| `MissingScriptsFinder/Search in all prefabs` | 搜索**项目内所有 Prefabs** 的 Missing Scripts。 |
+
+<Highlight color="#00d679">提醒</Highlight> 搜索会**递归检查所有子对象**；未加载的场景会**暂时以 Additive 打开**检查后自动关闭，不影响当前场景状态。
+
+---
+
+## 方法总览 {#method-overview}
+
+以下方法皆对应上方菜单功能，也可于自定义工具中直接调用：
+
+| 方法 | 说明 |
+| :--- | :--- |
+| [FindMissingScriptsInLoadedScenes](#findmissingscriptsinloadedscenes) | 搜索已加载场景。 |
+| [FindMissingScriptsInBuildSettingsScenes](#findmissingscriptsinbuildsettingsscenes) | 搜索 Build Settings 已启用场景。 |
+| [FindMissingScriptsInBuildSettingsScenesIncludeDisable](#findmissingscriptsinbuildsettingsscenesincludedisable) | 搜索 Build Settings 所有场景 (含停用)。 |
+| [FindMissingScriptsInProjectAllScenes](#findmissingscriptsinprojectallscenes) | 搜索项目内所有场景。 |
+| [FindMissingScriptsInAllPrefabs](#findmissingscriptsinallprefabs) | 搜索项目内所有 Prefabs。 |
+
+---
+
+### FindMissingScriptsInLoadedScenes {#findmissingscriptsinloadedscenes}
+
+```csharp
+public static void FindMissingScriptsInLoadedScenes()
+```
+
+搜索**当前已加载场景**中所有对象 (含子对象) 的 Missing Scripts。
+
+### FindMissingScriptsInBuildSettingsScenes {#findmissingscriptsinbuildsettingsscenes}
+
+```csharp
+public static void FindMissingScriptsInBuildSettingsScenes()
+```
+
+搜索 **Build Settings 中已启用场景**的 Missing Scripts。
+
+### FindMissingScriptsInBuildSettingsScenesIncludeDisable {#findmissingscriptsinbuildsettingsscenesincludedisable}
+
+```csharp
+public static void FindMissingScriptsInBuildSettingsScenesIncludeDisable()
+```
+
+搜索 **Build Settings 中所有场景** (含停用场景) 的 Missing Scripts。
+
+### FindMissingScriptsInProjectAllScenes {#findmissingscriptsinprojectallscenes}
+
+```csharp
+public static void FindMissingScriptsInProjectAllScenes()
+```
+
+搜索**项目内所有场景资源**的 Missing Scripts。
+
+### FindMissingScriptsInAllPrefabs {#findmissingscriptsinallprefabs}
+
+```csharp
+public static void FindMissingScriptsInAllPrefabs()
+```
+
+扫描**项目内所有 Prefabs** 的脚本引用 (比对脚本 GUID)，逐一检查疑似丢失的 Prefab 并输出 **Missing Scripts 统计与定位日志**。

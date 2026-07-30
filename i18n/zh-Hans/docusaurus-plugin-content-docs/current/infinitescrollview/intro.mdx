@@ -1,0 +1,170 @@
+---
+sidebar_position: 1
+---
+
+# 模块介绍
+
+export const Highlight = ({ children, color }) => (
+  <span
+    style={{
+      backgroundColor: color,
+      borderRadius: '5px',
+      color: '#fff',
+      padding: '2.5px'
+    }}>
+    {children}
+  </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+## 基本说明
+
+无限列表 (魔改版)，基于**原生 UGUI** 能够简单的**继承**或**使用现有的 Infinite ScrollView**，以**对象池**的概念进行对象有效循环利用，仅需少量的 GameObject 即可承载大量列表数据。
+
+Reference: [howtungtung - InfiniteScrollView](https://github.com/howtungtung/InfiniteScrollView)
+
+- 版本：**v1.7.1** (`com.michaelo.oxgkit.infinitescrollview`)
+- 命名空间：`OxGKit.InfiniteScrollView`
+
+<Highlight color="#0373fc">注意</Highlight> 本模块依赖 **UniTask** 与 **OxGKit.LoggingSystem**，需先自行安装 (详见 [Installation](#installation))。
+
+---
+
+## 应用说明
+
+### 内置 ScrollView 实现
+
+| 组件 | 说明 |
+| :--- | :--- |
+| [`VerticalInfiniteScrollView`](/docs/infinitescrollview/API/Runtime/ScrollViewVariants#verticalinfinitescrollview) | 垂直列表 (上下滚动)。 |
+| [`HorizontalInfiniteScrollView`](/docs/infinitescrollview/API/Runtime/ScrollViewVariants#horizontalinfinitescrollview) | 水平列表 (左右滚动)。 |
+| [`VerticalGridInfiniteScrollView`](/docs/infinitescrollview/API/Runtime/ScrollViewVariants#verticalgridinfinitescrollview) | 垂直网格 (横向并排 `columnCount` 个 Cell)。 |
+| [`HorizontalGridInfiniteScrollView`](/docs/infinitescrollview/API/Runtime/ScrollViewVariants#horizontalgridinfinitescrollview) | 水平网格 (纵向并排 `rowCount` 个 Cell)。 |
+
+皆继承抽象基类 [`InfiniteScrollView`](/docs/infinitescrollview/API/Runtime/InfiniteScrollView)，将组件挂载至 UGUI 的 `ScrollRect` 对象上即可使用，也可自行继承扩展定制列表行为。
+
+### 对象池循环利用
+
+- 初始对象池 (`InitializePool`) 时，依 `cellPoolSize` 预先创建 Cell 对象池，滚动时仅对**可视范围内**的数据配置 Cell，滚出范围即**回收回池**循环利用。
+- **数据与显示分离**：数据清单 ([`InfiniteCellData`](/docs/infinitescrollview/API/Runtime/InfiniteCell#infinitecelldata)) 由列表持有，Cell ([`InfiniteCell`](/docs/infinitescrollview/API/Runtime/InfiniteCell)) 于配置显示时才绑定数据并触发刷新。
+
+<Highlight color="#ff2f00">重要</Highlight> 使用前必须**先初始对象池** — `await InitializePool()` 或于 Inspector 勾选 **initializePoolOnAwake**。
+
+<Highlight color="#0373fc">注意</Highlight> `cellPoolSize` 需足够覆盖**可视数量 + extendVisibleRange 的预留量**，对象池不足时会输出错误日志。
+
+<Highlight color="#00d679">提醒</Highlight> `content` 节点**不需要**挂载 LayoutGroup / ContentSizeFitter，Cell 位置由列表自行计算。
+
+### 创建 Cell 模板
+
+- 通过 Right-Click **Create/OxGKit/Infinite ScrollView/Template Infinite Cell.cs (Script)** 创建 Cell 脚本模板。
+- 通过 Right-Click **Create/OxGKit/Infinite ScrollView/Template Infinite Cell (RectTransform Prefab)** 创建 Cell 的 RectTransform Prefab 模板。
+
+---
+
+## 简单使用
+
+### 创建列表
+
+1. 创建 UGUI **Scroll View**，于 `ScrollRect` 对象上挂载所需的 Infinite ScrollView 组件 (如 `VerticalInfiniteScrollView`)。
+2. 制作 **Cell Prefab** (根节点为 `RectTransform`，挂载继承 `InfiniteCell` 的脚本)，并指定给 `cellPrefab`。
+3. 依需求配置 `cellPoolSize`、`dataOrder` (Normal / Reverse)、`snapAlign`、`extendVisibleRange`、`padding` 等选项。
+4. 初始对象池并填入数据。
+
+```csharp
+using Cysharp.Threading.Tasks;
+using OxGKit.InfiniteScrollView;
+using UnityEngine;
+
+public class ListLauncher : MonoBehaviour
+{
+    // 场景上挂载于 ScrollRect 对象的列表组件 (以垂直列表为例)
+    public VerticalInfiniteScrollView scrollView;
+
+    private async void Start()
+    {
+        // 1. 初始对象池 (若已于 Inspector 勾选 initializePoolOnAwake 则可省略)
+        await this.scrollView.InitializePool();
+
+        // 2. 批量添加数据后统一刷新 (Add 默认不刷新)
+        for (int i = 0; i < 1000; i++)
+            this.scrollView.Add(new InfiniteCellData(new Vector2(100f, 100f), $"Item {i}"));
+        this.scrollView.Refresh();
+
+        // 3. Cell 点击事件 (Cell 端需调用 base.OnClick() 触发)
+        this.scrollView.onCellSelected += (cell) => Debug.Log($"Selected index: {cell.cellData.index}");
+
+        // 4. 移动至指定索引 (0.1 秒补间)
+        this.scrollView.Snap(50, 0.1f);
+    }
+}
+```
+
+### 实现自定义 Cell
+
+```csharp
+using Cysharp.Threading.Tasks;
+using OxGKit.InfiniteScrollView;
+using UnityEngine.UI;
+
+public class ItemCell : InfiniteCell
+{
+    public Text titleTxt;
+    public Button button;
+
+    public override async UniTask OnCreate(object args)
+    {
+        // 创建时初始一次 (args 由 InitializePool(args) 转传)
+        this.button.onClick.AddListener(this.OnClick);
+    }
+
+    public override void OnRefresh()
+    {
+        // Cell 为对象池循环利用，显示必须完全由 cellData 驱动
+        string text = (string)this.cellData.data;
+        this.titleTxt.text = $"[{this.cellData.index}] {text}";
+    }
+
+    public override void OnRecycle()
+    {
+        // 回收回对象池时的清理
+    }
+}
+```
+
+*[参考 Example]*
+
+---
+
+## Installation
+
+| Install via git URL |
+|:--- |
+| Add https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/InfiniteScrollView/Scripts to Package Manager |
+
+**第三方库 (需自行安装)**
+
+- 使用 [UniTask v2.5.0 or higher](https://github.com/Cysharp/UniTask), Add https://github.com/Cysharp/UniTask.git?path=src/UniTask/Assets/Plugins/UniTask to Package Manager
+- 使用 OxGKit.LoggingSystem, Add https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/LoggingSystem/Scripts to Package Manager
+
+**Samples (Package Manager -> Samples)**
+
+- **AI Agent Skills** (参考 [AI Agent Skills](/docs/agent-skills))
+- **Infinite Vertical Demo** (垂直列表：Normal / Reverse 数据顺序与增删操作)
+- **Infinite Horizontal Demo** (水平列表：Normal / Reverse 数据顺序与增删操作)
+- **Infinite Grid Demo** (垂直/水平网格：columnCount / rowCount / spacing 配置)
+- **Infinite TabPage Demo** (页签分页：以 Snap 切换页面)
+- **Infinite ChatRoom Demo** (聊天室：动态 Cell 高度 + SnapLast 自动滚动至最新消息)
+
+---
+
+## 模块 API
+
+- Runtime
+  - [InfiniteScrollView](/docs/infinitescrollview/API/Runtime/InfiniteScrollView) (using OxGKit.InfiniteScrollView)
+  - [ScrollView Variants](/docs/infinitescrollview/API/Runtime/ScrollViewVariants) (using OxGKit.InfiniteScrollView)
+  - [InfiniteCell](/docs/infinitescrollview/API/Runtime/InfiniteCell) (using OxGKit.InfiniteScrollView)

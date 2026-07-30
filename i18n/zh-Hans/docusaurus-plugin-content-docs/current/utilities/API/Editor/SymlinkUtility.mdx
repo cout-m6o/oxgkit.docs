@@ -1,0 +1,58 @@
+---
+sidebar_position: 3
+description: SymlinkUtility 提供在项目中创建文件夹符号链接 (Junction/Symlink) 的菜单工具，并于 Project 窗口显示链接标记。
+---
+
+# SymlinkUtility
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`SymlinkUtility` 提供在项目中**创建文件夹符号链接**的菜单工具，可将**项目外部的共享文件夹**以 **Junction / 绝对 Symlink / 相对 Symlink** 链接进项目使用 (例如共享美术资源、跨项目共享模块)，并于 **Project 窗口**对符号链接文件夹显示 `<=>` 标记 (修改自 [karl-/unity-symlink-utility](https://github.com/karl-/unity-symlink-utility))。
+
+|  |  |
+| :--- | :--- |
+| **命名空间** | `OxGKit.Utilities.Symlink.Editor` |
+| **类型** | `public static class SymlinkUtility` |
+| **源码** | [SymlinkUtility.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/Utilities/Scripts/Editor/SymlinkUtility/SymlinkUtility.cs) |
+
+## 菜单功能 (Menu Items) {#menu-items}
+
+于 **Project 窗口 Right-Click** (或 Assets 菜单) 操作，会打开文件夹选择窗口选取**来源文件夹**，并于**当前选取的文件夹** (未选取时为 `Assets`) 之下创建链接：
+
+| 菜单 | 说明 |
+| :--- | :--- |
+| `Assets/Create/Folder (Junction)` | 创建 **Junction** 链接 (**仅 Windows**，不需管理员权限)。 |
+| `Assets/Create/Folder (Absolute Symlink)` | 创建**绝对路径**符号链接。 |
+| `Assets/Create/Folder (Relative Symlink)` | 创建**相对路径**符号链接。 |
+
+<Highlight color="#0373fc">注意</Highlight> **Windows** 上创建 Symlink (Absolute / Relative) 需要**管理员权限** (会弹出 UAC 提示)，**Junction 则不需要**；macOS 通过 `ln -s` 创建。
+
+## 通用规则 {#general-rules}
+
+### 限制条件 {#constraints}
+
+- **来源文件夹不可位于本项目内** (`Application.dataPath` 之下)，否则会输出警告并中止。
+- 目标位置**已存在同名文件夹**时会中止链接。
+- 创建完成后会自动 `AssetDatabase.Refresh`。
+
+### 链接标记 {#symlink-marker}
+
+- **Project 窗口**中，符号链接 (含 Junction) 的文件夹右侧会显示 `<=>` 标记，方便辨识。
+
+<Highlight color="#00d679">提醒</Highlight> 符号链接文件夹内的资源会被 Unity **视为项目内资源**导入；团队协作时，请确保成员本机皆有对应的来源文件夹，并留意版本控制 (VCS) 对符号链接的处理方式。

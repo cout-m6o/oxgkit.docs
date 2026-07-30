@@ -1,0 +1,247 @@
+---
+sidebar_position: 1
+description: Cacher provides three capacity-bounded generic cache containers (ARC, LRU, LRU-K) with custom removal handlers and thread-safe operations.
+---
+
+# Cacher
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+**Cacher** is the **capacity-bounded cache container** family of **Utilities**, providing generic caches with three eviction strategies: `ARCCache<TKey, TValue>` (Adaptive Replacement), `LRUCache<TKey, TValue>` (Least Recently Used), and `LRUKCache<TKey, TValue>` (LRU-K, scan-resistant). All operations are protected by **thread locks**, and a **custom removal handler** `IRemoveCacheHandler<TKey, TValue>` can process values on eviction or removal.
+
+|  |  |
+| :--- | :--- |
+| **Namespace** | `OxGKit.Utilities.Cacher` |
+| **Type** | `public class ARCCache<TKey, TValue>`, `public class LRUCache<TKey, TValue>`, `public class LRUKCache<TKey, TValue>` |
+| **Source** | [ARCCache.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/Utilities/Scripts/Runtime/Cacher/ARCCache.cs), [LRUCache.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/Utilities/Scripts/Runtime/Cacher/LRUCache.cs), [LRUKCache.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/Utilities/Scripts/Runtime/Cacher/LRUKCache.cs) |
+
+```csharp
+using OxGKit.Utilities.Cacher;
+```
+
+<Highlight color="#ff2f00">Important</Highlight> The **default removal handler** of all three caches is `UnityObjectRemoveCacheHandler<TKey, TValue>`: when the cached value is a `UnityEngine.Object`, **eviction or removal automatically destroys the object**. If cached values are still held and used externally, provide a custom `IRemoveCacheHandler<TKey, TValue>` to change this behavior.
+
+## Quick Start {#quick-start}
+
+```csharp
+using OxGKit.Utilities.Cacher;
+using UnityEngine;
+
+// Create an LRU cache with capacity 60
+var cache = new LRUCache<string, Texture2D>(60);
+
+// Add to the cache
+cache.Add("key", texture);
+
+// Get from the cache (returns default on miss)
+Texture2D t2d = cache.Get("key");
+
+// Check existence
+bool contains = cache.Contains("key");
+
+// Remove from the cache (the default handler destroys Unity objects)
+cache.Remove("key");
+
+// Clear the cache
+cache.Clear();
+
+// Custom removal handler (replaces the default UnityObjectRemoveCacheHandler)
+public class MyRemoveCacheHandler : IRemoveCacheHandler<string, Texture2D>
+{
+    public void RemoveCache(string key, Texture2D value)
+    {
+        // Decide what happens on eviction (e.g. do not Destroy)
+    }
+}
+
+var customCache = new LRUCache<string, Texture2D>(60, new MyRemoveCacheHandler());
+```
+
+## General Rules {#general-rules}
+
+### Choosing a Strategy {#strategy}
+
+| Cache | Strategy | Best for |
+| :--- | :--- | :--- |
+| `ARCCache<TKey, TValue>` | Adaptive Replacement Cache | Mixed access patterns balancing **recency and frequency**. |
+| `LRUCache<TKey, TValue>` | Least Recently Used | Plain **recency-based** eviction (least recently used goes first). |
+| `LRUKCache<TKey, TValue>` | LRU-K | **Scan resistance**: an entry becomes "hot" only after K accesses; eviction removes the **least recently used entry with the lowest popularity** first. |
+
+### Removal Handler {#remove-handler}
+
+- On eviction (capacity reached), `Remove`, and `Clear`, the cache calls `IRemoveCacheHandler<TKey, TValue>.RemoveCache(key, value)` for each removed value.
+- When not specified, the default is [UnityObjectRemoveCacheHandler](#unityobjectremovecachehandler) (automatically destroys Unity objects).
+
+### Thread Safety {#thread-safety}
+
+- `GetKeys`, `Contains`, `Get`, `Add`, `Remove`, `Clear`, and `Count` are all protected by **lock** in all three caches, so they can be used from multiple threads.
+
+<Highlight color="#0373fc">Attention</Highlight> The constructors of `ARCCache` and `LRUCache` throw `ArgumentException` when **capacity is less than or equal to 0**; `LRUKCache` performs no such check, so pass a sensible capacity and K value yourself.
+
+---
+
+## ARCCache {#arccache}
+
+### Constructors {#arccache-constructors}
+
+```csharp
+public ARCCache(int capacity)
+
+public ARCCache(int capacity, IRemoveCacheHandler<TKey, TValue> removeCacheHandler)
+```
+
+Creates an **ARC cache** with the given capacity and an optional removal handler.
+
+- **Behavior**: internally managed by two linked lists, **T1 (recency)** and **T2 (frequency)**. New keys enter T1; **another hit (Get) or update (Add) promotes them to T2**. When full, the tail of T1 is evicted first, then the tail of T2.
+
+```csharp
+var arc = new ARCCache<string, Texture2D>(60);
+```
+
+## LRUCache {#lrucache}
+
+### Constructors {#lrucache-constructors}
+
+```csharp
+public LRUCache(int capacity)
+
+public LRUCache(int capacity, IRemoveCacheHandler<TKey, TValue> removeCacheHandler)
+```
+
+Creates an **LRU cache** with the given capacity and an optional removal handler.
+
+- **Behavior**: `Get` and `Add` (update) move the node to the **front** of the list; when full, the **least recently used** entry (list tail) is evicted.
+
+```csharp
+var lru = new LRUCache<string, Texture2D>(60);
+```
+
+## LRUKCache {#lrukcache}
+
+### Constructors {#lrukcache-constructors}
+
+```csharp
+public LRUKCache(int capacity, int k)
+
+public LRUKCache(int capacity, int k, IRemoveCacheHandler<TKey, TValue> removeCacheHandler)
+```
+
+Creates an **LRU-K cache** with the given capacity, where `k` is the access-count threshold, and an optional removal handler.
+
+- **Behavior**: every `Get` / `Add` increments the key's counter (capped at K) and moves it to the list tail (most recently used); eviction starts from the least recently used end, removes the entry with the **lowest counter**, and **decays the counters** of the remaining entries.
+
+```csharp
+var lruk = new LRUKCache<string, Texture2D>(60, 3);
+```
+
+---
+
+## Shared Members and Methods {#common-members}
+
+The following members and methods are **identical** across `ARCCache<TKey, TValue>`, `LRUCache<TKey, TValue>`, and `LRUKCache<TKey, TValue>`.
+
+### Members {#members}
+
+| Member | Description |
+| :--- | :--- |
+| `public int Count` | Current number of cached entries. |
+
+### Method Overview {#method-overview}
+
+| Method | Description |
+| :--- | :--- |
+| [GetKeys](#getkeys) | Gets an array of all cached keys. |
+| [Contains](#contains) | Checks whether the given key exists in the cache. |
+| [Get](#get) | Gets the cached value for a key (updates its usage state). |
+| [Add](#add) | Adds or updates a cache entry (triggers eviction when full). |
+| [Remove](#remove) | Removes the entry for a key (invokes the removal handler). |
+| [Clear](#clear) | Clears all entries (invokes the removal handler for each). |
+
+---
+
+### GetKeys {#getkeys}
+
+```csharp
+public TKey[] GetKeys()
+```
+
+Gets an **array of all cached keys**.
+
+### Contains {#contains}
+
+```csharp
+public bool Contains(TKey key)
+```
+
+Checks whether the given key exists in the cache.
+
+### Get {#get}
+
+```csharp
+public TValue Get(TKey key)
+```
+
+Gets the cached value for a key; **returns `default` on a miss**. On a hit, the usage state is updated per strategy (ARC promotes to T2 / LRU moves to the front / LRU-K increments the counter and moves to the tail).
+
+### Add {#add}
+
+```csharp
+public void Add(TKey key, TValue value)
+```
+
+Adds or updates a cache entry; **when the cache is full, an entry is evicted first**, and the evicted value is passed to the removal handler.
+
+### Remove {#remove}
+
+```csharp
+public bool Remove(TKey key)
+```
+
+Removes the entry for a key; returns `true` on success. The removed value is passed to the **removal handler** (which destroys Unity objects by default).
+
+### Clear {#clear}
+
+```csharp
+public void Clear()
+```
+
+Clears all entries, **invoking the removal handler for each one**, then resets the internal structures.
+
+---
+
+## IRemoveCacheHandler {#iremovecachehandler}
+
+```csharp
+public interface IRemoveCacheHandler<TKey, TValue>
+{
+    void RemoveCache(TKey key, TValue value);
+}
+```
+
+The removal handler interface ([IRemoveCacheHandler.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/Utilities/Scripts/Runtime/Cacher/Interface/IRemoveCacheHandler.cs)), invoked when a cache entry is **evicted or removed**. Implement it to customize behavior (e.g. return objects to a pool, release resources, or do nothing).
+
+## UnityObjectRemoveCacheHandler {#unityobjectremovecachehandler}
+
+```csharp
+public class UnityObjectRemoveCacheHandler<TKey, TValue> : IRemoveCacheHandler<TKey, TValue>
+```
+
+The **default removal handler** ([UnityObjectRemoveCacheHandler.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/Utilities/Scripts/Runtime/Cacher/Implement/UnityObjectRemoveCacheHandler.cs)): when the cached value is a `UnityEngine.Object`, it calls `UnityEngine.Object.Destroy` on it.
+
+<Highlight color="#00d679">Reminder</Highlight> If the cached value is **not a Unity object** (e.g. `string` or a custom class), the default handler does nothing; the entry is simply removed from the cache and left to the GC.

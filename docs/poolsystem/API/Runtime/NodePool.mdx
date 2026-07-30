@@ -1,0 +1,231 @@
+---
+sidebar_position: 1
+description: NodePool 是 PoolSystem 的簡易 GameObject 物件池組件，支持異步分散幀加載 (負載平衡)、自動增長 (Auto Put) 與最大數量限制 (Max Size)。
+---
+
+# NodePool
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`NodePool` 是 **PoolSystem** 的簡易 **GameObject 物件池**組件 (`MonoBehaviour`)，以 **Queue (先進先出)** 管理閒置物件，支持**異步分散幀加載 (負載平衡)**、**自動增長 (Auto Put)** 與**最大數量限制 (Max Size)**；透過 **Add Component -> OxGKit -> PoolSystem -> NodePool** 掛載至場景節點上使用 (該節點即為物件池的容器節點)。
+
+|  |  |
+| :--- | :--- |
+| **命名空間** | `OxGKit.PoolSystem` |
+| **類型** | `public class NodePool : MonoBehaviour` |
+| **原始碼** | [NodePool.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/PoolSystem/Scripts/Runtime/Core/NodePool.cs) |
+
+```csharp
+using OxGKit.PoolSystem;
+```
+
+<Highlight color="#0373fc">注意</Highlight> 分散幀加載基於 **UniTask** 實現，啟用時 [Initialize](#initialize) 會**異步分批建立**物件，可透過 [IsLoadFinished](#isloadfinished) 確認完成時機。
+
+## 快速上手 {#quick-start}
+
+```csharp
+using OxGKit.PoolSystem;
+using UnityEngine;
+
+// 於 Inspector 指定場景上的 NodePool (已配置 Source GameObject)
+public NodePool objPool;
+
+// 手動初始物件池 (勾選 initializeOnStart 則會於 Start 自動初始)
+this.objPool.Initialize();
+
+// 從物件池取出並指定父節點 (池中無可用物件且未開啟 autoPut 時會回傳 null)
+var go = this.objPool.Get(this.transform);
+
+// 使用完畢歸還物件池
+this.objPool.Put(go);
+```
+
+## 通用規則 {#general-rules}
+
+### 生命週期 {#lifecycle}
+
+1. **初始**：勾選 **initializeOnStart (預設)** 會於 `Start` 自動呼叫 [Initialize](#initialize)；取消勾選則自行決定初始時機。
+2. **取出/歸還**：以 [Get](#get) 取出物件 (自動 `SetActive(true)`)，使用完畢以 [Put](#put) 歸還 (自動 `SetActive(false)` 並歸位至池節點下)。
+3. **清空**：組件 `OnDestroy` 時會自動呼叫 [Clear](#clear)，取消未完成的加載任務並銷毀池中物件。
+
+<Highlight color="#ff2f00">重要</Highlight> **Source GameObject (go) 不能為空**，未指定來源時初始物件池會擲出 `ArgumentNullException`；另外**請勿自行 `Destroy` 池化物件**，務必以 [Put](#put) 歸還，否則物件池數量會逐漸縮減。
+
+### 物件狀態重置 {#reset-state}
+
+池化物件是**重複使用**的，[Get](#get) 取出時不會重置物件狀態，請於物件的 `OnEnable` 或取出後自行重置 (例如速度、拖尾、協程等)，切勿假設物件為全新實例化的狀態。
+
+### 自動增長批次設定 {#auto-put-batch}
+
+<Highlight color="#0373fc">注意</Highlight> 目前版本 (v1.0.2) 的自動增長 (Auto Put) 分散幀流程，「每生成 N 個物件」的批次數量沿用 **initDelayFrameAfterSpawnCount** 設定 (**autoDelayFrameAfterSpawnCount** 尚未被使用)，延遲幀數則使用 **autoPutDelayFrame**。
+
+### 日誌輸出 {#logging}
+
+本模組的日誌透過 [LoggingSystem](/docs/loggingsystem/intro) 輸出，日誌器名稱為 `OxGKit.PoolSystem.Logger`，可透過其配置開關與級別。
+
+---
+
+## 成員 {#members}
+
+| 成員 | 說明 |
+| :--- | :--- |
+| `public GameObject go` | 物件池的來源物件 (Inspector: **Source GameObject**)，**必填**。 |
+| `public bool initializeOnStart` | 是否於 `Start` 自動初始物件池 (預設 `true`)。 |
+| `public int initSize` | 物件池的初始數量 (預設 `5`)。 |
+| `public bool initLoadAcrossFrames` | 初始時啟用分散幀加載 (預設 `true`)。 |
+| `public int initDelayFrameAfterSpawnCount` | 初始時每生成 N 個物件後進行延遲 (預設 `1`，配置 `<= 0` 會自動修正為 `1`)。 |
+| `public int initDelayFrame` | 初始時每批延遲的幀數 (預設 `1`)。 |
+| `public bool autoPut` | 池中無可用物件時，是否自動增生 (預設 `false`)。 |
+| `public int autoPutSize` | 每次自動增生的數量 (預設 `1`)。 |
+| `public bool autoPutLoadAcrossFrames` | 自動增生時啟用分散幀加載 (預設 `true`)。 |
+| `public int autoDelayFrameAfterSpawnCount` | 自動增生時每生成 N 個物件後進行延遲 (預設 `1`，詳見[自動增長批次設定](#auto-put-batch))。 |
+| `public int autoPutDelayFrame` | 自動增生時每批延遲的幀數 (預設 `1`)。 |
+| `public int maxSize` | 物件池上限，`0` 或 `-1` 為不限制，`> 0` 時 **initSize** 與 **autoPut** 增生皆會受限 (預設 `0`)。 |
+
+---
+
+## 初始與管理 {#pool-management}
+
+### 方法總覽 {#management-overview}
+
+| 方法 | 說明 |
+| :--- | :--- |
+| [Initialize](#initialize) | 初始物件池 (會先清空再依 initSize 重新建立)。 |
+| [IsLoadFinished](#isloadfinished) | 初始或自動增生的加載流程是否完成。 |
+| [Count](#count) | 當前池中的閒置物件數量。 |
+| [Clear](#clear) | 清空物件池 (取消加載任務並銷毀池中物件)。 |
+
+---
+
+### Initialize {#initialize}
+
+```csharp
+public void Initialize()
+```
+
+初始物件池：會先呼叫 [Clear](#clear) 清空，再依 **initSize** 建立物件並放入池中 (**maxSize** `> 0` 時以 `Min(initSize, maxSize)` 為準)；啟用 **initLoadAcrossFrames** 時，會以異步分散幀方式分批建立。
+
+<Highlight color="#00d679">提醒</Highlight> 勾選 **initializeOnStart** 會於 `Start` 自動呼叫；重複呼叫等同於**重建**物件池。
+
+```csharp
+// 手動初始物件池 (取消勾選 initializeOnStart 時)
+this.objPool.Initialize();
+```
+
+### IsLoadFinished {#isloadfinished}
+
+```csharp
+public bool IsLoadFinished()
+```
+
+回傳**初始或自動增生**的加載流程是否已完成；啟用分散幀加載時，建議在需要完整物件池的時機前 (例如大量生成前) 先行確認。
+
+```csharp
+if (this.objPool.IsLoadFinished())
+{
+    // 物件池已就緒
+}
+```
+
+### Count {#count}
+
+```csharp
+public int Count()
+```
+
+回傳**當前池中的閒置物件數量** ([Get](#get) 取出會遞減、[Put](#put) 歸還會遞增)。
+
+```csharp
+int count = this.objPool.Count();
+```
+
+### Clear {#clear}
+
+```csharp
+public void Clear()
+```
+
+清空物件池：**取消尚未完成的加載任務**，銷毀池中所有物件並將計數歸零；組件 `OnDestroy` 時會自動呼叫。
+
+<Highlight color="#0373fc">注意</Highlight> 清空僅會銷毀**池中閒置物件**，已被 [Get](#get) 取出的物件不受影響；請留意功能關閉順序，**物件池銷毀後不應再對其呼叫 [Put](#put)**。
+
+---
+
+## 取出與歸還 {#get-put}
+
+### 方法總覽 {#get-put-overview}
+
+| 方法 | 說明 |
+| :--- | :--- |
+| [Get](#get) | 從物件池取出物件 (支持指定父節點、座標與旋轉)。 |
+| [Put](#put) | 將物件歸還物件池 (超出 maxSize 會直接銷毀)。 |
+
+---
+
+### Get {#get}
+
+```csharp
+public GameObject Get()
+
+public GameObject Get(Transform parent)
+
+public GameObject Get(Transform parent, Vector3 position)
+
+public GameObject Get(Transform parent, Vector3 position, Quaternion rotation)
+```
+
+從物件池取出物件並自動 `SetActive(true)`：
+
+- **無參數**：物件會脫離池節點 (父節點設為 `null`)。
+- **parent**：取出後掛至指定的父節點下。
+- **position**：設置物件的 **localPosition (局部座標)**。
+- **rotation**：設置物件的 **rotation (世界空間旋轉)**。
+
+池中無可用物件時：
+
+- 已啟用 **autoPut** 且 **autoPutSize** `> 0` → 自動增生並返回物件 (即使開啟分散幀加載，第一個物件仍會同幀建立並立即返回)。
+- 未啟用 **autoPut** → 回傳 `null`，**呼叫端需自行判空**。
+
+<Highlight color="#0373fc">注意</Highlight> **position** 設置的是 **localPosition**，會受父節點 Transform 影響；**rotation** 則為**世界空間**旋轉。
+
+```csharp
+// 取出並指定父節點
+var go = this.objPool.Get(this.transform);
+if (go != null)
+{
+    // 使用物件...
+}
+
+// 取出並指定父節點、局部座標與旋轉
+var go2 = this.objPool.Get(parent, Vector3.zero, Quaternion.identity);
+```
+
+### Put {#put}
+
+```csharp
+public void Put(GameObject go)
+```
+
+將物件**歸還**物件池：自動歸位至池節點下並 `SetActive(false)`；若 **maxSize** `> 0` 且池中數量已達上限，則**直接銷毀**該物件並輸出日誌提醒。
+
+<Highlight color="#00d679">提醒</Highlight> **maxSize** 統計的是**池中閒置物件**數量，場上使用中的物件歸還時若池已滿即會被銷毀，請以**尖峰同時使用量**評估上限。
+
+```csharp
+// 使用完畢歸還物件池
+this.objPool.Put(go);
+```

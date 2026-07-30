@@ -1,0 +1,262 @@
+---
+sidebar_position: 1
+description: Cursors 是 CursorSystem 的静态门面 (Facade)，包装 CursorManager 单例的所有操作，提供游标显示/锁定控制、状态切换与渲染重置等 API。
+---
+
+# Cursors
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`Cursors` 是 **CursorSystem** 的**静态门面 (Facade)**，内部包装 [CursorManager](./CursorManager.mdx) 单例的所有操作 (首次调用会自动查找或创建 `[CursorManager]` 实例)，提供**游标显示/锁定控制**、**状态切换**与**渲染重置**等 API；建议一律通过 `Cursors` 进行游标操作，保持状态一致。
+
+|  |  |
+| :--- | :--- |
+| **命名空间** | `OxGKit.CursorSystem` |
+| **类型** | `public static class Cursors` |
+| **源码** | [Cursors.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/CursorSystem/Scripts/Runtime/Cursors.cs) |
+
+```csharp
+using OxGKit.CursorSystem;
+```
+
+## 快速上手 {#quick-start}
+
+```csharp
+using OxGKit.CursorSystem;
+using UnityEngine;
+
+// 初始 CursorManager 实例 (场景上已放置 CursorManager Prefab 则会自动查找)
+Cursors.InitInstance();
+
+// 按名称切换游标状态
+Cursors.SetCursorState("Attack");
+
+// 重置回默认状态 (列表第一条)
+Cursors.ResetCursorState();
+
+// 显示与锁定控制
+Cursors.SetCursorVisible(true);
+Cursors.SetCursorLockState(CursorLockMode.Confined);
+```
+
+## 通用规则 {#general-rules}
+
+### 单例与默认状态 {#singleton-default-state}
+
+1. 任一 `Cursors` API 首次被调用时，会自动查找场景上的 [CursorManager](./CursorManager.mdx)；找不到则自动创建 `[CursorManager]` 节点 (整理至 `OxGKit` 容器节点下并 DontDestroyOnLoad 常驻)。
+2. **Cursor States 列表第一条即为默认状态**，[ResetCursorState](#resetcursorstate) 会重置回第一条状态。
+
+<Highlight color="#0373fc">注意</Highlight> 状态名称属于**数据** (依 Inspector 上的 Cursor States 配置)，并非常量；[SetCursorState](#setcursorstate) 传入未定义的名称会返回 `false`，开发时建议检查返回值。
+
+---
+
+## 初始 {#initialization}
+
+### 方法总览 {#init-overview}
+
+| 方法 | 说明 |
+| :--- | :--- |
+| [InitInstance](#initinstance) | 初始 CursorManager 实例。 |
+
+---
+
+### InitInstance {#initinstance}
+
+```csharp
+public static void InitInstance()
+```
+
+初始 [CursorManager](./CursorManager.mdx) 实例 (查找场景上的实例，找不到则自动创建)，建议在游戏启动时调用。
+
+---
+
+## 显示与锁定 {#visibility-lock}
+
+### 方法总览 {#visibility-overview}
+
+| 方法 | 说明 |
+| :--- | :--- |
+| [IsCursorVisible](#iscursorvisible) | 检查游标是否显示。 |
+| [SetCursorVisible](#setcursorvisible) | 设置游标显示开关。 |
+| [GetCurrentCursorLockState](#getcurrentcursorlockstate) | 获取当前游标锁定模式。 |
+| [SetCursorLockState](#setcursorlockstate) | 设置游标锁定模式。 |
+
+---
+
+### IsCursorVisible {#iscursorvisible}
+
+```csharp
+public static bool IsCursorVisible()
+```
+
+检查返回游标当前是否显示 (即 `Cursor.visible`)。
+
+### SetCursorVisible {#setcursorvisible}
+
+```csharp
+public static void SetCursorVisible(bool visible)
+```
+
+设置游标显示开关 (即 `Cursor.visible`)。
+
+### GetCurrentCursorLockState {#getcurrentcursorlockstate}
+
+```csharp
+public static CursorLockMode GetCurrentCursorLockState()
+```
+
+获取当前游标锁定模式 (即 `Cursor.lockState`)。
+
+### SetCursorLockState {#setcursorlockstate}
+
+```csharp
+public static void SetCursorLockState(CursorLockMode cursorLockMode)
+```
+
+设置游标锁定模式 (`None`、`Locked`、`Confined`)。
+
+```csharp
+// FPS 类操作 (隐藏并锁定于画面中心)
+Cursors.SetCursorVisible(false);
+Cursors.SetCursorLockState(CursorLockMode.Locked);
+
+// 打开菜单时释放
+Cursors.SetCursorLockState(CursorLockMode.None);
+Cursors.SetCursorVisible(true);
+```
+
+<Highlight color="#0373fc">注意</Highlight> **WebGL** 平台受浏览器限制，锁定 (`Locked`) 需由**用户手势** (点击等) 触发才会生效。
+
+---
+
+## 状态管理 {#state-management}
+
+### 方法总览 {#state-overview}
+
+| 方法 | 说明 |
+| :--- | :--- |
+| [GetAllCursorStates](#getallcursorstates) | 获取所有游标状态。 |
+| [GetCursorState](#getcursorstate) | 获取指定名称的游标状态。 |
+| [GetCurrentCursorState](#getcurrentcursorstate) | 获取当前游标状态。 |
+| [SetCursorState](#setcursorstate) | 按名称切换游标状态。 |
+| [ResetCursorState](#resetcursorstate) | 重置回默认状态 (列表第一条)。 |
+
+---
+
+### GetAllCursorStates {#getallcursorstates}
+
+```csharp
+public static CursorManager.CursorState[] GetAllCursorStates()
+```
+
+获取所有已配置的游标状态 ([CursorState](./CursorManager.mdx#cursorstate))。
+
+### GetCursorState {#getcursorstate}
+
+```csharp
+public static CursorManager.CursorState GetCursorState(string stateName)
+```
+
+获取指定名称的游标状态，找不到返回 `null`；可用于运行时动态调整状态参数 (贴图、热点、速率等)。
+
+```csharp
+var cursorState = Cursors.GetCursorState("Default");
+cursorState?.SetFrameRate(12);
+```
+
+### GetCurrentCursorState {#getcurrentcursorstate}
+
+```csharp
+public static CursorManager.CursorState GetCurrentCursorState()
+```
+
+获取当前游标状态。
+
+### SetCursorState {#setcursorstate}
+
+```csharp
+public static bool SetCursorState(string stateName)
+```
+
+按名称切换游标状态并重置渲染，切换成功返回 `true`；找不到该名称返回 `false`。
+
+```csharp
+// 例如滑入敌人时切换攻击游标
+if (!Cursors.SetCursorState("Attack"))
+    Debug.LogWarning("Cursor state not found!");
+```
+
+### ResetCursorState {#resetcursorstate}
+
+```csharp
+public static void ResetCursorState()
+```
+
+重置游标状态为**默认状态 (列表第一条)** 并重置渲染；也可用于 [RemoveCursorRender](#removecursorrender) 后恢复游标渲染。
+
+---
+
+## 渲染控制 {#render-control}
+
+### 方法总览 {#render-overview}
+
+| 方法 | 说明 |
+| :--- | :--- |
+| [SetIgnoreScale](#setignorescale) | 设置动态游标动画是否忽略 Time.timeScale。 |
+| [SetScaleToAllCursors](#setscaletoallcursors) | 设置所有游标状态的缩放比例并重置渲染。 |
+| [ResetRender](#resetrender) | 重置当前游标状态的渲染。 |
+| [RemoveCursorRender](#removecursorrender) | 移除游标渲染 (恢复系统游标)。 |
+
+---
+
+### SetIgnoreScale {#setignorescale}
+
+```csharp
+public static void SetIgnoreScale(bool ignore)
+```
+
+设置动态游标动画更新是否忽略 `Time.timeScale` (默认 `true`，使用 `Time.unscaledDeltaTime` 驱动)；若需要游标动画在游戏暂停 (`Time.timeScale = 0`) 时持续播放，请保持为 `true`。
+
+### SetScaleToAllCursors {#setscaletoallcursors}
+
+```csharp
+public static void SetScaleToAllCursors(Vector2 scale)
+```
+
+设置**所有**游标状态的缩放比例并重置渲染。
+
+<Highlight color="#0373fc">注意</Highlight> 缩放仅在该状态启用 **scalingEnabled** 且 **cursorMode 为 ForceSoftware** 时才会生效。
+
+### ResetRender {#resetrender}
+
+```csharp
+public static void ResetRender()
+```
+
+重置**当前**游标状态的渲染 (静态游标重新应用贴图；动态游标重置动画参数重新播放)。
+
+### RemoveCursorRender {#removecursorrender}
+
+```csharp
+public static void RemoveCursorRender()
+```
+
+移除游标渲染 (将当前状态置空并恢复**系统默认游标**)。
+
+<Highlight color="#00d679">提醒</Highlight> 若要恢复自定义游标渲染，请调用 [ResetCursorState](#resetcursorstate) 重新初始并重置渲染 (而非仅调用 [SetCursorVisible](#setcursorvisible))。

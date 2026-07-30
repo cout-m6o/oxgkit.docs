@@ -1,0 +1,231 @@
+---
+sidebar_position: 1
+description: NodePool is PoolSystem's simple GameObject pool component, supporting asynchronous across-frames loading (load balancing), auto growth (Auto Put), and max size limiting (Max Size).
+---
+
+# NodePool
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`NodePool` is **PoolSystem**'s simple **GameObject object pool** component (`MonoBehaviour`). It manages idle objects with a **Queue (FIFO)** and supports **asynchronous across-frames loading (load balancing)**, **auto growth (Auto Put)**, and **max size limiting (Max Size)**. Attach it to a scene node via **Add Component -> OxGKit -> PoolSystem -> NodePool** (that node becomes the pool's container node).
+
+|  |  |
+| :--- | :--- |
+| **Namespace** | `OxGKit.PoolSystem` |
+| **Type** | `public class NodePool : MonoBehaviour` |
+| **Source** | [NodePool.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/PoolSystem/Scripts/Runtime/Core/NodePool.cs) |
+
+```csharp
+using OxGKit.PoolSystem;
+```
+
+<Highlight color="#0373fc">Attention</Highlight> Across-frames loading is powered by **UniTask**; when enabled, [Initialize](#initialize) creates objects **asynchronously in batches** — use [IsLoadFinished](#isloadfinished) to check completion.
+
+## Quick Start {#quick-start}
+
+```csharp
+using OxGKit.PoolSystem;
+using UnityEngine;
+
+// Assign the scene's NodePool in the Inspector (Source GameObject configured)
+public NodePool objPool;
+
+// Manually initialize the pool (with initializeOnStart checked, it auto-initializes on Start)
+this.objPool.Initialize();
+
+// Get from the pool with a parent (returns null if the pool is empty and autoPut is off)
+var go = this.objPool.Get(this.transform);
+
+// Put back into the pool when done
+this.objPool.Put(go);
+```
+
+## General Rules {#general-rules}
+
+### Lifecycle {#lifecycle}
+
+1. **Initialization**: With **initializeOnStart (default)** checked, [Initialize](#initialize) is called automatically on `Start`; uncheck it to decide the initialization timing yourself.
+2. **Get/Put**: Take objects out with [Get](#get) (auto `SetActive(true)`) and return them with [Put](#put) when done (auto `SetActive(false)` and re-parented under the pool node).
+3. **Clear**: On the component's `OnDestroy`, [Clear](#clear) is called automatically — it cancels pending loading tasks and destroys pooled objects.
+
+<Highlight color="#ff2f00">Important</Highlight> **Source GameObject (go) must not be null** — initializing the pool without a source throws an `ArgumentNullException`. Also, **never `Destroy` a pooled object yourself** — always return it with [Put](#put), otherwise the pool shrinks over time.
+
+### Resetting Object State {#reset-state}
+
+Pooled objects are **reused** — [Get](#get) does not reset object state. Reset it yourself in the object's `OnEnable` or right after taking it out (e.g., velocity, trails, coroutines); never assume a freshly-instantiated state.
+
+### Auto-Put Batch Settings {#auto-put-batch}
+
+<Highlight color="#0373fc">Attention</Highlight> In the current version (v1.0.2), the across-frames auto growth (Auto Put) flow reuses the **initDelayFrameAfterSpawnCount** setting as its "spawn N objects" batch count (**autoDelayFrameAfterSpawnCount** is not applied yet), while the delay uses **autoPutDelayFrame**.
+
+### Log Output {#logging}
+
+This module logs through [LoggingSystem](/docs/loggingsystem/intro) under the logger name `OxGKit.PoolSystem.Logger`, whose toggle and level can be configured there.
+
+---
+
+## Members {#members}
+
+| Member | Description |
+| :--- | :--- |
+| `public GameObject go` | The source object to pool (Inspector: **Source GameObject**), **required**. |
+| `public bool initializeOnStart` | Whether to initialize the pool automatically on `Start` (default `true`). |
+| `public int initSize` | The initial size of the pool (default `5`). |
+| `public bool initLoadAcrossFrames` | Enables across-frames loading during initialization (default `true`). |
+| `public int initDelayFrameAfterSpawnCount` | During initialization, delay after spawning N objects (default `1`; values `<= 0` are corrected to `1`). |
+| `public int initDelayFrame` | Number of frames to delay per batch during initialization (default `1`). |
+| `public bool autoPut` | Whether to auto-create objects when the pool runs dry (default `false`). |
+| `public int autoPutSize` | The increment count for each auto-create operation (default `1`). |
+| `public bool autoPutLoadAcrossFrames` | Enables across-frames loading during auto growth (default `true`). |
+| `public int autoDelayFrameAfterSpawnCount` | During auto growth, delay after spawning N objects (default `1`; see [Auto-Put Batch Settings](#auto-put-batch)). |
+| `public int autoPutDelayFrame` | Number of frames to delay per batch during auto growth (default `1`). |
+| `public int maxSize` | The pool size cap: `0` or `-1` means unlimited; when `> 0`, both **initSize** and **autoPut** growth are restricted (default `0`). |
+
+---
+
+## Initialization & Management {#pool-management}
+
+### Method Overview {#management-overview}
+
+| Method | Description |
+| :--- | :--- |
+| [Initialize](#initialize) | Initializes the pool (clears first, then rebuilds by initSize). |
+| [IsLoadFinished](#isloadfinished) | Whether the init or auto-put loading process has finished. |
+| [Count](#count) | Current idle object count in the pool. |
+| [Clear](#clear) | Clears the pool (cancels loading tasks and destroys pooled objects). |
+
+---
+
+### Initialize {#initialize}
+
+```csharp
+public void Initialize()
+```
+
+Initializes the pool: calls [Clear](#clear) first, then creates **initSize** objects into the pool (with **maxSize** `> 0`, the count is `Min(initSize, maxSize)`); with **initLoadAcrossFrames** enabled, objects are created asynchronously in batches across frames.
+
+<Highlight color="#00d679">Reminder</Highlight> With **initializeOnStart** checked, this is called automatically on `Start`; calling it again is equivalent to **rebuilding** the pool.
+
+```csharp
+// Manually initialize the pool (when initializeOnStart is unchecked)
+this.objPool.Initialize();
+```
+
+### IsLoadFinished {#isloadfinished}
+
+```csharp
+public bool IsLoadFinished()
+```
+
+Returns whether the **init or auto-put** loading process has finished. With across-frames loading enabled, check it before moments that need the full pool warm (e.g., before mass spawning).
+
+```csharp
+if (this.objPool.IsLoadFinished())
+{
+    // The pool is ready
+}
+```
+
+### Count {#count}
+
+```csharp
+public int Count()
+```
+
+Returns the **current idle object count in the pool** ([Get](#get) decrements it, [Put](#put) increments it).
+
+```csharp
+int count = this.objPool.Count();
+```
+
+### Clear {#clear}
+
+```csharp
+public void Clear()
+```
+
+Clears the pool: **cancels pending loading tasks**, destroys all pooled objects, and resets the counter; called automatically on the component's `OnDestroy`.
+
+<Highlight color="#0373fc">Attention</Highlight> Clearing only destroys **idle objects in the pool** — objects already taken out by [Get](#get) are unaffected. Mind your shutdown order: **never call [Put](#put) on a pool that has been destroyed**.
+
+---
+
+## Get & Put {#get-put}
+
+### Method Overview {#get-put-overview}
+
+| Method | Description |
+| :--- | :--- |
+| [Get](#get) | Gets an object from the pool (with optional parent, position, and rotation). |
+| [Put](#put) | Returns an object to the pool (destroyed directly when exceeding maxSize). |
+
+---
+
+### Get {#get}
+
+```csharp
+public GameObject Get()
+
+public GameObject Get(Transform parent)
+
+public GameObject Get(Transform parent, Vector3 position)
+
+public GameObject Get(Transform parent, Vector3 position, Quaternion rotation)
+```
+
+Gets an object from the pool and automatically calls `SetActive(true)`:
+
+- **No arguments**: The object detaches from the pool node (parent set to `null`).
+- **parent**: Re-parents the object under the given parent.
+- **position**: Sets the object's **localPosition (local space)**.
+- **rotation**: Sets the object's **rotation (world space)**.
+
+When the pool has no available object:
+
+- With **autoPut** enabled and **autoPutSize** `> 0` → auto-creates and returns an object (even with across-frames loading enabled, the first object is still created in the same frame and returned immediately).
+- Without **autoPut** → returns `null`; **the caller must null-check**.
+
+<Highlight color="#0373fc">Attention</Highlight> **position** sets **localPosition** and is affected by the parent's Transform; **rotation** is in **world space**.
+
+```csharp
+// Get with a parent
+var go = this.objPool.Get(this.transform);
+if (go != null)
+{
+    // Use the object...
+}
+
+// Get with a parent, local position, and rotation
+var go2 = this.objPool.Get(parent, Vector3.zero, Quaternion.identity);
+```
+
+### Put {#put}
+
+```csharp
+public void Put(GameObject go)
+```
+
+**Returns** an object to the pool: re-parents it under the pool node and calls `SetActive(false)`; if **maxSize** `> 0` and the pool is full, the object is **destroyed directly** and a log reminder is printed.
+
+<Highlight color="#00d679">Reminder</Highlight> **maxSize** counts **idle objects in the pool** — in-flight objects returned to a full pool get destroyed, so size the cap to **peak concurrent usage**.
+
+```csharp
+// Put back into the pool when done
+this.objPool.Put(go);
+```

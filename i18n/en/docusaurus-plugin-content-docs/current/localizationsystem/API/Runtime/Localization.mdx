@@ -1,0 +1,451 @@
+---
+sidebar_position: 1
+description: Localization is the localization core of the LocalizationSystem, driven by callbacks for custom table parsing and custom supported languages, providing language switching, system-language detection, and code-to-text lookup APIs, and covering the LangType and LanguageMapping types.
+---
+
+# Localization
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`Localization` is the localization core of the **LocalizationSystem** (all members are `static`). The project supplies the supported languages and language table parsing via **callbacks** ([onAddSupportedLanguages](#onaddsupportedlanguages), [onParsingLanguageData](#onparsinglanguagedata), [onChangeLanguage](#onchangelanguage)), and the class provides **language switching ([ChangeLanguage](#changelanguage))**, **system-language detection**, and **code-to-text lookup ([GetStringByCode](#getstringbycode))** APIs; see the [Module Intro](../../intro.mdx) for the full initialization flow.
+
+|  |  |
+| :--- | :--- |
+| **Namespace** | `OxGKit.LocalizationSystem` |
+| **Type** | `public class Localization` (all members are `static`) |
+| **Source** | [Localization.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/LocalizationSystem/Scripts/Runtime/Core/Localization.cs) |
+
+```csharp
+using OxGKit.LocalizationSystem;
+```
+
+## Quick Start {#quick-start}
+
+```csharp
+using System.Collections.Generic;
+using OxGKit.LocalizationSystem;
+
+// 1. Declare the supported languages
+Localization.onAddSupportedLanguages = (supportedLanguages) =>
+{
+    supportedLanguages.Add(LangType.English);
+    supportedLanguages.Add(LangType.ChineseTraditional);
+};
+
+// 2. Provide language table parsing (data source is up to the project: JSON, spreadsheet exports, a server...)
+Localization.onParsingLanguageData = (langType, langData) =>
+{
+    foreach (var pair in langSheet[langType.ToString()])
+        langData.TryAdd(pair.Key, pair.Value);
+    return true; // return true on success
+};
+
+// 3. Refresh UI texts after a successful language switch
+Localization.onChangeLanguage = (langType) => RefreshAllLocalizedTexts();
+
+// 4. First switch (e.g. use the system language; automatically falls back to English when unsupported)
+Localization.ChangeLanguage(Localization.systemLanguage);
+
+// 5. The UI always looks up texts by code
+string title = Localization.GetStringByCode("ui.title");
+```
+
+## General Rules {#general-rules}
+
+### Required Callbacks {#required-callbacks}
+
+1. Assign [onAddSupportedLanguages](#onaddsupportedlanguages) to declare the supported languages.
+2. Assign [onParsingLanguageData](#onparsinglanguagedata) to provide language table parsing (the data source needed for parsing must be prepared first).
+3. (Recommended) Subscribe to [onChangeLanguage](#onchangelanguage) to refresh UI texts.
+
+<Highlight color="#ff2f00">Important</Highlight> When `onParsingLanguageData` is **unassigned or parsing returns `false`**, [ChangeLanguage](#changelanguage) **throws an exception**.
+
+### Caching Mechanism {#cache-rules}
+
+<Highlight color="#0373fc">Attention</Highlight> [GetSupportedLanguages](#getsupportedlanguages) and the mapping-table APIs **cache their result on the first call** (the callback is not fired again), so you must **assign `onAddSupportedLanguages` first**, before calling any supported-language related API (including [systemLanguage](#systemlanguage), [IsSupportedLanguage](#issupportedlanguage), etc.).
+
+### Persisting the Language {#persist-language}
+
+<Highlight color="#00d679">Reminder</Highlight> The module **does not persist the selected language**; the project owns saving/restoring the `LangType`. When restoring, it is recommended to sanitize the value with [GetAndCheckIsSupportedLanguage](#getandcheckissupportedlanguage) first.
+
+---
+
+## Callback Members {#callbacks}
+
+### Member Overview {#callback-overview}
+
+| Member | Description |
+| :--- | :--- |
+| [onAddSupportedLanguages](#onaddsupportedlanguages) | Callback that adds the supported languages. |
+| [onParsingLanguageData](#onparsinglanguagedata) | Callback that parses the language table data (invoked by ChangeLanguage). |
+| [onChangeLanguage](#onchangelanguage) | Callback fired after a successful language switch. |
+
+---
+
+### onAddSupportedLanguages {#onaddsupportedlanguages}
+
+```csharp
+public static Action<HashSet<LangType>> onAddSupportedLanguages
+```
+
+Callback that adds the **supported languages**; fired the **first time** [GetSupportedLanguages](#getsupportedlanguages) is called. Add the languages your project supports to the `supportedLanguages` set.
+
+```csharp
+Localization.onAddSupportedLanguages = (supportedLanguages) =>
+{
+    supportedLanguages.Add(LangType.English);
+    supportedLanguages.Add(LangType.ChineseTraditional);
+    supportedLanguages.Add(LangType.ChineseSimplified);
+    supportedLanguages.Add(LangType.Japanese);
+    supportedLanguages.Add(LangType.Korean);
+};
+```
+
+### onParsingLanguageData {#onparsinglanguagedata}
+
+```csharp
+public static Func<LangType, Dictionary<string, string>, bool> onParsingLanguageData
+```
+
+Callback that parses the **language table data**; invoked by [ChangeLanguage](#changelanguage). Fill the **Code -> Text** pairs of the given language into `langData` (after a successful switch, that dictionary is cached as the **current language table**), and return `true` on success.
+
+```csharp
+Localization.onParsingLanguageData = (langType, langData) =>
+{
+    // Your lang sheet (can load from json or server)
+    if (langSheet.ContainsKey(langType.ToString()))
+    {
+        // The ref langData will be cached by Localization
+        foreach (var pair in langSheet[langType.ToString()])
+            langData.TryAdd(pair.Key, pair.Value);
+        return true;
+    }
+    return false;
+};
+```
+
+<Highlight color="#ff2f00">Important</Highlight> When unassigned or returning `false`, `ChangeLanguage` throws an exception; the data source needed for parsing (game database, downloaded language tables, etc.) must be **prepared before initializing localization**.
+
+### onChangeLanguage {#onchangelanguage}
+
+```csharp
+public static Action<LangType> onChangeLanguage
+```
+
+Notification callback fired **after a successful language switch**; the parameter is the language switched to. This is the place to refresh the UI display texts (together with [GetStringByCode](#getstringbycode)).
+
+```csharp
+private void _InitEvents()
+{
+    // Refresh lang text callback
+    Localization.onChangeLanguage += this._RefreshLanguage;
+}
+
+private void _RefreshLanguage(LangType langType)
+{
+    this.titleText.text = Localization.GetStringByCode("ui.title");
+}
+```
+
+<Highlight color="#00d679">Reminder</Highlight> Fired on every successful switch, so the handler must be **repeat-safe** (only redraw texts/data; do not perform one-time registrations inside it).
+
+---
+
+## Properties {#properties}
+
+### Member Overview {#property-overview}
+
+| Member | Description |
+| :--- | :--- |
+| [currentLanguage](#currentlanguage) | The current language (read-only). |
+| [systemLanguage](#systemlanguage) | The system language (checked against the supported languages; falls back to English when unsupported). |
+
+---
+
+### currentLanguage {#currentlanguage}
+
+```csharp
+public static LangType currentLanguage { get; private set; }
+```
+
+The current language (read-only); its initial value comes from [systemLanguage](#systemlanguage), and it is only updated **after a successful** [ChangeLanguage](#changelanguage).
+
+```csharp
+// Save the selected language (the module does not persist it)
+PlayerPrefs.SetInt("language", (int)Localization.currentLanguage);
+```
+
+### systemLanguage {#systemlanguage}
+
+```csharp
+public static LangType systemLanguage { get; }
+```
+
+Gets the **system language**: maps the OS language via [GetSystemLanguageToLangType](#getsystemlanguagetolangtype) to a [LangType](#langtype), then checks it with [GetAndCheckIsSupportedLanguage](#getandcheckissupportedlanguage); when it is **not a supported language, it always falls back to `LangType.English`**.
+
+```csharp
+// On first launch without a saved language, use the system language as the default
+Localization.ChangeLanguage(Localization.systemLanguage);
+```
+
+---
+
+## Language Switching and Text Lookup {#change-and-get}
+
+### Method Overview {#change-overview}
+
+| Method | Description |
+| :--- | :--- |
+| [ChangeLanguage](#changelanguage) | Switches the language and validates it. |
+| [GetStringByCode](#getstringbycode) | Gets the corresponding text from the language table by code. |
+
+---
+
+### ChangeLanguage {#changelanguage}
+
+```csharp
+public static void ChangeLanguage(LangType langType)
+```
+
+Switches the language and validates it. The flow is:
+
+1. Invokes [onParsingLanguageData](#onparsinglanguagedata) to parse the language table of the given language.
+2. Verifies whether `langType` is a supported language:
+   - **Yes**: caches the language table data, updates [currentLanguage](#currentlanguage), and fires [onChangeLanguage](#onchangelanguage).
+   - **No**: logs a warning (`The language type is not supported`) and **keeps the current language** (no update, no callback).
+
+```csharp
+Localization.ChangeLanguage(LangType.Japanese);
+
+// Save the selected language (the module does not persist it)
+PlayerPrefs.SetInt("language", (int)Localization.currentLanguage);
+```
+
+<Highlight color="#ff2f00">Important</Highlight> When `onParsingLanguageData` is **unassigned or parsing fails (returns `false`)**, an `Exception` is thrown.
+
+<Highlight color="#0373fc">Attention</Highlight> Sanitize the value with [GetAndCheckIsSupportedLanguage](#getandcheckissupportedlanguage) before passing it in (to avoid a saved legacy language value that is no longer supported).
+
+### GetStringByCode {#getstringbycode}
+
+```csharp
+public static string GetStringByCode(string code)
+```
+
+Gets the corresponding text from the **current language table** by **code**; returns `"Unknown Text"` when the code is not found.
+
+```csharp
+this.titleText.text = Localization.GetStringByCode("ui.title");
+```
+
+<Highlight color="#0373fc">Attention</Highlight> **Throws an `Exception`** if [ChangeLanguage](#changelanguage) has never succeeded yet (no language table data); during QA, treat `"Unknown Text"` as a **missing string code** signal.
+
+---
+
+## Supported Language Queries {#supported-queries}
+
+### Method Overview {#query-overview}
+
+| Method | Description |
+| :--- | :--- |
+| [GetSupportedLanguages](#getsupportedlanguages) | Gets the current supported-language set. |
+| [IsSupportedLanguage](#issupportedlanguage) | Whether the language is supported. |
+| [GetAndCheckIsSupportedLanguage](#getandcheckissupportedlanguage) | Checks the language; always returns English when unsupported. |
+| [GetSystemLanguageToLangType](#getsystemlanguagetolangtype) | Gets the LangType definition corresponding to the system language. |
+| [GetSupportedLanguagesMappingByLangType](#getsupportedlanguagesmappingbylangtype) | Gets the language description mapping table (Key = LangType). |
+| [GetSupportedLanguagesMappingByLangDesc](#getsupportedlanguagesmappingbylangdesc) | Gets the language description mapping table (Key = LangDesc). |
+
+---
+
+### GetSupportedLanguages {#getsupportedlanguages}
+
+```csharp
+public static HashSet<LangType> GetSupportedLanguages()
+```
+
+Gets the current **supported-language set**; the first call fires [onAddSupportedLanguages](#onaddsupportedlanguages) to collect and **cache** the set, and subsequent calls return the cached result directly.
+
+### IsSupportedLanguage {#issupportedlanguage}
+
+```csharp
+public static bool IsSupportedLanguage(LangType langType)
+```
+
+Whether the language is a **supported language**.
+
+### GetAndCheckIsSupportedLanguage {#getandcheckissupportedlanguage}
+
+```csharp
+public static LangType GetAndCheckIsSupportedLanguage(LangType langType)
+```
+
+Gets and checks whether the language is a supported language: **returns the value as-is when supported; always returns `LangType.English` when unsupported**. Suitable for sanitizing **saved/system values**.
+
+```csharp
+var savedLang = (LangType)PlayerPrefs.GetInt("language", (int)Localization.systemLanguage);
+Localization.ChangeLanguage(Localization.GetAndCheckIsSupportedLanguage(savedLang));
+```
+
+### GetSystemLanguageToLangType {#getsystemlanguagetolangtype}
+
+```csharp
+public static LangType GetSystemLanguageToLangType()
+```
+
+Gets the [LangType](#langtype) definition corresponding to the OS language (`UnityEngine.Application.systemLanguage`) (**without** the supported-language check); returns `LangType.Unspecified` when it cannot be mapped.
+
+<Highlight color="#00d679">Reminder</Highlight> Some languages are not built into Unity's `SystemLanguage` (see the System Detection column of the [LangType table](#langtype)); **system detection can never return them**, but they can still be used as custom supported languages. `Hindi` requires **Unity 2022.3 / Unity 6000.0 or higher** for detection.
+
+### GetSupportedLanguagesMappingByLangType {#getsupportedlanguagesmappingbylangtype}
+
+```csharp
+public static Dictionary<LangType, string> GetSupportedLanguagesMappingByLangType()
+```
+
+Gets the language description mapping table of the **supported languages**, with **Key = LangType** (ex: `LangType.Spanish` -> `"Español"`); suitable for generating the display texts of a language menu (cached after the first call).
+
+### GetSupportedLanguagesMappingByLangDesc {#getsupportedlanguagesmappingbylangdesc}
+
+```csharp
+public static Dictionary<string, LangType> GetSupportedLanguagesMappingByLangDesc()
+```
+
+Gets the language description mapping table of the **supported languages**, with **Key = LangDesc** (ex: `"Español"` -> `LangType.Spanish`); suitable for a language menu to **look up the language from the selected option text** for switching (cached after the first call).
+
+```csharp
+// Language menu: display options with the mapped descriptions,
+// then look up the LangType from the selection to switch
+var mapping = Localization.GetSupportedLanguagesMappingByLangDesc();
+Localization.ChangeLanguage(mapping["English"]);
+```
+
+---
+
+## LangType {#langtype}
+
+World language definitions (a `byte` enum) with **72 values** in total (`Unspecified` + 71 world languages).
+
+|  |  |
+| :--- | :--- |
+| **Type** | `public enum LangType : byte` |
+| **Source** | [Languages.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/LocalizationSystem/Scripts/Runtime/Core/Definitions/Languages.cs) |
+
+Table legend:
+
+- **Description** = the language display text returned by [LanguageMapping.GetLanguageDesc](#getlanguagedesc).
+- **System Detection** = whether [GetSystemLanguageToLangType](#getsystemlanguagetolangtype) can return the value; ✗ means the language is not built into Unity's `SystemLanguage` (it can never come from system detection, but can still be used as a **custom supported language**).
+
+| Enum Value | Language | Description | System Detection |
+| :--- | :--- | :--- | :--- |
+| `Unspecified` | Unspecified | ─ | ✓ (fallback when unmappable) |
+| `Arabic` | Arabic | العربية | ✓ |
+| `ChineseSimplified` | Simplified Chinese | 简体中文 | ✓ |
+| `ChineseTraditional` | Traditional Chinese | 繁體中文 | ✓ |
+| `Dutch` | Dutch | Nederlands | ✓ |
+| `English` | English | English | ✓ |
+| `French` | French | Français | ✓ |
+| `German` | German | Deutsch | ✓ |
+| `Italian` | Italian | Italiano | ✓ |
+| `Portuguese` | Portuguese | Protuguês | ✓ |
+| `Spanish` | Spanish | Español | ✓ |
+| `Bengali` | Bengali | বাংলা | ✗ |
+| `Croatian` | Croatian | hrvatski | ✗ |
+| `Czech` | Czech | čeština | ✓ |
+| `Danish` | Danish | Dansk | ✓ |
+| `Greek` | Greek | ελληνικά | ✓ |
+| `Hebrew` | Hebrew | עברית | ✓ |
+| `Hindi` | Hindi | हिंदी | ✓ (Unity 2022.3+) |
+| `Hungarian` | Hungarian | Magyar | ✓ |
+| `Indonesian` | Indonesian | Bahasa Indonesia | ✓ |
+| `Japanese` | Japanese | 日本語 | ✓ |
+| `Korean` | Korean | 한국의 | ✓ |
+| `Malay` | Malay | Bahasa Melayu | ✗ |
+| `Perisan` | Persian | فارسی | ✗ |
+| `Polish` | Polish | Polski | ✓ |
+| `Romanian` | Romanian | româna | ✓ |
+| `Russian` | Russian | Русский | ✓ |
+| `Serbian` | Serbian | српски | ✓ |
+| `Swedish` | Swedish | Svenska | ✓ |
+| `Thai` | Thai | ไทย | ✓ |
+| `Turkish` | Turkish | Türkçe | ✓ |
+| `Urdu` | Urdu | اردو | ✗ |
+| `Vietnamese` | Vietnamese | tiếng việt | ✓ |
+| `Catalan` | Catalan (Spain) | catalá | ✓ |
+| `Latvian` | Latvian | Latviski | ✓ |
+| `Lithuanian` | Lithuanian | Lietuvių | ✓ |
+| `Norwegian` | Norwegian | Norsk bokmal | ✓ |
+| `Slovak` | Slovak | Slovenčina | ✓ |
+| `Slovenian` | Slovenian | Slovenščina | ✓ |
+| `Bulgarian` | Bulgarian | български | ✓ |
+| `Ukrainian` | Ukrainian | українська | ✓ |
+| `Filipino` | Filipino | Tagalog | ✗ |
+| `Finnish` | Finnish | Suomi | ✓ |
+| `Afrikaans` | Afrikaans | Afrikaans | ✓ |
+| `Romansh` | Romansh (Switzerland) | Rumantsch | ✗ |
+| `Burmese` | Burmese (official) | ဗမာ | ✗ |
+| `Khmer` | Khmer | ខ្មែរ | ✗ |
+| `Amharic` | Amharic (Ethiopia) | አማርኛ | ✗ |
+| `Belarusian` | Belarusian | беларуская | ✓ |
+| `Estonian` | Estonian | eesti | ✓ |
+| `Swahili` | Swahili (Tanzania) | Kiswahili | ✗ |
+| `Zulu` | Zulu (South Africa) | isiZulu | ✗ |
+| `Azerbaijani` | Azerbaijani | azərbaycanca | ✗ |
+| `Armenian` | Armenian (Armenia) | Հայերէն | ✗ |
+| `Georgian` | Georgian (Georgia) | ქართული | ✗ |
+| `Laotian` | Lao (Laos) | ລາວ | ✗ |
+| `Mongolian` | Mongolian | Монгол | ✗ |
+| `Nepali` | Nepali | नेपाली | ✗ |
+| `Kazakh` | Kazakh | қазақ тілі | ✗ |
+| `Galician` | Galician | Galego | ✗ |
+| `Icelandic` | Icelandic | íslenska | ✓ |
+| `Kannada` | Kannada | ಕನ್ನಡ | ✗ |
+| `Kyrgyz` | Kyrgyz | кыргыз тили; قىرعىز تىلى | ✗ |
+| `Malayalam` | Malayalam | മലയാളം | ✗ |
+| `Marathi` | Marathi | मराठी | ✗ |
+| `Tamil` | Tamil | தமிழ் | ✗ |
+| `Macedonian` | Macedonian | македонски јазик | ✗ |
+| `Telugu` | Telugu | తెలుగు | ✗ |
+| `Uzbek` | Uzbek | Ўзбек тили | ✗ |
+| `Basque` | Basque | Euskara | ✓ |
+| `Sinhala` | Sinhala (Sri Lanka) | සිංහල | ✗ |
+| `Faroese` | Faroese | Føroyskt | ✗ |
+
+<Highlight color="#0373fc">Attention</Highlight> The enum value for Persian is spelled `Perisan`, and the description of Portuguese is `"Protuguês"` (both are the actual definitions in the source code; always follow the source when using them).
+
+---
+
+## LanguageMapping {#languagemapping}
+
+Mapping helper (static class) between the language type and its **display description**.
+
+|  |  |
+| :--- | :--- |
+| **Type** | `public static class LanguageMapping` |
+| **Source** | [LanguageMapping.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/LocalizationSystem/Scripts/Runtime/Core/Definitions/LanguageMapping.cs) |
+
+### GetLanguageDesc {#getlanguagedesc}
+
+```csharp
+public static string GetLanguageDesc(LangType langType)
+```
+
+Gets the corresponding **language description** (see the [LangType table](#langtype)); returns `"Unknown Language"` when no description is defined.
+
+```csharp
+string desc = LanguageMapping.GetLanguageDesc(LangType.Spanish); // "Español"
+```

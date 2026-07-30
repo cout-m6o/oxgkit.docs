@@ -1,0 +1,254 @@
+---
+sidebar_position: 2
+description: DoTweenAnimEvent is the tween animation group player of TweenSystem, playing multiple DoTweenAnims together in Parallel or Sequence mode with PlayNormal, PlayReverse, PlayTrigger methods and end callbacks.
+---
+
+# DoTweenAnimEvent
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`DoTweenAnimEvent` is the **tween animation group player** of **TweenSystem**. It plays multiple [DoTweenAnims](./DoTweenAnim.mdx) together in **Parallel** or **Sequence** mode, providing **forward (PlayNormal), backward (PlayReverse), and trigger toggle (PlayTrigger)** play methods with **end callbacks (endCallback)**. Add it via **Add Component/OxGKit/TweenSystem/DoTweenAnimEvent**.
+
+|  |  |
+| :--- | :--- |
+| **Namespace** | `OxGKit.TweenSystem` |
+| **Type** | `public class DoTweenAnimEvent : MonoBehaviour` |
+| **Source** | [DoTweenAnimEvent.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/TweenSystem/Scripts/Runtime/DoTweenAnimEvent.cs) |
+
+```csharp
+using OxGKit.TweenSystem;
+```
+
+<Highlight color="#ff2f00">Important</Highlight> DoTweenAnimEvent **only plays at runtime**; it does not support editor preview (Preview Mode only supports DoTweenAnim, refer to the [Module Intro](../../intro.mdx#preview-mode)).
+
+## Quick Start {#quick-start}
+
+```csharp
+using DG.Tweening;
+using OxGKit.TweenSystem;
+using UnityEngine;
+
+public class PanelController : MonoBehaviour
+{
+    // Configure the Do Tween Anims list in the Inspector (DriveMode set to Event)
+    [SerializeField]
+    private DoTweenAnimEvent _panelAnim;
+
+    // Open panel (plays forward)
+    public void OpenPanel()
+    {
+        this._panelAnim.PlayNormal(() => Debug.Log("Panel opened"));
+    }
+
+    // Close panel (plays backward)
+    public void ClosePanel()
+    {
+        this._panelAnim.PlayReverse(() => this.gameObject.SetActive(false));
+    }
+}
+```
+
+## General Rules {#general-rules}
+
+### PlayMode {#playmode}
+
+```csharp
+public enum PlayMode
+{
+    Parallel,    // Parallel playback (all at once)
+    Sequence     // Sequential playback (one by one in list order)
+}
+```
+
+- **Parallel**: all DoTweenAnims in the list **play at the same time**; the `endCallback` fires after the **longest duration** finishes.
+- **Sequence**: plays **one by one** in list order; each DoTweenAnim finishes (measured by its longest track duration) before the next one starts, and the `endCallback` fires after all of them finish.
+
+### Trigger Direction (trigger) {#trigger-direction}
+
+- **trigger = true** plays forward (normal); **trigger = false** plays backward (reverse).
+- Each DoTweenAnim plays forward or backward according to its own tracks' playMode (see [DoTweenAnim](./DoTweenAnim.mdx#playmode)).
+
+<Highlight color="#0373fc">Attention</Highlight> The [DoTweenAnims](./DoTweenAnim.mdx) in the list should have their **DriveMode set to Event** (Active mode replays automatically on activation, do not mix them); also, every DoTweenAnim **must have at least one tween track enabled**, otherwise a `NullReferenceException` occurs when computing the group duration.
+
+---
+
+## Members {#members}
+
+| Member | Description |
+| :--- | :--- |
+| `public PlayMode playMode` | Group play mode (default `Parallel`), Inspector: **Play Mode**. |
+| `public List<DoTweenAnim> doTweenAnims` | The controlled [DoTweenAnim](./DoTweenAnim.mdx) list, Inspector: **Do Tween Anims**. |
+
+---
+
+## Play Control {#play-control}
+
+### Overview {#play-overview}
+
+| Method | Description |
+| :--- | :--- |
+| [PlayNormal](#playnormal) | Plays forward. |
+| [PlayReverse](#playreverse) | Plays backward. |
+| [PlayTrigger](#playtrigger) | Trigger playback (auto-flip or explicit direction). |
+| [PlayTriggerOnce](#playtriggeronce) | Plays only once when the trigger direction changes. |
+| [ResetTrigger](#resettrigger) | Resets the trigger flag. |
+| [Kill](#kill) | Kills the current group play sequence. |
+
+---
+
+### PlayNormal {#playnormal}
+
+```csharp
+public void PlayNormal()
+
+public void PlayNormal(TweenCallback endCallback = null)
+```
+
+**Plays forward** (trigger = true) all DoTweenAnims in the list; the `endCallback` fires after **all of them finish playing**.
+
+```csharp
+this._panelAnim.PlayNormal(() => Debug.Log("All tweens ended"));
+```
+
+### PlayReverse {#playreverse}
+
+```csharp
+public void PlayReverse()
+
+public void PlayReverse(TweenCallback endCallback = null)
+```
+
+**Plays backward** (trigger = false) all DoTweenAnims in the list; the `endCallback` fires after **all of them finish playing**.
+
+```csharp
+this._panelAnim.PlayReverse(() => this.gameObject.SetActive(false));
+```
+
+### PlayTrigger {#playtrigger}
+
+```csharp
+public void PlayTrigger()
+
+public void PlayTrigger(TweenCallback endCallback = null)
+
+public void PlayTrigger(bool trigger, TweenCallback endCallback = null)
+```
+
+**Trigger playback**: the overloads without a trigger parameter **automatically record and flip** the trigger flag (direction alternates on each call); the overload with an explicit **trigger** plays according to the parameter (`true` = forward, `false` = backward).
+
+```csharp
+// Alternates direction on each call (open -> close -> open...)
+this._panelAnim.PlayTrigger();
+
+// Explicit direction + end callback
+this._panelAnim.PlayTrigger(true, () => Debug.Log("Played normally"));
+```
+
+### PlayTriggerOnce {#playtriggeronce}
+
+```csharp
+public void PlayTriggerOnce(bool trigger)
+
+public void PlayTriggerOnce(bool trigger, TweenCallback endCallback = null)
+```
+
+Plays only when the **trigger differs from the last recorded state** (`true` = forward, `false` = backward), preventing replays of the same state; ideal for **Toggle**-style UI.
+
+```csharp
+// Play on toggle change (no replay for the same state)
+toggle.onValueChanged.AddListener((isOn) =>
+{
+    toggle.GetComponent<DoTweenAnimEvent>().PlayTriggerOnce
+    (
+        isOn,
+        () => Debug.Log("Toggle tween finished")
+    );
+});
+```
+
+### ResetTrigger {#resettrigger}
+
+```csharp
+public void ResetTrigger()
+```
+
+**Resets the trigger flag** (back to `false`), affecting the flip starting point of [PlayTrigger](#playtrigger) and the state comparison of [PlayTriggerOnce](#playtriggeronce).
+
+### Kill {#kill}
+
+```csharp
+public void Kill()
+```
+
+**Kills** the current group play sequence (each play method also kills the previous sequence automatically before playing again).
+
+<Highlight color="#00d679">Reminder</Highlight> Call `Kill()` before a UI object is **destroyed or recycled** to prevent the `endCallback` from being invoked on a destroyed object.
+
+---
+
+## List Management {#list-management}
+
+### Overview {#list-overview}
+
+| Method | Description |
+| :--- | :--- |
+| [SetPlayMode](#setplaymode) | Sets the group play mode. |
+| [AddDoTweenAnim](#adddotweenanim) | Dynamically adds one or more DoTweenAnims (chainable). |
+| [RemoveDoTweenAnim](#removedotweenanim) | Removes a specific DoTweenAnim. |
+| [ClearDoTweenAnims](#cleardotweenanims) | Clears the list. |
+
+---
+
+### SetPlayMode {#setplaymode}
+
+```csharp
+public void SetPlayMode(PlayMode playMode)
+```
+
+Sets the group play mode (**Parallel / Sequence**).
+
+### AddDoTweenAnim {#adddotweenanim}
+
+```csharp
+public DoTweenAnimEvent AddDoTweenAnim(params DoTweenAnim[] doTweenAnims)
+```
+
+Dynamically adds **one or more** DoTweenAnims to the list; returns itself for **chained calls**.
+
+```csharp
+animEvent
+    .AddDoTweenAnim(anim1, anim2)
+    .PlayNormal(() => Debug.Log("Played"));
+```
+
+### RemoveDoTweenAnim {#removedotweenanim}
+
+```csharp
+public void RemoveDoTweenAnim(DoTweenAnim doTweenAnim)
+```
+
+Removes a **specific** DoTweenAnim from the list.
+
+### ClearDoTweenAnims {#cleardotweenanims}
+
+```csharp
+public void ClearDoTweenAnims()
+```
+
+Clears the entire DoTweenAnim list.

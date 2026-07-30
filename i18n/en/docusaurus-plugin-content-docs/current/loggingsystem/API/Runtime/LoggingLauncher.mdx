@@ -1,0 +1,327 @@
+---
+sidebar_position: 2
+description: LoggingLauncher is the log deployment launcher of LoggingSystem, responsible for initializing loggers and loading the config file, and provides dynamic configuration APIs for global and per-logger settings.
+---
+
+# LoggingLauncher
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`LoggingLauncher` is the log deployment launcher of **LoggingSystem** (a `MonoBehaviour` singleton). It is responsible for **initializing loggers and loading the config file** (StreamingAssets), and provides **dynamic configuration APIs for the global (Master) and per-logger settings**; you can import the **LoggingLauncher Prefab** via Samples and drag it into the scene to activate it (only needs to be activated once).
+
+|  |  |
+| :--- | :--- |
+| **Namespace** | `OxGKit.LoggingSystem` |
+| **Type** | `public class LoggingLauncher : MonoBehaviour` |
+| **Source** | [LoggingLauncher.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/LoggingSystem/Scripts/Runtime/LoggingLauncher.cs) |
+
+```csharp
+using OxGKit.LoggingSystem;
+```
+
+<Highlight color="#0373fc">Attention</Highlight> Methods marked **[StartCoroutine]** are convenience calls that wrap a coroutine; each method has a corresponding **[Async]** version (`IEnumerator`), which you can yield in your own coroutine to await completion.
+
+## Quick Start {#quick-start}
+
+```csharp
+using OxGKit.LoggingSystem;
+
+// The LoggingLauncher Prefab is already placed in the scene (Initialize On Awake)
+// -> Automatically runs InitLoggers + loads the StreamingAssets config file
+
+// Dynamically configure a single logger
+LoggingLauncher.ConfigureLogger("Game.Logger", true, LogLevel.LogWarning | LogLevel.LogError);
+
+// Master toggle
+LoggingLauncher.ToggleMasterLogging(false);
+
+// Custom config (dynamically configure loggers)
+var loggersConfig = new LoggersConfig
+(
+    new LoggerSettings("Game.Logger", true, LogLevel.All)
+);
+LoggingLauncher.SetLoggersConfig(loggersConfig);
+```
+
+## General Rules {#general-rules}
+
+### Initialization Flow {#init-flow}
+
+1. **Initialize On Awake (default)**: LoggingLauncher automatically runs `InitLoggers` in `Awake` (collecting all `Logging` implementations via reflection) and tries to load the StreamingAssets config file.
+2. **Manual initialization (HybridCLR)**: Uncheck the **"Initialize On Awake"** option in the Inspector, call [CreateLogger](#createlogger) yourself to register loggers one by one, and finally call [TryLoadLoggers](#tryloadloggers) to apply the configuration.
+
+<Highlight color="#ff2f00">Important</Highlight> When working with **HybridCLR** where the main project and the hot-update project are separated, you must manually split the creation of the Loggers initialization flow into **AOT** and **Hotfix** parts (the Hotfix project's Loggers must be initialized in the Hotfix project).
+
+### Config Effective Conditions {#config-condition}
+
+<Highlight color="#ff2f00">Important</Highlight> Loggers are loaded and output only under **UNITY_EDITOR** or when the **OXGKIT_LOGGER_ON** symbol is defined; otherwise the message `Not enabled LoggingSystem by symbol [OXGKIT_LOGGER_ON]` is shown.
+
+---
+
+## Members {#members}
+
+| Member | Description |
+| :--- | :--- |
+| `public bool initLoggersOnAwake` | Whether to initialize automatically in `Awake` (Inspector: **Initialize On Awake**); must be unchecked when initializing manually with HybridCLR. |
+| `public LoggersConfig loggersConfig` | The current logger configuration data ([LoggersConfig](./LoggersConfig.mdx)). |
+| `public static ConfigFileType currentConfigFileType` | The current config file type (Json / Bytes), defaults to `Bytes`. |
+
+---
+
+## Logger Management {#logger-management}
+
+### Method Overview {#logger-overview}
+
+| Method | Description |
+| :--- | :--- |
+| [InitLoggers](#initloggers) | Collects and initializes all loggers via reflection. |
+| [ClearLoggers](#clearloggers) | Clears all registered loggers. |
+| [CreateLogger](#createlogger) | Manually registers a single logger (HybridCLR flow). |
+| [TryInitLoggers](#tryinitloggers) | Initializes all loggers and loads the config file. |
+| [TryLoadLoggers](#tryloadloggers) | Reloads logger settings from the config file. |
+
+---
+
+### InitLoggers {#initloggers}
+
+```csharp
+public static void InitLoggers()
+```
+
+Collects all `Logging` implementation classes via reflection and creates instances (including [LoggerName](./LoggersConfig.mdx#loggernameattribute) name and override handling).
+
+### ClearLoggers {#clearloggers}
+
+```csharp
+public static void ClearLoggers()
+```
+
+Clears all registered logger caches.
+
+### CreateLogger {#createlogger}
+
+```csharp
+public static void CreateLogger<TLogging>() where TLogging : Logging, new()
+```
+
+Manually registers a single logger, used for the manually split AOT / Hotfix initialization flow with **HybridCLR** (avoids reflection failing to collect types from the hot-update project).
+
+```csharp
+// HybridCLR (must uncheck the "Initialize On Awake" option on LoggingLauncher):
+LoggingLauncher.CreateLogger<LoggingDemoLogger1>();
+LoggingLauncher.CreateLogger<LoggingDemoLogger2>();
+LoggingLauncher.TryLoadLoggers();
+```
+
+### TryInitLoggers {#tryinitloggers}
+
+```csharp
+// [StartCoroutine]
+public static void TryInitLoggers()
+
+// [Async]
+public static IEnumerator TryInitLoggersAsync()
+```
+
+Initializes all loggers (`InitLoggers`) and loads the StreamingAssets config file to apply the settings (equivalent to the automatic Awake initialization flow).
+
+### TryLoadLoggers {#tryloadloggers}
+
+```csharp
+// [StartCoroutine]
+public static void TryLoadLoggers()
+
+// [Async]
+public static IEnumerator TryLoadLoggersAsync()
+```
+
+**Reloads** logger settings from the config file; **this method must be called to reload after adding or removing a Logger**.
+
+---
+
+## Global Config (Master) {#master-config}
+
+### Method Overview {#master-overview}
+
+| Method | Description |
+| :--- | :--- |
+| [ToggleMasterLogging](#togglemasterlogging) | Master toggle (enables/disables all loggers). |
+| [LevelMasterLogging](#levelmasterlogging) | Sets the global log level. |
+| [ColorMasterLogging](#colormasterlogging) | Sets the global log color mode. |
+
+---
+
+### ToggleMasterLogging {#togglemasterlogging}
+
+```csharp
+// [StartCoroutine]
+public static void ToggleMasterLogging(bool logMainActive)
+
+// [Async]
+public static IEnumerator ToggleMasterLoggingAsync(bool logMainActive)
+```
+
+Switches the **master toggle** (Master Logging Toggle); when off, no logger outputs anything.
+
+### LevelMasterLogging {#levelmasterlogging}
+
+```csharp
+// [StartCoroutine]
+public static void LevelMasterLogging(LogLevel logMainLevel)
+
+// [Async]
+public static IEnumerator LevelMasterLoggingAsync(LogLevel logMainLevel)
+```
+
+Sets the **global level** (Master Logging Level); it takes effect as the intersection with the per-logger levels (see the [level rules table](../../intro.mdx#log-level)).
+
+### ColorMasterLogging {#colormasterlogging}
+
+```csharp
+// [StartCoroutine]
+public static void ColorMasterLogging(LogColor logMainColor)
+
+// [Async]
+public static IEnumerator ColorMasterLoggingAsync(LogColor logMainColor)
+```
+
+Sets the **global color mode** (Master Logging Color); the stricter of it and the per-logger color mode takes effect (see the [color rules table](../../intro.mdx#log-color)).
+
+---
+
+## Per-Logger Config {#per-logger-config}
+
+### Method Overview {#per-logger-overview}
+
+| Method | Description |
+| :--- | :--- |
+| [ConfigureLogger](#configurelogger) | Configures the toggle/level/color of the specified logger. |
+| [ConfigureAllLoggers](#configurealloggers) | Configures the toggle/level/color of all loggers at once. |
+| [SetLoggersConfig](#setloggersconfig) | Overwrites the current config with a custom LoggersConfig and reloads. |
+
+---
+
+### ConfigureLogger {#configurelogger}
+
+```csharp
+// [StartCoroutine]
+public static void ConfigureLogger(string loggerName, bool logActive, LogLevel logLevel = LogLevel.All, LogColor logColor = LogColor.EditorOnly)
+
+// [Async]
+public static IEnumerator ConfigureLoggerAsync(string loggerName, bool logActive, LogLevel logLevel = LogLevel.All, LogColor logColor = LogColor.EditorOnly)
+```
+
+Configures the toggle, level, and color mode of the logger with the **specified name**; automatically reloads after configuring.
+
+```csharp
+LoggingLauncher.ConfigureLogger("Game.Logger", true, LogLevel.LogWarning | LogLevel.LogError);
+```
+
+### ConfigureAllLoggers {#configurealloggers}
+
+```csharp
+// [StartCoroutine]
+public static void ConfigureAllLoggers(bool logActive, LogLevel logLevel = LogLevel.All, LogColor logColor = LogColor.EditorOnly)
+
+// [Async]
+public static IEnumerator ConfigureAllLoggersAsync(bool logActive, LogLevel logLevel = LogLevel.All, LogColor logColor = LogColor.EditorOnly)
+```
+
+Configures the toggle, level, and color mode of **all** loggers at once; automatically reloads after configuring.
+
+### SetLoggersConfig {#setloggersconfig}
+
+```csharp
+// [StartCoroutine]
+public static void SetLoggersConfig(LoggersConfig loggersConfig)
+
+// [Async]
+public static IEnumerator SetLoggersConfigAsync(LoggersConfig loggersConfig)
+```
+
+Overwrites the current config with a **custom [LoggersConfig](./LoggersConfig.mdx)** and reloads (dynamically configure loggers).
+
+```csharp
+var loggersConfig = new LoggersConfig
+(
+    new LoggerSettings("LoggingDemo.Logger1", true, LogLevel.LogDebug),
+    new LoggerSettings("LoggingDemo.Logger2", true, LogLevel.LogWarning),
+    new LoggerSettings("LoggingDemo.Logger3", true, LogLevel.Off)
+);
+LoggingLauncher.SetLoggersConfig(loggersConfig);
+```
+
+---
+
+## Config Reload {#config-reload}
+
+### Method Overview {#reload-overview}
+
+| Method | Description |
+| :--- | :--- |
+| [ReloadLoggersConfig](#reloadloggersconfig) | (Instance) Re-initializes loggers and syncs the config list. |
+| [ReloadFromLoggersConfig](#reloadfromloggersconfig) | (Instance) Reloads the config from the config file. |
+| [ResetLoggersConfig](#resetloggersconfig) | (Instance) Clears and rebuilds the config. |
+| [ReloadLoggersConfigAndSet](#reloadloggersconfigandset) | Syncs the config list with the current logger implementations (add/remove comparison). |
+
+---
+
+### ReloadLoggersConfig {#reloadloggersconfig}
+
+```csharp
+// [StartCoroutine]
+public void ReloadLoggersConfig(Action<LoggersConfig> result = null)
+
+// [Async]
+public IEnumerator ReloadLoggersConfigAsync(Action<LoggersConfig> result = null)
+```
+
+(Instance method) Re-initializes loggers and syncs the config list; when finished, returns the current config via `result`.
+
+### ReloadFromLoggersConfig {#reloadfromloggersconfig}
+
+```csharp
+// [StartCoroutine]
+public void ReloadFromLoggersConfig(Action<LoggersConfig> result = null)
+
+// [Async]
+public IEnumerator ReloadFromLoggersConfigAsync(Action<LoggersConfig> result = null)
+```
+
+(Instance method) Reloads the config from the StreamingAssets config file.
+
+### ResetLoggersConfig {#resetloggersconfig}
+
+```csharp
+// [StartCoroutine]
+public void ResetLoggersConfig(Action<LoggersConfig> result = null)
+
+// [Async]
+public IEnumerator ResetLoggersConfigAsync(Action<LoggersConfig> result = null)
+```
+
+(Instance method) Clears the current config and rebuilds it with default values.
+
+### ReloadLoggersConfigAndSet {#reloadloggersconfigandset}
+
+```csharp
+public static void ReloadLoggersConfigAndSet(LoggersConfig loggersConfig, Action<LoggersConfig> result)
+```
+
+Compares and syncs the passed-in config list with the **currently registered logger implementations** (automatically adds new loggers and removes loggers that no longer exist); when finished, returns via `result`.

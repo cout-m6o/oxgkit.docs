@@ -1,0 +1,327 @@
+---
+sidebar_position: 2
+description: LoggingLauncher 是 LoggingSystem 的日誌部署啟動器，負責日誌器的初始、載入配置文件，並提供全域與個別日誌器的動態配置 API。
+---
+
+# LoggingLauncher
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`LoggingLauncher` 是 **LoggingSystem** 的日誌部署啟動器 (`MonoBehaviour` 單例)，負責**日誌器的初始與載入配置文件** (StreamingAssets)，並提供**全域 (Master) 與個別日誌器的動態配置 API**；可透過 Samples 匯入 **LoggingLauncher Prefab** 拖曳至場景激活 (僅需激活一次)。
+
+|  |  |
+| :--- | :--- |
+| **命名空間** | `OxGKit.LoggingSystem` |
+| **類型** | `public class LoggingLauncher : MonoBehaviour` |
+| **原始碼** | [LoggingLauncher.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/LoggingSystem/Scripts/Runtime/LoggingLauncher.cs) |
+
+```csharp
+using OxGKit.LoggingSystem;
+```
+
+<Highlight color="#0373fc">注意</Highlight> 標註 **[StartCoroutine]** 的方法為包裝協程的便捷呼叫；各方法皆有對應的 **[Async]** 版本 (`IEnumerator`)，可自行以協程等待完成時機。
+
+## 快速上手 {#quick-start}
+
+```csharp
+using OxGKit.LoggingSystem;
+
+// 場景上已放置 LoggingLauncher Prefab (Initialize On Awake)
+// -> 會自動 InitLoggers + 加載 StreamingAssets 配置文件
+
+// 動態配置單一日誌器
+LoggingLauncher.ConfigureLogger("Game.Logger", true, LogLevel.LogWarning | LogLevel.LogError);
+
+// 全域開關
+LoggingLauncher.ToggleMasterLogging(false);
+
+// 自定義配置 (動態配置日誌器)
+var loggersConfig = new LoggersConfig
+(
+    new LoggerSettings("Game.Logger", true, LogLevel.All)
+);
+LoggingLauncher.SetLoggersConfig(loggersConfig);
+```
+
+## 通用規則 {#general-rules}
+
+### 初始流程 {#init-flow}
+
+1. **Initialize On Awake (預設)**：LoggingLauncher 於 `Awake` 自動執行 `InitLoggers` (反射收集所有 `Logging` 實作) 並嘗試加載 StreamingAssets 配置文件。
+2. **手動初始 (HybridCLR)**：取消 Inspector 上的 **"Initialize On Awake"** 選項，自行呼叫 [CreateLogger](#createlogger) 逐一註冊，最後呼叫 [TryLoadLoggers](#tryloadloggers) 套用配置。
+
+<Highlight color="#ff2f00">重要</Highlight> 搭配 **HybridCLR** 有主工程跟熱更工程的區分時，必須手動拆分創建 **AOT** 跟 **Hotfix** 的 Loggers 初始流程 (Hotfix 工程的 Loggers 需在 Hotfix 工程中初始)。
+
+### 配置生效條件 {#config-condition}
+
+<Highlight color="#ff2f00">重要</Highlight> 僅於 **UNITY_EDITOR** 或已定義 **OXGKIT_LOGGER_ON** 宏時，才會進行日誌器載入與輸出，否則會提示 `Not enabled LoggingSystem by symbol [OXGKIT_LOGGER_ON]`。
+
+---
+
+## 成員 {#members}
+
+| 成員 | 說明 |
+| :--- | :--- |
+| `public bool initLoggersOnAwake` | 是否於 `Awake` 自動初始 (Inspector: **Initialize On Awake**)，搭配 HybridCLR 手動初始時需取消。 |
+| `public LoggersConfig loggersConfig` | 當前的日誌器配置數據 ([LoggersConfig](./LoggersConfig.mdx))。 |
+| `public static ConfigFileType currentConfigFileType` | 當前配置文件類型 (Json / Bytes)，預設 `Bytes`。 |
+
+---
+
+## 日誌器管理 {#logger-management}
+
+### 方法總覽 {#logger-overview}
+
+| 方法 | 說明 |
+| :--- | :--- |
+| [InitLoggers](#initloggers) | 反射收集並初始所有日誌器。 |
+| [ClearLoggers](#clearloggers) | 清除所有已註冊日誌器。 |
+| [CreateLogger](#createlogger) | 手動註冊單一日誌器 (HybridCLR 流程)。 |
+| [TryInitLoggers](#tryinitloggers) | 初始所有日誌器並加載配置文件。 |
+| [TryLoadLoggers](#tryloadloggers) | 依配置文件重載日誌器設定。 |
+
+---
+
+### InitLoggers {#initloggers}
+
+```csharp
+public static void InitLoggers()
+```
+
+以反射收集所有 `Logging` 實作類並建立實例 (含 [LoggerName](./LoggersConfig.mdx#loggernameattribute) 的名稱與覆寫處理)。
+
+### ClearLoggers {#clearloggers}
+
+```csharp
+public static void ClearLoggers()
+```
+
+清除所有已註冊的日誌器緩存。
+
+### CreateLogger {#createlogger}
+
+```csharp
+public static void CreateLogger<TLogging>() where TLogging : Logging, new()
+```
+
+手動註冊單一日誌器，用於 **HybridCLR** 手動拆分 AOT / Hotfix 初始流程 (避免反射收集不到熱更工程的類型)。
+
+```csharp
+// HybridCLR (必須取消 LoggingLauncher 上的 "Initialize On Awake" 選項):
+LoggingLauncher.CreateLogger<LoggingDemoLogger1>();
+LoggingLauncher.CreateLogger<LoggingDemoLogger2>();
+LoggingLauncher.TryLoadLoggers();
+```
+
+### TryInitLoggers {#tryinitloggers}
+
+```csharp
+// [StartCoroutine]
+public static void TryInitLoggers()
+
+// [Async]
+public static IEnumerator TryInitLoggersAsync()
+```
+
+初始所有日誌器 (`InitLoggers`) 並加載 StreamingAssets 配置文件套用設定 (等同 Awake 自動初始流程)。
+
+### TryLoadLoggers {#tryloadloggers}
+
+```csharp
+// [StartCoroutine]
+public static void TryLoadLoggers()
+
+// [Async]
+public static IEnumerator TryLoadLoggersAsync()
+```
+
+依配置文件**重載**日誌器設定；**新增或移除 Logger 後皆需呼叫此方法進行重載**。
+
+---
+
+## 全域配置 (Master) {#master-config}
+
+### 方法總覽 {#master-overview}
+
+| 方法 | 說明 |
+| :--- | :--- |
+| [ToggleMasterLogging](#togglemasterlogging) | 全域開關 (啟用/停用所有日誌器)。 |
+| [LevelMasterLogging](#levelmasterlogging) | 設置全域日誌級別。 |
+| [ColorMasterLogging](#colormasterlogging) | 設置全域日誌顏色模式。 |
+
+---
+
+### ToggleMasterLogging {#togglemasterlogging}
+
+```csharp
+// [StartCoroutine]
+public static void ToggleMasterLogging(bool logMainActive)
+
+// [Async]
+public static IEnumerator ToggleMasterLoggingAsync(bool logMainActive)
+```
+
+切換**全域開關** (Master Logging Toggle)，關閉時所有日誌器皆不輸出。
+
+### LevelMasterLogging {#levelmasterlogging}
+
+```csharp
+// [StartCoroutine]
+public static void LevelMasterLogging(LogLevel logMainLevel)
+
+// [Async]
+public static IEnumerator LevelMasterLoggingAsync(LogLevel logMainLevel)
+```
+
+設置**全域級別** (Master Logging Level)，與個別級別取交集後生效 (詳見[級別規則表](../../intro.mdx#log-level-級別))。
+
+### ColorMasterLogging {#colormasterlogging}
+
+```csharp
+// [StartCoroutine]
+public static void ColorMasterLogging(LogColor logMainColor)
+
+// [Async]
+public static IEnumerator ColorMasterLoggingAsync(LogColor logMainColor)
+```
+
+設置**全域顏色模式** (Master Logging Color)，與個別顏色模式取較嚴格者生效 (詳見[顏色規則表](../../intro.mdx#log-color-顏色))。
+
+---
+
+## 個別配置 {#per-logger-config}
+
+### 方法總覽 {#per-logger-overview}
+
+| 方法 | 說明 |
+| :--- | :--- |
+| [ConfigureLogger](#configurelogger) | 配置指定日誌器的開關/級別/顏色。 |
+| [ConfigureAllLoggers](#configurealloggers) | 一次配置所有日誌器的開關/級別/顏色。 |
+| [SetLoggersConfig](#setloggersconfig) | 以自定義 LoggersConfig 覆蓋當前配置並重載。 |
+
+---
+
+### ConfigureLogger {#configurelogger}
+
+```csharp
+// [StartCoroutine]
+public static void ConfigureLogger(string loggerName, bool logActive, LogLevel logLevel = LogLevel.All, LogColor logColor = LogColor.EditorOnly)
+
+// [Async]
+public static IEnumerator ConfigureLoggerAsync(string loggerName, bool logActive, LogLevel logLevel = LogLevel.All, LogColor logColor = LogColor.EditorOnly)
+```
+
+配置**指定名稱**日誌器的開關、級別與顏色模式，配置後自動重載。
+
+```csharp
+LoggingLauncher.ConfigureLogger("Game.Logger", true, LogLevel.LogWarning | LogLevel.LogError);
+```
+
+### ConfigureAllLoggers {#configurealloggers}
+
+```csharp
+// [StartCoroutine]
+public static void ConfigureAllLoggers(bool logActive, LogLevel logLevel = LogLevel.All, LogColor logColor = LogColor.EditorOnly)
+
+// [Async]
+public static IEnumerator ConfigureAllLoggersAsync(bool logActive, LogLevel logLevel = LogLevel.All, LogColor logColor = LogColor.EditorOnly)
+```
+
+一次配置**所有**日誌器的開關、級別與顏色模式，配置後自動重載。
+
+### SetLoggersConfig {#setloggersconfig}
+
+```csharp
+// [StartCoroutine]
+public static void SetLoggersConfig(LoggersConfig loggersConfig)
+
+// [Async]
+public static IEnumerator SetLoggersConfigAsync(LoggersConfig loggersConfig)
+```
+
+以**自定義的 [LoggersConfig](./LoggersConfig.mdx)** 覆蓋當前配置並重載 (動態配置日誌器)。
+
+```csharp
+var loggersConfig = new LoggersConfig
+(
+    new LoggerSettings("LoggingDemo.Logger1", true, LogLevel.LogDebug),
+    new LoggerSettings("LoggingDemo.Logger2", true, LogLevel.LogWarning),
+    new LoggerSettings("LoggingDemo.Logger3", true, LogLevel.Off)
+);
+LoggingLauncher.SetLoggersConfig(loggersConfig);
+```
+
+---
+
+## 配置重載 {#config-reload}
+
+### 方法總覽 {#reload-overview}
+
+| 方法 | 說明 |
+| :--- | :--- |
+| [ReloadLoggersConfig](#reloadloggersconfig) | (實例) 重新初始日誌器並同步配置清單。 |
+| [ReloadFromLoggersConfig](#reloadfromloggersconfig) | (實例) 從配置文件重新載入配置。 |
+| [ResetLoggersConfig](#resetloggersconfig) | (實例) 清空配置並重建。 |
+| [ReloadLoggersConfigAndSet](#reloadloggersconfigandset) | 同步配置清單與當前日誌器實作 (新增/移除比對)。 |
+
+---
+
+### ReloadLoggersConfig {#reloadloggersconfig}
+
+```csharp
+// [StartCoroutine]
+public void ReloadLoggersConfig(Action<LoggersConfig> result = null)
+
+// [Async]
+public IEnumerator ReloadLoggersConfigAsync(Action<LoggersConfig> result = null)
+```
+
+(實例方法) 重新初始日誌器並同步配置清單，完成後透過 `result` 回傳當前配置。
+
+### ReloadFromLoggersConfig {#reloadfromloggersconfig}
+
+```csharp
+// [StartCoroutine]
+public void ReloadFromLoggersConfig(Action<LoggersConfig> result = null)
+
+// [Async]
+public IEnumerator ReloadFromLoggersConfigAsync(Action<LoggersConfig> result = null)
+```
+
+(實例方法) 從 StreamingAssets 配置文件重新載入配置。
+
+### ResetLoggersConfig {#resetloggersconfig}
+
+```csharp
+// [StartCoroutine]
+public void ResetLoggersConfig(Action<LoggersConfig> result = null)
+
+// [Async]
+public IEnumerator ResetLoggersConfigAsync(Action<LoggersConfig> result = null)
+```
+
+(實例方法) 清空當前配置並以預設值重建。
+
+### ReloadLoggersConfigAndSet {#reloadloggersconfigandset}
+
+```csharp
+public static void ReloadLoggersConfigAndSet(LoggersConfig loggersConfig, Action<LoggersConfig> result)
+```
+
+將傳入的配置清單與**當前已註冊日誌器實作**進行比對同步 (自動補上新日誌器、移除不存在的日誌器)，完成後透過 `result` 回傳。

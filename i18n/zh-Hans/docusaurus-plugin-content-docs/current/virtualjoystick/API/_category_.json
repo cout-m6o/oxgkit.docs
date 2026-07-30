@@ -1,0 +1,8 @@
+{
+  "label": "API",
+  "key": "virtualjoystick-api",
+  "position": 99,
+  "link": {
+    "type": "generated-index"
+  }
+}

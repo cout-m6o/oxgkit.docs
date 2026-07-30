@@ -1,0 +1,209 @@
+---
+sidebar_position: 1
+---
+
+import ReactPlayer from 'react-player'
+
+# Module Intro
+
+export const Highlight = ({ children, color }) => (
+  <span
+    style={{
+      backgroundColor: color,
+      borderRadius: '5px',
+      color: '#fff',
+      padding: '2.5px'
+    }}>
+    {children}
+  </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+## Basic Instructions
+
+Various time controllers: DeltaTimer, RealTimer, DTUpdater, RTUpdater, IntervalTimer, IntervalSetter, NtpTime (clock sync with NTP server) — covering **game-time and real-time timers**, **update loops independent of MonoBehaviour**, a **JavaScript-setInterval-style periodic ticker**, and a **clock synchronization tool for NTP servers**.
+
+- Version: **v1.1.3** (`com.michaelo.oxgkit.timesystem`)
+- Namespace: `OxGKit.TimeSystem`
+
+<Highlight color="#0373fc">Attention</Highlight> This module depends on **UniTask** and [OxGKit.LoggingSystem](/docs/loggingsystem/intro) (as log output) — install the dependencies first.
+
+---
+
+## Application Description
+
+### Picking the Right Tool (by Time Base)
+
+<Highlight color="#ff2f00">Important</Highlight> Before choosing a timer or updater, decide whether the use case must **ignore `Time.timeScale` and game pause (real time)** or should **follow game time** — that decides the Real series vs the Delta (DT) series.
+
+| Type | Time Base | Driven By | Use For |
+| :--- | :--- | :--- | :--- |
+| [DeltaTimer](/docs/timesystem/API/Runtime/DeltaTimer) | Accumulated deltaTime fed externally (game time) | Owner calls `UpdateTimer(dt)` in Update | Cooldowns/countdowns that follow game pause and speed changes |
+| [RealTimer](/docs/timesystem/API/Runtime/RealTimer) | System clock (real time) | Self-driven (query-based) | Cooldowns/countdowns unaffected by pause and `Time.timeScale` |
+| [DTUpdater](/docs/timesystem/API/Runtime/DTUpdater) | UniTask update loop (multiplies Unity `Time.timeScale`) | `Start()` | Standalone update loops affected by `Time.timeScale` |
+| [RTUpdater](/docs/timesystem/API/Runtime/RTUpdater) | UniTask update loop (real time) | `Start()` / `StartOnThread()` | Standalone update loops unaffected by `Time.timeScale` (e.g. network heartbeat) |
+| [IntervalTimer](/docs/timesystem/API/Runtime/IntervalTimer) / [IntervalSetter](/docs/timesystem/API/Runtime/IntervalSetter) | Millisecond interval | `SetInterval` | Fire an `Action` every N milliseconds (JavaScript-setInterval style) |
+| [RealTime](/docs/timesystem/API/Runtime/RealTime) | System clock | Main program calls `InitStartupTime()` | Recording the application startup time |
+| [NtpTime](/docs/timesystem/API/Runtime/NtpTime) | NTP server / HTTP time API | `Synchronize()` | Server-authoritative time (anti-cheat, daily reset, and other trusted-time scenarios) |
+
+### Timer / Tick / Mark Timing Modes
+
+Both [DeltaTimer](/docs/timesystem/API/Runtime/DeltaTimer) and [RealTimer](/docs/timesystem/API/Runtime/RealTimer) provide three timing modes that can be used simultaneously on the same instance:
+
+- **Timer (one-shot)**: set a one-shot countdown with `SetTimer(seconds)` and check it with `IsTimerTimeout()`.
+- **Tick (repeating)**: set a repeating interval with `SetTick(seconds)`; when `IsTickTimeout()` returns true it **re-arms automatically**, firing in a loop.
+- **Mark (time anchor)**: mark the current time with `SetMark()` and read the elapsed time since the mark with `GetElapsedMarkTime()` (stopwatch-style).
+
+### Update Loops and Interval Ticking
+
+- [DTUpdater](/docs/timesystem/API/Runtime/DTUpdater) and [RTUpdater](/docs/timesystem/API/Runtime/RTUpdater) are **UniTask-driven** standalone update loops exposing `onUpdate`, `onFixedUpdate`, and `onLateUpdate` callbacks, with a configurable `targetFrameRate` (loop frequency) and `timeScale` (own time scale, 0 ~ 64) — great for driving **non-MonoBehaviour** systems (e.g. an ActionSystem runner).
+- [IntervalSetter](/docs/timesystem/API/Runtime/IntervalSetter) is a static manager that creates and manages [IntervalTimer](/docs/timesystem/API/Runtime/IntervalTimer) instances, keyed by **int id / string id / anonymous handle**.
+
+<Highlight color="#ff2f00">Important</Highlight> Updaters and IntervalTimers are **UniTask loops** — when the owning feature or scene exits, **always call `Stop()` / `StopInterval()` / `TryClearInterval()`**, otherwise the loops keep running.
+
+### Module Logs
+
+- This module logs through **OxGKit.LoggingSystem** with the logger name `OxGKit.TimeSystem.Logger`; its toggle and level can be configured on the **LoggingLauncher**.
+
+---
+
+## Simple Usage
+
+### RealTimer vs DeltaTimer
+
+```csharp
+using OxGKit.TimeSystem;
+using UnityEngine;
+
+public class TimerExample : MonoBehaviour
+{
+    private RealTimer _realTimer;
+    private DeltaTimer _deltaTimer;
+
+    private void Start()
+    {
+        // RealTimer (real time, unaffected by Time.timeScale and pause)
+        this._realTimer = new RealTimer();
+        this._realTimer.SetTimer(3f);
+        this._realTimer.Play();
+
+        // DeltaTimer (game time, driven by feeding dt via UpdateTimer)
+        this._deltaTimer = new DeltaTimer();
+        this._deltaTimer.SetTimer(3f);
+        this._deltaTimer.Play();
+    }
+
+    private void Update()
+    {
+        // A DeltaTimer must be fed deltaTime continuously
+        this._deltaTimer.UpdateTimer(Time.deltaTime);
+
+        // Check the RealTimer
+        if (this._realTimer.IsPlaying() &&
+            this._realTimer.IsTimerTimeout())
+        {
+            this._realTimer.Stop();
+            Debug.Log("[RealTimer] Time's up!");
+        }
+
+        // Check the DeltaTimer
+        if (this._deltaTimer.IsPlaying() &&
+            this._deltaTimer.IsTimerTimeout())
+        {
+            this._deltaTimer.Stop();
+            Debug.Log("[DeltaTimer] Time's up!");
+        }
+    }
+}
+```
+
+### Updater Loop
+
+```csharp
+using OxGKit.TimeSystem;
+
+// Update loop independent of MonoBehaviour (UniTask-driven)
+var rtUpdater = new RTUpdater();
+rtUpdater.onUpdate += (dt) => { /* per update */ };
+rtUpdater.timeScale = 1f;        // own time scale (0 ~ 64)
+rtUpdater.targetFrameRate = 60f; // loop frequency (default 60)
+rtUpdater.Start();
+
+// Always stop when the feature exits
+rtUpdater.Stop();
+```
+
+### IntervalSetter Ticking
+
+```csharp
+using OxGKit.TimeSystem;
+
+// Fire every 1000 milliseconds (managed by string id)
+IntervalSetter.SetInterval("poll", () => { /* periodic work */ }, 1000);
+
+// Stop and remove
+IntervalSetter.TryClearInterval("poll");
+```
+
+### NtpTime Clock Sync
+
+```csharp
+using OxGKit.TimeSystem;
+
+// Synchronize with an NTP server (default time.google.com)
+NtpTime.Synchronize();
+
+// Read the corrected time once synchronized
+if (NtpTime.IsSynchronized())
+{
+    var now = NtpTime.GetNow();
+    var utcNow = NtpTime.GetUtcNow();
+}
+```
+
+*[See Example]*
+
+---
+
+## Installation
+
+| Install via git URL |
+|:--- |
+| Add https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/TimeSystem/Scripts to Package Manager |
+
+**Third-party libraries (install separately)**
+
+- Use [UniTask v2.5.0 or higher](https://github.com/Cysharp/UniTask), Add https://github.com/Cysharp/UniTask.git?path=src/UniTask/Assets/Plugins/UniTask to Package Manager
+- Use OxGKit.LoggingSystem, Add https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/LoggingSystem/Scripts to Package Manager
+
+**Samples (Package Manager -> Samples)**
+
+- **AI Agent Skills** (see [AI Agent Skills](/docs/agent-skills))
+- **Timer Demo**
+
+---
+
+## Module API
+
+- Runtime
+  - [DeltaTimer](/docs/timesystem/API/Runtime/DeltaTimer) (using OxGKit.TimeSystem)
+  - [RealTimer](/docs/timesystem/API/Runtime/RealTimer) (using OxGKit.TimeSystem)
+  - [DTUpdater](/docs/timesystem/API/Runtime/DTUpdater) (using OxGKit.TimeSystem)
+  - [RTUpdater](/docs/timesystem/API/Runtime/RTUpdater) (using OxGKit.TimeSystem)
+  - [IntervalTimer](/docs/timesystem/API/Runtime/IntervalTimer) (using OxGKit.TimeSystem)
+  - [IntervalSetter](/docs/timesystem/API/Runtime/IntervalSetter) (using OxGKit.TimeSystem)
+  - [RealTime](/docs/timesystem/API/Runtime/RealTime) (using OxGKit.TimeSystem)
+  - [NtpTime](/docs/timesystem/API/Runtime/NtpTime) (using OxGKit.TimeSystem)
+
+---
+
+## Demo
+
+**TimeSystem Demo**
+
+<ReactPlayer controls url='/video/timesystem_demo.mp4' />

@@ -1,0 +1,98 @@
+---
+sidebar_position: 5
+description: UISafeAreaAdapter 依据屏幕 Safe Area 自动调整 UI 面板锚点，适配刘海与异形屏幕。
+---
+
+# UISafeAreaAdapter
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`UISafeAreaAdapter` 为 **UI 安全区域适配组件**，依据 `Screen.safeArea` 自动调整指定面板 (`RectTransform`) 的**锚点 (anchorMin / anchorMax)**，适配**刘海、打孔与异形屏幕**；分辨率变更时会自动重新适配，也可开启 `refreshAlways` 每帧刷新 (应对屏幕旋转)。
+
+|  |  |
+| :--- | :--- |
+| **命名空间** | `OxGKit.Utilities.Adapter` |
+| **类型** | `public class UISafeAreaAdapter : MonoBehaviour` |
+| **源码** | [UISafeAreaAdapter.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/Utilities/Scripts/Runtime/Adapter/UISafeAreaAdapter.cs) |
+
+```csharp
+using OxGKit.Utilities.Adapter;
+```
+
+<Highlight color="#00d679">提醒</Highlight> 通过 **AddComponentMenu: OxGKit/Utilities/Adapter/UISafeAreaAdapter** 加入组件 (同对象仅允许一个, DisallowMultipleComponent)。
+
+## 快速上手 {#quick-start}
+
+1. 将 `UISafeAreaAdapter` 挂载于需要适配的 **UI 面板**上。
+2. `panel` 未指定时，`Awake` 会自动使用**自身的 `RectTransform`**。
+3. `Start` 时自动执行第一次适配；**分辨率变更**时自动重新适配。
+
+```csharp
+using OxGKit.Utilities.Adapter;
+using UnityEngine;
+
+public class SafeAreaDemo : MonoBehaviour
+{
+    public UISafeAreaAdapter adapter;
+
+    private void Start()
+    {
+        // 需要应对屏幕旋转时, 可开启每帧刷新
+        this.adapter.refreshAlways = true;
+
+        // 或于特定时机手动刷新
+        this.adapter.RefreshViewSize();
+    }
+}
+```
+
+## 通用规则 {#general-rules}
+
+### 适配时机 {#refresh-timing}
+
+- **Start**：自动执行第一次适配。
+- **LateUpdate**：检测到**分辨率变更**时自动适配；`refreshAlways = true` 时**每帧**适配。
+- **手动**：调用 [RefreshViewSize](#refreshviewsize)。
+
+<Highlight color="#00d679">提醒</Highlight> 适配时的 Safe Area 与分辨率日志**仅于数值变更时输出** (避免每帧产生字符串分配)，日志通过 **OxGKit.LoggingSystem** 输出。
+
+---
+
+## 成员 {#members}
+
+| 成员 | 说明 |
+| :--- | :--- |
+| `public bool refreshAlways` | 是否每帧刷新适配 (默认 `false`)，应对屏幕旋转等场景。 |
+| `public RectTransform panel` | 要适配的目标面板，未指定时自动使用自身的 `RectTransform`。 |
+
+---
+
+## 方法 {#methods}
+
+### RefreshViewSize {#refreshviewsize}
+
+```csharp
+public void RefreshViewSize()
+```
+
+依据当前 `Screen.safeArea` 重新计算并应用面板的 `anchorMin` 与 `anchorMax` (以屏幕宽高归一化)。
+
+```csharp
+adapter.RefreshViewSize();
+```

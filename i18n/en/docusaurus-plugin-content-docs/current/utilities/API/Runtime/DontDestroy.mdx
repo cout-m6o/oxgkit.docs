@@ -1,0 +1,71 @@
+---
+sidebar_position: 6
+description: The DontDestroy component marks the object as DontDestroyOnLoad in Awake and supports runtime renaming with a configured name.
+---
+
+# DontDestroy
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`DontDestroy` is a **cross-scene persistent object marker component**. In `Awake`, it renames the object to the **Runtime Name** configured in the Inspector and calls `DontDestroyOnLoad` so the object **survives scene switches**.
+
+|  |  |
+| :--- | :--- |
+| **Namespace** | `OxGKit.Utilities.DontDestroy` |
+| **Type** | `public class DontDestroy : MonoBehaviour` |
+| **Source** | [DontDestroy.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/Utilities/Scripts/Runtime/DontDestroy/DontDestroy.cs) |
+
+```csharp
+using OxGKit.Utilities.DontDestroy;
+```
+
+<Highlight color="#0373fc">Attention</Highlight> `DontDestroyOnLoad` only works on **root GameObjects**; attach this component to an object at the scene root level (one per object, DisallowMultipleComponent).
+
+## Quick Start {#quick-start}
+
+1. Attach the component to a **root object** via **AddComponentMenu: OxGKit/Utilities/DontDestroy/DontDestroy**.
+2. Configure the **Runtime Name** in the Inspector (default `DontDestroy`); in `Awake`, the object is renamed automatically and marked persistent.
+
+```csharp
+using OxGKit.Utilities.DontDestroy;
+using UnityEngine;
+
+public class DontDestroyDemo : MonoBehaviour
+{
+    private void Start()
+    {
+        var dontDestroy = this.GetComponent<DontDestroy>();
+
+        // Rename the object at runtime
+        dontDestroy.SetRuntimeName("GameManager");
+    }
+}
+```
+
+---
+
+## Methods {#methods}
+
+### SetRuntimeName {#setruntimename}
+
+```csharp
+public void SetRuntimeName(string runtimeName)
+```
+
+**Renames the object** with the given name (updates both the GameObject name and the internally stored Runtime Name).

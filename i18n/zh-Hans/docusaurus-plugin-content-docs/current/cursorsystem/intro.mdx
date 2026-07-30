@@ -1,0 +1,146 @@
+---
+sidebar_position: 1
+---
+
+import ReactPlayer from 'react-player'
+
+# 模块介绍
+
+export const Highlight = ({ children, color }) => (
+  <span
+    style={{
+      backgroundColor: color,
+      borderRadius: '5px',
+      color: '#fff',
+      padding: '2.5px'
+    }}>
+    {children}
+  </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+## 基本说明
+
+Cursor 游标管理器，支持**静态与动态游标**与**各种状态行为切换** (例如经营模拟类的游戏，需要有各种游标状态等...)。
+
+- 版本：**v1.0.1** (`com.michaelo.oxgkit.cursorsystem`)
+- 命名空间：`OxGKit.CursorSystem`
+
+---
+
+## 应用说明
+
+### CursorManager 配置界面
+
+- 通过 **Package Manager -> Samples** 导入 **CursorManager Prefab**，再拖拽至启动场景上 (也可以不放置 Prefab，首次调用 [Cursors](/docs/cursorsystem/API/Runtime/Cursors) API 时，会自动查找或创建 `[CursorManager]` 节点)，CursorManager 会自动整理至 `OxGKit` 容器节点下并 **DontDestroyOnLoad** 常驻。
+- 在 Inspector 上编辑 **Cursor States** 列表，每条 [CursorState](/docs/cursorsystem/API/Runtime/CursorManager#cursorstate) 可配置以下：
+  - **stateName**：状态名称 (运行时切换的依据)。
+  - **renderType**：Static (静态游标) 或 Dynamic (动态游标序列帧)。
+  - **cursorMode**：Cursor 渲染模式 (Auto 或 ForceSoftware)。
+  - **scalingEnabled、scale**：缩放开关与缩放比例。
+  - **hotspot**：游标热点位置。
+  - **staticCursorTexture**：静态游标贴图。
+  - **dynamicCursorTextures、isLoop、playMode、frameRate**：动态游标序列帧、是否循环、播放模式、播放速率。
+
+<Highlight color="#0373fc">注意</Highlight> Cursor States 列表中的**第一条状态即为默认状态** (Default)，`ResetCursorState` 会重置回第一条状态。
+
+### 播放模式 (PlayMode)
+
+动态游标支持以下播放模式：
+
+- Normal (顺放)
+- Reverse (倒放)
+- PingPong (顺放 -> 倒放)
+- PingPongReverse (倒放 -> 顺放)
+
+<Highlight color="#ff2f00">重要</Highlight> 动态游标需设置 **frameRate 大于 0** 才会播放动画；缩放功能需启用 **scalingEnabled** 并将 **cursorMode 设为 ForceSoftware** 才会生效。
+
+<Highlight color="#00d679">提醒</Highlight> 游标贴图建议将 Texture Type 设为 **Cursor**，确保渲染清晰；**WebGL** 平台浏览器对自定义游标有尺寸限制，建议使用小尺寸贴图。
+
+---
+
+## 简单使用
+
+### 切换游标状态
+
+```csharp
+using OxGKit.CursorSystem;
+
+// 初始 CursorManager 实例 (场景上已放置 CursorManager Prefab 则会自动查找)
+Cursors.InitInstance();
+
+// 按名称切换游标状态 (返回 bool 表示是否切换成功)
+Cursors.SetCursorState("Loading");
+
+// 重置回默认状态 (列表第一条)
+Cursors.ResetCursorState();
+```
+
+### 显示与锁定控制
+
+```csharp
+// 隐藏游标并锁定于画面中心 (FPS 类操作)
+Cursors.SetCursorVisible(false);
+Cursors.SetCursorLockState(CursorLockMode.Locked);
+
+// 打开菜单时释放
+Cursors.SetCursorLockState(CursorLockMode.None);
+Cursors.SetCursorVisible(true);
+```
+
+### 运行时动态指定贴图
+
+```csharp
+// 按需自行加载 Texture2D (例如 Resources 或 AssetBundle)
+Texture2D tex = Resources.Load<Texture2D>("Cursors/cursor_default");
+
+// 获取指定状态，运行时动态替换游标贴图
+var cursorState = Cursors.GetCursorState("Default");
+cursorState.SetStaticCursor(tex);
+
+// 动态游标序列帧替换与参数调整
+Texture2D[] texture2ds = Resources.LoadAll<Texture2D>("Cursors/Loading");
+cursorState.SetDynamicCursor(texture2ds);
+cursorState.SetFrameRate(12);
+cursorState.SetLoop(true);
+cursorState.ResetRender();
+```
+
+*[参考 Example]*
+
+---
+
+## Installation
+
+| Install via git URL |
+|:--- |
+| Add https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/CursorSystem/Scripts to Package Manager |
+
+**无第三方依赖**
+
+**Samples (Package Manager -> Samples)**
+
+- **AI Agent Skills** (参考 [AI Agent Skills](/docs/agent-skills))
+- **CursorManager Prefab**
+- **CursorManager Demo**
+
+---
+
+## 模块 API
+
+- Runtime
+  - [Cursors](/docs/cursorsystem/API/Runtime/Cursors) (using OxGKit.CursorSystem)
+  - [CursorManager](/docs/cursorsystem/API/Runtime/CursorManager) (using OxGKit.CursorSystem)
+
+---
+
+## Demo
+
+**CursorSystem Demo**
+
+<ReactPlayer controls url='/video/cursorsystem_demo.mp4' />

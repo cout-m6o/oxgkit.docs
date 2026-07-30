@@ -1,0 +1,321 @@
+---
+sidebar_position: 3
+description: ActionSystem 内置的默认动作，包含 SequenceAction (序列)、ParallelAction (并行)、ParallelDelayAction (交错并行)、DelayAction (延迟) 与 DelegateAction (委托回调)。
+---
+
+# Default Actions
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+**ActionSystem** 内置 **5 种默认动作** (皆继承 [ActionBase](./ActionBase.mdx))，通过组合即可构建出各种运行组 (序列、并行、延迟、回调)，并可互相**嵌套组合** (序列包并行、并行包序列)，最后交由 [ActionRunner](./ActionRunner.mdx) 启动运行。
+
+|  |  |
+| :--- | :--- |
+| **命名空间** | `OxGKit.ActionSystem` |
+| **类型** | `SequenceAction`、`ParallelAction`、`ParallelDelayAction`、`DelayAction`、`DelegateAction` (皆继承 `ActionBase`) |
+| **源码** | [SequenceAction.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/ActionSystem/Scripts/Runtime/DefaultActions/SequenceAction.cs)、[ParallelAction.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/ActionSystem/Scripts/Runtime/DefaultActions/ParallelAction.cs)、[ParallelDelayAction.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/ActionSystem/Scripts/Runtime/DefaultActions/ParallelDelayAction.cs)、[DelayAction.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/ActionSystem/Scripts/Runtime/DefaultActions/DelayAction.cs)、[DelegateAction.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/ActionSystem/Scripts/Runtime/DefaultActions/DelegateAction.cs) |
+
+```csharp
+using OxGKit.ActionSystem;
+```
+
+## 快速上手 {#quick-start}
+
+```csharp
+using OxGKit.ActionSystem;
+using UnityEngine;
+
+// 并行组：同时执行，全部完成后结束
+var parAction = new ParallelAction("Burst");
+parAction
+    .AddAction(DelayAction.CreateDelayAction(1f, () => Debug.Log("Delay 1s done")))
+    .AddAction(DelayAction.CreateDelayAction(2f, () => Debug.Log("Delay 2s done")));
+
+// 序列组：依序执行 (Step 1 -> 延迟 1 秒 -> Step 2 -> 并行组)
+var seqAction = new SequenceAction("OpenFlow");
+seqAction
+    .AddAction(DelegateAction.CreateDelegateAction(() => Debug.Log("Step 1")))
+    .AddAction(DelayAction.CreateDelayAction(1f))
+    .AddAction(DelegateAction.CreateDelegateAction(() => Debug.Log("Step 2")))
+    .AddAction(parAction);
+
+// 通过 ActionRunner 启动 (由拥有者驱动 DriveUpdate)
+this._runner.RunAction(seqAction);
+```
+
+## 通用规则 {#general-rules}
+
+### 组合规则 {#composition-rules}
+
+- 默认动作皆继承 [ActionBase](./ActionBase.mdx)，可互相**嵌套组合**，`AddAction` 皆可**链式调用**。
+- 每种默认动作皆提供 `()`、`(int uid)`、`(string name)`、`(string name, int uid)` 四种构造函数，可自定义名称 (日志识别) 与 UID (供 `RemoveAction` 移除)。
+
+<Highlight color="#0373fc">注意</Highlight> 组合动作 (SequenceAction / ParallelAction / ParallelDelayAction) 内部以 `SetDuration(-1)` 运行，**完成时机由子项动作决定** (全部完成才结束)。
+
+### 动作总览 {#actions-overview}
+
+| 动作 | 说明 |
+| :--- | :--- |
+| [SequenceAction](#sequenceaction) | 序列动作，依序执行子项动作 (一次一个)。 |
+| [ParallelAction](#parallelaction) | 并行动作，同时执行所有子项动作。 |
+| [ParallelDelayAction](#paralleldelayaction) | 交错并行动作，依延迟间隔依序启动子项动作后并行执行。 |
+| [DelayAction](#delayaction) | 延迟动作，延迟指定秒数后结束 (可附带结束回调)。 |
+| [DelegateAction](#delegateaction) | 委托动作，启动时触发回调 (可附带延迟)。 |
+
+---
+
+## SequenceAction {#sequenceaction}
+
+```csharp
+public class SequenceAction : ActionBase
+```
+
+**序列动作**：依加入顺序**一次一个**执行子项动作，前一个动作全部完成 (`IsAllDone`) 后才会启动下一个；所有子项动作完成后，序列动作即完成 (若启动时没有任何动作会直接标记完成)。
+
+### 构造函数 {#seq-constructors}
+
+```csharp
+public SequenceAction()
+
+public SequenceAction(int uid)
+
+public SequenceAction(string name)
+
+public SequenceAction(string name, int uid)
+```
+
+### 方法总览 {#seq-overview}
+
+| 方法 | 说明 |
+| :--- | :--- |
+| [AddAction](#seq-addaction) | 加入动作 (启动前组合)。 |
+| [QueueAction](#seq-queueaction) | 排队动作 (运行中追加)。 |
+| [RemoveAction](#seq-removeaction) | 依 UID 移除动作。 |
+
+---
+
+### AddAction {#seq-addaction}
+
+```csharp
+public SequenceAction AddAction(ActionBase action)
+```
+
+加入动作至准备清单 (同一实例不会重复加入)，返回序列动作本身，可**链式调用**。
+
+<Highlight color="#0373fc">注意</Highlight> `AddAction` 需于**序列动作启动前**加入 (启动时会将准备清单转入待执行队列)；若序列**已在运行中**要追加动作，请改用 [QueueAction](#seq-queueaction)。
+
+```csharp
+var seqAction = new SequenceAction("OpenFlow");
+seqAction
+    .AddAction(DelegateAction.CreateDelegateAction(() => Debug.Log("Step 1")))
+    .AddAction(DelayAction.CreateDelayAction(1f))
+    .AddAction(DelegateAction.CreateDelegateAction(() => Debug.Log("Step 2")));
+
+this._runner.RunAction(seqAction);
+```
+
+### QueueAction {#seq-queueaction}
+
+```csharp
+public SequenceAction QueueAction(ActionBase action)
+```
+
+于**运行中**排队追加动作 (可链式调用)，于下一次更新时并入待执行队列，接续于现有动作之后依序执行。
+
+### RemoveAction {#seq-removeaction}
+
+```csharp
+public void RemoveAction(int uid)
+```
+
+依 `uid` 从当前执行/待执行/排队队列中移除动作 (标记全部完成并输出移除日志)。
+
+---
+
+## ParallelAction {#parallelaction}
+
+```csharp
+public class ParallelAction : ActionBase
+```
+
+**并行动作**：启动时**同时启动所有**子项动作并平行更新，**全部**子项动作完成后即完成 (若启动时没有任何动作会直接标记完成)。
+
+### 构造函数 {#par-constructors}
+
+```csharp
+public ParallelAction()
+
+public ParallelAction(int uid)
+
+public ParallelAction(string name)
+
+public ParallelAction(string name, int uid)
+```
+
+### AddAction {#par-addaction}
+
+```csharp
+public ParallelAction AddAction(ActionBase action)
+```
+
+加入动作 (同一实例不会重复加入)，返回并行动作本身，可**链式调用**；需于并行动作**启动前**加入。
+
+```csharp
+var parAction = new ParallelAction("Burst");
+parAction
+    .AddAction(DelayAction.CreateDelayAction(1f, () => Debug.Log("Delay 1s done")))
+    .AddAction(DelayAction.CreateDelayAction(2f, () => Debug.Log("Delay 2s done")));
+
+this._runner.RunAction(parAction);
+```
+
+---
+
+## ParallelDelayAction {#paralleldelayaction}
+
+```csharp
+public class ParallelDelayAction : ActionBase
+```
+
+**交错并行动作**：与 [ParallelAction](#parallelaction) 相似，但启动子项动作时会依 `delayTime` **间隔依序启动** (交错启动，内部使用 **UniTask** 延迟)，之后并行更新，全部子项动作完成后即完成。
+
+### 构造函数 {#pardelay-constructors}
+
+```csharp
+public ParallelDelayAction()
+
+public ParallelDelayAction(int uid)
+
+public ParallelDelayAction(string name)
+
+public ParallelDelayAction(string name, int uid)
+
+public ParallelDelayAction(float delayTime)
+```
+
+`delayTime` 为每个子项动作之间的**启动间隔秒数** (大于 0 才会进行交错延迟)。
+
+### AddAction {#pardelay-addaction}
+
+```csharp
+public ParallelDelayAction AddAction(ActionBase action)
+```
+
+加入动作 (同一实例不会重复加入)，返回交错并行动作本身，可**链式调用**；需于动作**启动前**加入。
+
+```csharp
+// 每隔 0.2 秒启动一个子项动作，之后并行执行
+var staggerAction = new ParallelDelayAction(0.2f);
+staggerAction
+    .AddAction(DelegateAction.CreateDelegateAction(() => Debug.Log("Spawn 1")))
+    .AddAction(DelegateAction.CreateDelegateAction(() => Debug.Log("Spawn 2")))
+    .AddAction(DelegateAction.CreateDelegateAction(() => Debug.Log("Spawn 3")));
+
+this._runner.RunAction(staggerAction);
+```
+
+---
+
+## DelayAction {#delayaction}
+
+```csharp
+public class DelayAction : ActionBase
+```
+
+**延迟动作**：延迟 `delayTime` 秒后结束，结束时触发 `onEndAction` 回调 (可选，触发一次后清空)。
+
+### 成员 {#delay-members}
+
+| 成员 | 说明 |
+| :--- | :--- |
+| `public float delayTime` | 延迟秒数 (于 `OnStart` 作为持续时间设置)。 |
+| `public Action onEndAction` | 结束回调 (完成时触发一次后清空)。 |
+
+### 构造函数 {#delay-constructors}
+
+```csharp
+public DelayAction()
+
+public DelayAction(int uid)
+
+public DelayAction(string name)
+
+public DelayAction(string name, int uid)
+```
+
+### CreateDelayAction {#createdelayaction}
+
+```csharp
+public static DelayAction CreateDelayAction(float delayTime, Action onEndAction = null)
+```
+
+**[Factory]** 创建延迟动作，指定延迟秒数与结束回调。
+
+```csharp
+// 延迟 1.5 秒后触发回调
+var delayAction = DelayAction.CreateDelayAction(1.5f, () => Debug.Log("1.5s done"));
+```
+
+---
+
+## DelegateAction {#delegateaction}
+
+```csharp
+public class DelegateAction : ActionBase
+```
+
+**委托动作**：启动时触发 `onAction` 回调 (触发一次后清空)。
+
+### 成员 {#delegate-members}
+
+| 成员 | 说明 |
+| :--- | :--- |
+| `public event Action onAction` | 委托回调 (启动时触发一次后清空)。 |
+
+### 构造函数 {#delegate-constructors}
+
+```csharp
+public DelegateAction()
+
+public DelegateAction(int uid)
+
+public DelegateAction(string name)
+
+public DelegateAction(string name, int uid)
+```
+
+### CreateDelegateAction {#createdelegateaction}
+
+```csharp
+public static ActionBase CreateDelegateAction(Action onAction, float delayTime = 0f)
+```
+
+**[Factory]** 创建委托动作，并自动将 `MarkAsDone` 挂入回调链 (回调触发后即完成)；当 `delayTime` **大于 0** 时，会返回**包装 DelayAction + DelegateAction 的 [SequenceAction](#sequenceaction)** (先延迟再触发回调)。
+
+<Highlight color="#0373fc">注意</Highlight> `delayTime` 大于 0 时返回的是 **SequenceAction 包装** (静态类型为 `ActionBase`)，请勿将返回值转换为 `DelegateAction`。
+
+<Highlight color="#00d679">提醒</Highlight> 建议通过 `CreateDelegateAction` 工厂方法创建；若自行 `new DelegateAction()` 并订阅 `onAction`，由于内部以 `SetDuration(-1)` 运行，必须自行于回调中调用 `MarkAsDone()` 结束动作。
+
+```csharp
+// 立即触发回调
+var callback = DelegateAction.CreateDelegateAction(() => Debug.Log("Hello"));
+
+// 延迟 1 秒后触发回调 (返回 SequenceAction 包装)
+var delayedCallback = DelegateAction.CreateDelegateAction(() => Debug.Log("Hello Delayed"), 1f);
+```

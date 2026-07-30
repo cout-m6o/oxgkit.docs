@@ -1,0 +1,219 @@
+---
+sidebar_position: 1
+description: MonoSingleton 为 SingletonSystem 的 MonoBehaviour 单例基类，支持场景查找或自动创建实例、DontDestroyOnLoad 常驻控制，并提供 OnCreate、OnStart、OnRelease 生命周期挂钩。
+---
+
+# MonoSingleton
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`MonoSingleton<T>` 为 **SingletonSystem** 的 `MonoBehaviour` **单例基类** (线程锁保护)，获取实例时会**优先查找场景上的既有实例，否则自动创建 GameObject** 挂载组件，支持 **DontDestroyOnLoad 跨场景常驻控制**，并以 **OnCreate / OnStart / OnRelease** 生命周期挂钩取代 Unity 的 `Awake` / `Start` / `OnDestroy`。
+
+|  |  |
+| :--- | :--- |
+| **命名空间** | `OxGKit.SingletonSystem` |
+| **类型** | `public abstract class MonoSingleton<T> : MonoBehaviour where T : MonoSingleton<T>` |
+| **源码** | [MonoSingleton.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/SingletonSystem/Scripts/Runtime/Core/MonoSingleton.cs) |
+
+```csharp
+using OxGKit.SingletonSystem;
+```
+
+<Highlight color="#00d679">提醒</Highlight> 不需要挂载于 GameObject 的纯数据或逻辑管理类，请改用 [NewSingleton](./NewSingleton.mdx)。
+
+## 快速上手 {#quick-start}
+
+```csharp
+using OxGKit.SingletonSystem;
+
+public class GameManager : MonoSingleton<GameManager>
+{
+    protected override void OnCreate() { /* Call by Unity.Awake */ }
+
+    protected override void OnStart() { /* Call by Unity.Start */ }
+
+    protected override void OnRelease() { /* Call by Unity.OnDestroy */ }
+
+    public void SaveGame() { /* ... */ }
+}
+
+// 获取实例并访问 (场景查找或自动创建，默认 DontDestroyOnLoad)
+GameManager.GetInstance().SaveGame();
+
+// 场景限定单例 (随场景卸载销毁)
+GameManager.GetInstance(dontDestroyOnLoad: false);
+
+// 启动时明确初始实例 (warm-up)
+GameManager.InitInstance();
+
+// 销毁实例 (连同 GameObject)
+GameManager.DestroyInstance();
+```
+
+## 通用规则 {#general-rules}
+
+### 生命周期对应 {#lifecycle-mapping}
+
+基类已将 `Awake()`、`Start()`、`OnDestroy()` 实现为**私有方法**，并以标记防护对应触发以下挂钩：
+
+| Unity 方法 | 挂钩 | 标记 |
+| :--- | :--- | :--- |
+| `Awake` | [OnCreate](#oncreate) | `isCreated` |
+| `Start` | [OnStart](#onstart) | `isStarted` |
+| `OnDestroy` | [OnRelease](#onrelease) | `isReleased` (并重置 `isCreated`、`isStarted` 与实例引用) |
+
+<Highlight color="#ff2f00">重要</Highlight> **不可实现 `Awake()`、`Start()`、`OnDestroy()`** (基类已占用)，其余 Unity 方法 (`Update`、`OnEnable` 等) 均可正常实现。
+
+### 实例创建规则 {#instance-rules}
+
+1. **场景预先放置**：实例于 `Awake` 自动注册为单例，并依 Inspector 上的 [dontDestroyOnLoad](#members) 字段决定是否常驻 (详见[模块介绍](../../intro.mdx#dontdestroyonload-控制))。
+2. **代码动态创建**：调用 [GetInstance](#getinstance) 时若无实例，会查找场景既有实例 (`FindObjectsOfType` 取第一个)，否则以 `new GameObject(typeof(T).Name)` 自动创建并挂载组件。
+
+<Highlight color="#0373fc">注意</Highlight> [GetInstance](#getinstance) **仅于 Play Mode 进行实例创建** (`Application.isPlaying`)。
+
+<Highlight color="#0373fc">注意</Highlight> 同一类型于场景上放置**多个实例时不会自动去重** (查找取第一个)，请避免于多场景 (Additive) 重复放置。
+
+<Highlight color="#00d679">提醒</Highlight> 于 `OnCreate` / `OnStart` 注册的事件，请于 [OnRelease](#onrelease) 解除注册，避免常驻单例累积失效委托；于关闭/销毁流程中访问单例，建议先以 [CheckInstanceExists](#checkinstanceexists) 检查，避免于退出阶段又重新创建实例。
+
+---
+
+## 成员 {#members}
+
+| 成员 | 说明 |
+| :--- | :--- |
+| `public bool dontDestroyOnLoad` | (实例字段) 是否于 `Awake` 进行 `DontDestroyOnLoad` 常驻标记，默认 `true`，场景预先放置时可于 Inspector 配置。 |
+| `public static bool isCreated` | [OnCreate](#oncreate) 是否已触发。 |
+| `public static bool isStarted` | [OnStart](#onstart) 是否已触发。 |
+| `public static bool isReleased` | 实例是否已销毁 ([OnRelease](#onrelease) 已触发)，新实例 `Awake` 时会重置为 `false`。 |
+
+---
+
+## 实例管理 {#instance-management}
+
+### 方法总览 {#instance-overview}
+
+| 方法 | 说明 |
+| :--- | :--- |
+| [GetInstance](#getinstance) | 获取单例实例 (场景查找或自动创建)。 |
+| [InitInstance](#initinstance) | 初始单例实例 (等同调用 GetInstance)。 |
+| [CheckInstanceExists](#checkinstanceexists) | 检查实例是否存在。 |
+| [DestroyInstance](#destroyinstance) | 销毁单例实例。 |
+
+---
+
+### GetInstance {#getinstance}
+
+```csharp
+public static T GetInstance(bool dontDestroyOnLoad = true)
+```
+
+获取单例实例 (线程锁保护)。若实例尚不存在 (仅于 Play Mode)，会**优先查找场景上的既有实例，否则自动创建** `new GameObject(typeof(T).Name)` 并挂载组件；`dontDestroyOnLoad` 参数为 `true` 时会标记实例并执行 `DontDestroyOnLoad`。
+
+```csharp
+// 需要跨场景常驻 (默认)
+GameManager.GetInstance();
+
+// 不需要跨场景常驻 (首次获取时设置一次即可)
+StageManager.GetInstance(dontDestroyOnLoad: false);
+```
+
+<Highlight color="#0373fc">注意</Highlight> `dontDestroyOnLoad` 参数于**首次创建实例时生效**，请于第一次获取实例的调用点决定并保持一致。
+
+### InitInstance {#initinstance}
+
+```csharp
+public static void InitInstance(bool dontDestroyOnLoad = true)
+```
+
+初始单例实例 (等同调用 [GetInstance](#getinstance))，适合于启动流程**明确控制创建顺序** (warm-up)，避免延迟创建造成的顺序问题。
+
+```csharp
+private void Awake()
+{
+    GameManager.InitInstance();
+    AudioManager.InitInstance();
+}
+```
+
+### CheckInstanceExists {#checkinstanceexists}
+
+```csharp
+public static bool CheckInstanceExists()
+```
+
+检查实例是否存在 (**不会**触发创建)。
+
+```csharp
+if (GameManager.CheckInstanceExists())
+    GameManager.GetInstance().SaveGame();
+```
+
+### DestroyInstance {#destroyinstance}
+
+```csharp
+public static void DestroyInstance(bool gameObjectIncluded = true)
+```
+
+销毁单例实例；`gameObjectIncluded` 为 `true` 时**连同 GameObject 一并销毁**，为 `false` 时仅销毁组件本身。销毁后会触发 [OnRelease](#onrelease) 并重置状态标记与实例引用，之后可再重新创建新实例。
+
+```csharp
+// 连同 GameObject 一并销毁 (默认)
+GameManager.DestroyInstance();
+
+// 仅销毁组件本身 (保留 GameObject)
+GameManager.DestroyInstance(gameObjectIncluded: false);
+```
+
+---
+
+## 生命周期挂钩 {#lifecycle-hooks}
+
+### 方法总览 {#lifecycle-overview}
+
+| 方法 | 说明 |
+| :--- | :--- |
+| [OnCreate](#oncreate) | 由 Unity `Awake` 触发。 |
+| [OnStart](#onstart) | 由 Unity `Start` 触发。 |
+| [OnRelease](#onrelease) | 由 Unity `OnDestroy` 触发。 |
+
+---
+
+### OnCreate {#oncreate}
+
+```csharp
+protected abstract void OnCreate()
+```
+
+由 Unity `Awake` 触发 (以 `isCreated` 标记防护仅触发一次)，于此实现初始逻辑。
+
+### OnStart {#onstart}
+
+```csharp
+protected abstract void OnStart()
+```
+
+由 Unity `Start` 触发 (以 `isStarted` 标记防护仅触发一次)，于此实现启动逻辑。
+
+### OnRelease {#onrelease}
+
+```csharp
+protected abstract void OnRelease()
+```
+
+由 Unity `OnDestroy` 触发，于此实现释放逻辑 (解除事件注册、释放资源)；触发后 `isReleased` 为 `true`，并重置 `isCreated`、`isStarted` 与实例引用。

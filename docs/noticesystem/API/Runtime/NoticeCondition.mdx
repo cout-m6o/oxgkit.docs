@@ -1,0 +1,151 @@
+---
+sidebar_position: 3
+description: NoticeCondition 為 NoticeSystem 的通知條件基類，自定義條件需繼承並實作 ShowCondition 判斷是否顯示紅點，並涵蓋 NoticeInfo (條件 ID 與數據) 通知資訊結構。
+---
+
+# NoticeCondition
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`NoticeCondition` 為 **NoticeSystem** 的**通知條件基類 (抽象類)**，自定義條件需繼承並實作 `ShowCondition` 判斷是否顯示紅點，經由 [NoticeManager.RegisterCondition](./NoticeManager.mdx#registercondition) 註冊後自動分配條件 ID；可透過 Right-Click **Create/OxGKit/Notice System/Template Notice Condition.cs** 建立條件模板 (參考 [模塊介紹](../../intro.mdx))。
+
+|  |  |
+| :--- | :--- |
+| **命名空間** | `OxGKit.NoticeSystem` |
+| **類型** | `public abstract class NoticeCondition` |
+| **原始碼** | [NoticeCondition.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/NoticeSystem/Scripts/Runtime/Core/NoticeCondition.cs) |
+
+```csharp
+using OxGKit.NoticeSystem;
+```
+
+## 快速上手 {#quick-start}
+
+```csharp
+using OxGKit.NoticeSystem;
+using UnityEngine;
+
+public class NewMailCond : NoticeCondition
+{
+    #region Default
+    // 慣例：定義靜態屬性取得自動分配的條件 ID
+    public static int id { get { return NoticeManager.GetConditionId<NewMailCond>(); } }
+
+    // 於場景載入前自動註冊條件 (對應 BeforeSceneLoad 模板)
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+    static void Register()
+    {
+        NoticeManager.RegisterCondition<NewMailCond>();
+    }
+    #endregion
+
+    public override bool ShowCondition(object data)
+    {
+        if (data != null)
+        {
+            MailBox mailBox = data as MailBox;
+
+            // 有未讀郵件則顯示紅點
+            if (mailBox.unreadCount > 0) return true;
+        }
+
+        return false;
+    }
+}
+```
+
+## 通用規則 {#general-rules}
+
+- 條件類為**純邏輯類**，`ShowCondition` 內不要持有 MonoBehaviour 狀態或場景引用。
+- `ShowCondition` 的 `data` 可能為 `null` 或不同類型 (多個 UI 共用同一條件時)，需做**防禦性檢查**。
+- 條件 ID 由 [NoticeManager.RegisterCondition](./NoticeManager.mdx#registercondition) 註冊時**自動分配**，慣例上於條件類中定義靜態屬性 `id`。
+
+<Highlight color="#00d679">提醒</Highlight> 單一 NoticeItem 持有多個條件為 **OR 邏輯** (任一符合即顯示)；若需 **AND 邏輯**，將整組判斷寫在同一個條件類的 `ShowCondition` 中。
+
+---
+
+## 方法總覽 {#overview}
+
+| 方法 | 說明 |
+| :--- | :--- |
+| [SetId](#setid) | 設置條件 ID (由 NoticeManager 註冊時自動調用)。 |
+| [GetId](#getid) | 取得條件 ID。 |
+| [ShowCondition](#showcondition) | (抽象) 依數據判斷條件是否成立 (是否顯示紅點)。 |
+
+---
+
+### SetId {#setid}
+
+```csharp
+public void SetId(int id)
+```
+
+設置條件 ID。
+
+<Highlight color="#0373fc">注意</Highlight> 由 [NoticeManager.RegisterCondition](./NoticeManager.mdx#registercondition) 於註冊時**自動調用**，一般無需自行調用。
+
+### GetId {#getid}
+
+```csharp
+public int GetId()
+```
+
+取得條件 ID (亦可透過 `NoticeManager.GetConditionId<T>()` 以類型查詢)。
+
+### ShowCondition {#showcondition}
+
+```csharp
+public abstract bool ShowCondition(object data)
+```
+
+依傳入的數據判斷條件是否成立，回傳 `true` 表示**顯示紅點**；`data` 為 NoticeItem 註冊時透過 [NoticeInfo](#noticeinfo) 傳入的數據。
+
+---
+
+## NoticeInfo {#noticeinfo}
+
+通知資訊 (結構)，包含**條件 ID 與判斷數據**，作為 [NoticeItem.RegisterNotice](./NoticeItem.mdx#registernotice) / [RenewNotice](./NoticeItem.mdx#renewnotice) 的註冊單位。
+
+|  |  |
+| :--- | :--- |
+| **類型** | `public struct NoticeInfo` |
+| **原始碼** | [NoticeInfo.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/NoticeSystem/Scripts/Runtime/Core/NoticeInfo.cs) |
+
+### 成員 {#noticeinfo-members}
+
+| 成員 | 說明 |
+| :--- | :--- |
+| `public int conditionId` | 條件 ID。 |
+| `public object data` | 交給 `ShowCondition` 判斷的數據 (可為數值類型或參考類型)。 |
+
+### 建構子 {#noticeinfo-constructors}
+
+```csharp
+public NoticeInfo(int conditionId, object data)
+```
+
+```csharp
+// 參考類型數據 (變更後僅需 Notify)
+new NoticeInfo(NewMailCond.id, this._mailBox);
+
+// 數值類型數據 (變更後必須 RenewNotice 更新快照，再 Notify)
+new NoticeInfo(CoinInWalletCond.id, this._coin);
+```
+
+<Highlight color="#ff2f00">重要</Highlight> **數值類型 (Value Type)** 數據儲存的是**快照**，數據變更後必須透過 [NoticeItem.RenewNotice](./NoticeItem.mdx#renewnotice) 更新數據再 Notify，否則紅點不會刷新。

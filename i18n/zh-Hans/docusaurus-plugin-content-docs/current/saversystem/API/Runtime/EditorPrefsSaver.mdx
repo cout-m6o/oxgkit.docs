@@ -1,0 +1,168 @@
+---
+sidebar_position: 3
+description: EditorPrefsSaver 是 SaverSystem 内置的编辑器存储器，以 UnityEditor.EditorPrefs 作为存储后端，仅供编辑器脚本使用 (例如编辑器工具的偏好设置)。
+---
+
+# EditorPrefsSaver
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`EditorPrefsSaver` 是 **SaverSystem** 内置的**编辑器存储器** (继承 [Saver](./Saver.mdx))，以 `UnityEditor.EditorPrefs` 作为存储后端，适合存储**编辑器工具的偏好设置** (EditorWindow、自定义 Inspector 等)；并可直接使用基类提供的[文本数据功能 (Data Map)](./Saver.mdx#data-map)。
+
+|  |  |
+| :--- | :--- |
+| **命名空间** | `OxGKit.SaverSystem.Editor` |
+| **类型** | `public class EditorPrefsSaver : Saver` |
+| **源码** | [EditorPrefsSaver.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/SaverSystem/Scripts/Editor/Core/Saver/Implements/EditorPrefsSaver.cs) |
+
+```csharp
+using OxGKit.SaverSystem;
+using OxGKit.SaverSystem.Editor;
+```
+
+<Highlight color="#ff2f00">重要</Highlight> `EditorPrefsSaver` 位于 **Editor Assembly** (`OxGKit.SaverSystem.Editor`)，**仅能在编辑器脚本 (Editor 文件夹或 Editor asmdef) 中引用**，不可用于运行时脚本 (发布时会编译失败)。
+
+## 快速上手 {#quick-start}
+
+```csharp
+using OxGKit.SaverSystem;
+using OxGKit.SaverSystem.Editor;
+
+// 在编辑器工具中创建存储器 (EditorPrefs 后端)
+Saver editorSaver = new EditorPrefsSaver();
+
+// 存储编辑器工具偏好设置
+editorSaver.SaveString("MyProject.MyTool.lastExportPath", "Assets/Exports");
+string path = editorSaver.GetString("MyProject.MyTool.lastExportPath", "");
+```
+
+## 通用规则 {#general-rules}
+
+### 适用范围 {#scope}
+
+| 存储器 | 存储后端 | 适用 |
+| :--- | :--- | :--- |
+| [PlayerPrefsSaver](./PlayerPrefsSaver.mdx) | `UnityEngine.PlayerPrefs` | **运行时** (游戏内设置，随应用程序/平台存储) |
+| `EditorPrefsSaver` | `UnityEditor.EditorPrefs` | **仅编辑器** (编辑器工具偏好设置) |
+
+(模块概览详见[模块介绍](../../intro.mdx))
+
+### 存储范围与写入时机 {#storage-scope}
+
+<Highlight color="#0373fc">注意</Highlight> `EditorPrefs` 为**用户级**存储，**同一台机器上的所有 Unity 项目共用**，建议键名加上项目或工具前缀 (例如 `MyProject.MyTool.someKey`) 避免冲突。
+
+<Highlight color="#00d679">提醒</Highlight> 与 [PlayerPrefsSaver](./PlayerPrefsSaver.mdx) 不同，`EditorPrefs` 由编辑器**自动持久化**，无需 (也没有) `Save()` 调用。
+
+---
+
+## 重写成员 {#overrides}
+
+### 方法总览 {#overview}
+
+| 方法 | 说明 |
+| :--- | :--- |
+| [SaveString](#savestring) | 存储字符串。 |
+| [GetString](#getstring) | 获取字符串。 |
+| [SaveInt](#saveint) | 存储整数。 |
+| [GetInt](#getint) | 获取整数。 |
+| [SaveFloat](#savefloat) | 存储浮点数。 |
+| [GetFloat](#getfloat) | 获取浮点数。 |
+| [HasKey](#haskey) | 检查指定键是否存在。 |
+| [DeleteKey](#deletekey) | 删除指定键。 |
+| [DeleteAll](#deleteall) | 删除所有 EditorPrefs 键值。 |
+
+---
+
+### SaveString {#savestring}
+
+```csharp
+public override void SaveString(string key, string value)
+```
+
+通过 `EditorPrefs.SetString` 存储字符串。
+
+```csharp
+editorSaver.SaveString("MyProject.MyTool.lastExportPath", "Assets/Exports");
+```
+
+### GetString {#getstring}
+
+```csharp
+public override string GetString(string key, string defaultValue = "")
+```
+
+通过 `EditorPrefs.GetString` 获取字符串，键不存在时返回 `defaultValue`。
+
+### SaveInt {#saveint}
+
+```csharp
+public override void SaveInt(string key, int value)
+```
+
+通过 `EditorPrefs.SetInt` 存储整数。
+
+### GetInt {#getint}
+
+```csharp
+public override int GetInt(string key, int defaultValue = 0)
+```
+
+通过 `EditorPrefs.GetInt` 获取整数，键不存在时返回 `defaultValue`。
+
+### SaveFloat {#savefloat}
+
+```csharp
+public override void SaveFloat(string key, float value)
+```
+
+通过 `EditorPrefs.SetFloat` 存储浮点数。
+
+### GetFloat {#getfloat}
+
+```csharp
+public override float GetFloat(string key, float defaultValue = 0f)
+```
+
+通过 `EditorPrefs.GetFloat` 获取浮点数，键不存在时返回 `defaultValue`。
+
+### HasKey {#haskey}
+
+```csharp
+public override bool HasKey(string key)
+```
+
+通过 `EditorPrefs.HasKey` 检查指定键是否存在。
+
+### DeleteKey {#deletekey}
+
+```csharp
+public override void DeleteKey(string key)
+```
+
+通过 `EditorPrefs.DeleteKey` 删除指定键。
+
+### DeleteAll {#deleteall}
+
+```csharp
+public override void DeleteAll()
+```
+
+通过 `EditorPrefs.DeleteAll` 删除键值。
+
+<Highlight color="#ff2f00">重要</Highlight> `EditorPrefs.DeleteAll` 会删除**整台机器用户级的所有编辑器偏好设置** (包含 Unity 本身与其他工具的设置)，一般情况**强烈不建议使用**。

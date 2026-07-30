@@ -1,0 +1,146 @@
+---
+sidebar_position: 3
+description: TextureAnimation is a CPU-computed image sequence animation component supporting SpriteRenderer and Image, with multiple play modes and edit-mode preview.
+---
+
+# TextureAnim
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`TextureAnimation` is a **CPU-computed** **image sequence animation** component. Configure the sprite sequence and playback settings in the Inspector, and it plays on either a **SpriteRenderer or an Image**, with **Normal, Reverse, PingPong, and PingPongReverse** play modes and **edit-mode preview (ExecuteInEditMode)**.
+
+|  |  |
+| :--- | :--- |
+| **Namespace** | `OxGKit.Utilities.TextureAnim` |
+| **Type** | `public class TextureAnimation : MonoBehaviour` |
+| **Source** | [TextureAnimation.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/Utilities/Scripts/Runtime/TextureAnim/TextureAnimation.cs) |
+
+```csharp
+using OxGKit.Utilities.TextureAnim;
+```
+
+<Highlight color="#0373fc">Attention</Highlight> The component must live on an object with a **`SpriteRenderer` or `Image`** (auto-detected in `Awake`, **SpriteRenderer first**). Add it via **AddComponentMenu: OxGKit/Utilities/TextureAnim/TextureAnimation**.
+
+## Quick Start {#quick-start}
+
+```csharp
+using OxGKit.Utilities.TextureAnim;
+using UnityEngine;
+
+public class TextureAnimDemo : MonoBehaviour
+{
+    public TextureAnimation texAnim;
+
+    private void Start()
+    {
+        // Set the frame rate
+        this.texAnim.SetFrameRate(12);
+
+        // Set the end callback (fires when a non-looping run completes)
+        this.texAnim.SetAnimationEnd(() =>
+        {
+            Debug.Log("Animation Complete");
+        });
+    }
+
+    public void Replay()
+    {
+        // Reset the animation and play from the beginning
+        this.texAnim.ResetAnim();
+    }
+}
+```
+
+## General Rules {#general-rules}
+
+### Inspector Options {#inspector-options}
+
+| Field | Description |
+| :--- | :--- |
+| `Sprites` | The image sequence (`List` of `Sprite`) used as animation frames in order. |
+| `Is Loop` | Whether to loop the playback (default `false`). |
+| `Play Mode` | Play mode: **Normal**, **Reverse**, **PingPong**, **PingPongReverse**. |
+| `Frame Rate` | Playback frame rate (default `30`). |
+| `Ignore Time Scale` | Whether to ignore `Time.timeScale` (default `true`, uses `unscaledDeltaTime`). |
+
+### Playback Behavior {#play-behaviours}
+
+- The animation is driven by `Update`, switching sprites at intervals derived from `Frame Rate`.
+- When a **non-looping (Is Loop = false)** run completes, playback stops on the final frame and the callback set via [SetAnimationEnd](#setanimationend) fires; **PingPong / PingPongReverse** counts as complete only after **one full round trip (two passes)**.
+- The component automatically calls [ResetAnim](#resetanim) on **OnDisable** and on Inspector value changes (Editor).
+
+<Highlight color="#00d679">Reminder</Highlight> The animation can be previewed in **edit mode** (ExecuteInEditMode) without entering Play Mode.
+
+---
+
+## Method Overview {#method-overview}
+
+| Method | Description |
+| :--- | :--- |
+| [IsAnimationComplete](#isanimationcomplete) | Checks whether the animation has completed. |
+| [SetAnimationEnd](#setanimationend) | Sets the animation end callback. |
+| [SetIgnoreScale](#setignorescale) | Sets whether to ignore the time scale. |
+| [SetFrameRate](#setframerate) | Sets the playback frame rate. |
+| [ResetAnim](#resetanim) | Resets the animation to its initial state. |
+
+---
+
+### IsAnimationComplete {#isanimationcomplete}
+
+```csharp
+public bool IsAnimationComplete()
+```
+
+Checks whether the animation has completed (only **non-looping** playback reaches the complete state).
+
+### SetAnimationEnd {#setanimationend}
+
+```csharp
+public void SetAnimationEnd(Action endCallback)
+```
+
+Sets the **animation end callback**, invoked when a non-looping run completes.
+
+```csharp
+texAnim.SetAnimationEnd(() => Debug.Log("Done"));
+```
+
+### SetIgnoreScale {#setignorescale}
+
+```csharp
+public void SetIgnoreScale(bool ignore)
+```
+
+Sets whether to ignore `Time.timeScale` (`true` uses `unscaledDeltaTime`; `false` uses `deltaTime`).
+
+### SetFrameRate {#setframerate}
+
+```csharp
+public void SetFrameRate(int frameRate)
+```
+
+Sets the playback frame rate (minimum `0`; the animation does not update at frame rate `0`).
+
+### ResetAnim {#resetanim}
+
+```csharp
+public void ResetAnim()
+```
+
+Resets the animation to its **initial state** (time, frame index, complete flag, ping-pong pass count) and immediately shows the starting frame.

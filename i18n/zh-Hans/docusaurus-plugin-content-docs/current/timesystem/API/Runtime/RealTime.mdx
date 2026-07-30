@@ -1,0 +1,100 @@
+---
+sidebar_position: 7
+description: RealTime 是记录应用程序启动时间的静态工具，由主程序于启动时调用 InitStartupTime 进行初始 (仅首次生效)，可作为全局的游戏启动时间基准。
+---
+
+# RealTime
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`RealTime` 是**记录应用程序启动时间的静态工具**，由主程序 (Main MonoBehaviour 的 `Awake`) 调用 `InitStartupTime()` 进行初始 (**仅首次调用生效**)，之后可通过 `timeSinceStartup` 获取启动时间，作为全局的游戏启动时间基准。
+
+|  |  |
+| :--- | :--- |
+| **命名空间** | `OxGKit.TimeSystem` |
+| **类型** | `public static class RealTime` |
+| **源码** | [RealTime.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/TimeSystem/Scripts/Runtime/Core/Time/RealTime.cs) |
+
+```csharp
+using OxGKit.TimeSystem;
+```
+
+## 快速上手 {#quick-start}
+
+```csharp
+using OxGKit.TimeSystem;
+using UnityEngine;
+
+public class Main : MonoBehaviour
+{
+    private void Awake()
+    {
+        // 由主程序于启动时初始 (仅首次生效)
+        RealTime.InitStartupTime();
+    }
+
+    private void Start()
+    {
+        if (RealTime.IsInitStartupTime())
+        {
+            // 获取游戏启动时间
+            System.DateTime startup = RealTime.timeSinceStartup;
+        }
+    }
+}
+```
+
+<Highlight color="#00d679">提醒</Highlight> 建议在**主程序启动时**即调用 `InitStartupTime()`，记录到的才会是真正的游戏启动时间。
+
+---
+
+## 成员 {#members}
+
+| 成员 | 说明 |
+| :--- | :--- |
+| `public static DateTime timeSinceStartup { get; }` | 应用程序启动时间 (由 [InitStartupTime](#initstartuptime) 记录的系统时间)。 |
+
+---
+
+## 方法 {#methods}
+
+### 方法总览 {#methods-overview}
+
+| 方法 | 说明 |
+| :--- | :--- |
+| [InitStartupTime](#initstartuptime) | 初始启动时间 (仅首次调用生效)。 |
+| [IsInitStartupTime](#isinitstartuptime) | 检查是否已初始启动时间。 |
+
+---
+
+### InitStartupTime {#initstartuptime}
+
+```csharp
+public static void InitStartupTime()
+```
+
+以当下系统时间 (`DateTime.Now`) 记录为启动时间；**仅首次调用生效**，重复调用会直接忽略。
+
+### IsInitStartupTime {#isinitstartuptime}
+
+```csharp
+public static bool IsInitStartupTime()
+```
+
+检查是否已初始启动时间；尚未初始时会通过日志提示 (`Please call RealTime.InitStartupTime() in main program first`) 并返回 false。

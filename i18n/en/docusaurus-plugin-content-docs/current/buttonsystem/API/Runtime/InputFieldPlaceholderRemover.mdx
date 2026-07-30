@@ -1,0 +1,78 @@
+---
+sidebar_position: 2
+description: InputFieldPlaceholderRemover is an input field helper that automatically hides the Placeholder while the input field is focused and restores it on defocus, supporting InputField (Legacy) and TMP_InputField.
+---
+
+# InputFieldPlaceholderRemover
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`InputFieldPlaceholderRemover` is the input field helper shipped with **ButtonSystem** (a `MonoBehaviour` component, see [Module Intro](../../intro.mdx#inputfieldplaceholderremover)); attach it onto the **same GameObject** as an **InputField (Legacy)** or **TMP_InputField** and the Placeholder is **hidden automatically while the input field is focused (editing)** and restored after it loses focus — pure component behavior, **effective as soon as it is attached, no API calls needed**.
+
+|  |  |
+| :--- | :--- |
+| **Namespace** | `OxGKit.ButtonSystem` |
+| **Type** | `public class InputFieldPlaceholderRemover : MonoBehaviour` |
+| **Source** | [InputFieldPlaceholderRemover.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/ButtonSystem/Scripts/Runtime/Core/InputField/InputFieldPlaceholderRemover.cs) |
+
+```csharp
+using OxGKit.ButtonSystem;
+```
+
+## Quick Start {#quick-start}
+
+1. On the object holding the **InputField (Legacy)** or **TMP_InputField**, use **Add Component -> InputFieldPlaceholderRemover**.
+2. Done — enter Play Mode and click the input field: the Placeholder hides automatically on focus and reappears on defocus.
+
+It can also be attached at runtime:
+
+```csharp
+using OxGKit.ButtonSystem;
+using TMPro;
+using UnityEngine;
+
+public class SetupInputField : MonoBehaviour
+{
+    public TMP_InputField inputField;
+
+    private void Awake()
+    {
+        // Attaching onto the same object as the input field is all it takes
+        this.inputField.gameObject.AddComponent<InputFieldPlaceholderRemover>();
+    }
+}
+```
+
+## General Rules {#general-rules}
+
+### Supported Input Field Types {#supported-input-fields}
+
+| Input Field | Implementation |
+| :--- | :--- |
+| `TMP_InputField` | Event driven via **onSelect / onDeselect**: hides the Placeholder on select, restores it on deselect. |
+| `InputField` (Legacy) | Polled per frame in `Update` via **isFocused**: hides the Placeholder while focused, restores it when focus is lost. |
+
+### Attachment Rules {#attach-rules}
+
+- The component grabs the `InputField` and `TMP_InputField` references on the **same GameObject** in `Awake`, so it **must live on the same object as the input field** (attaching it to a parent or child object has no effect).
+- The component exposes **no public API members** — its behavior is fully automatic, with no configuration needed (or possible).
+
+<Highlight color="#0373fc">Attention</Highlight> The input field must have its **Placeholder** assigned (the default UGUI structure already has one); the component toggles it via `placeholder.gameObject.SetActive`.
+
+<Highlight color="#00d679">Reminder</Highlight> When attaching at runtime, make sure the input field component already exists on the object before calling `AddComponent`, so `Awake` can grab the input field reference.

@@ -1,0 +1,187 @@
+---
+sidebar_position: 8
+description: NtpTime is a static clock-synchronization utility for NTP servers or HTTP time APIs; once synchronized, it provides the corrected current time for anti-cheat, daily reset, and other trusted-time scenarios.
+---
+
+# NtpTime
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`NtpTime` is a **static clock-synchronization utility for NTP servers or HTTP time APIs**. After synchronizing once, it keeps providing the **corrected current time** (extrapolated as "time of the received response + elapsed time"), unaffected by users changing the device clock — suitable for **anti-cheat, daily reset**, and other scenarios that need trusted time.
+
+|  |  |
+| :--- | :--- |
+| **Namespace** | `OxGKit.TimeSystem` |
+| **Type** | `public static class NtpTime` |
+| **Source** | [NtpTime.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/TimeSystem/Scripts/Runtime/Core/Time/NtpTime.cs) |
+
+```csharp
+using OxGKit.TimeSystem;
+```
+
+## Quick Start {#quick-start}
+
+```csharp
+using Cysharp.Threading.Tasks;
+using OxGKit.TimeSystem;
+
+// Synchronize with an NTP server (defaults: time.google.com, 10s timeout)
+await NtpTime.Synchronize();
+
+// Read the corrected time once synchronized
+if (NtpTime.IsSynchronized())
+{
+    System.DateTime now = NtpTime.GetNow();       // local time
+    System.DateTime utcNow = NtpTime.GetUtcNow(); // UTC time
+}
+```
+
+## General Rules {#general-rules}
+
+### Synchronization Methods {#sync-methods}
+
+`Synchronize` picks the synchronization method automatically based on the `ntpServer` parameter:
+
+| Method | ntpServer Parameter | Description |
+| :--- | :--- | :--- |
+| **NTP (UDP)** | A host name (e.g. `time.google.com`) | Requests the NTP server over a UDP socket (port 123), executed on the thread pool. |
+| **HTTP time API** | A URL starting with `http://` or `https://` | Requests via UnityWebRequest (**WebGL compatible**); by default parses the **TimeAPI.io Timezone API** response format, e.g. `https://timeapi.io/api/timezone/zone?timeZone=Asia/Taipei`. |
+
+<Highlight color="#0373fc">Attention</Highlight> **WebGL cannot use UDP sockets** — synchronize through an **HTTP time API** instead (pass the API URL as `ntpServer`).
+
+### Behavior While Not Synchronized {#no-sync-fallback}
+
+<Highlight color="#ff2f00">Important</Highlight> `Synchronize` is an **async** flow — gate reads on [IsSynchronized](#issynchronized). **While not synchronized, the time getters only print a warning log (`[NTP] No synchronized.`) and fall back to the local system time** (`GetTimeZone` returns an empty string, `GetUtcOffset` returns 0) — no exception is thrown.
+
+### Time Extrapolation {#time-correction}
+
+<Highlight color="#00d679">Reminder</Highlight> After a successful sync, the "time of the received response" is recorded, and later reads are extrapolated as **synchronized time + elapsed time** — **no repeated synchronization required**; to re-correct (e.g. after the network recovers), simply call [Synchronize](#synchronize) again.
+
+---
+
+## Methods {#methods}
+
+### Method Overview {#methods-overview}
+
+| Method | Description |
+| :--- | :--- |
+| [Synchronize](#synchronize) | Begins synchronizing with an NTP server or HTTP time API. |
+| [IsSynchronized](#issynchronized) | Whether synchronization has completed. |
+| [GetNow](#getnow) | Gets the corrected local time. |
+| [GetUtcNow](#getutcnow) | Gets the corrected UTC time. |
+| [GetNtpDate](#getntpdate) | Gets the corrected time in the original synchronized timezone. |
+| [GetTimeZone](#gettimezone) | Gets the timezone name used for synchronization. |
+| [GetUtcOffset](#getutcoffset) | Gets the UTC offset (hours) of the synchronized time. |
+
+---
+
+### Synchronize {#synchronize}
+
+```csharp
+public static UniTask Synchronize(string ntpServer = "time.google.com", int requestTimeout = 10)
+
+public static UniTask Synchronize<TResponseFormat>(string ntpServer = "time.google.com", int requestTimeout = 10) where TResponseFormat : TimeApiResponseFormat
+```
+
+Begins synchronizing with an NTP server or HTTP time API (the synchronized state is reset to unsynchronized first):
+
+- `ntpServer`: an NTP server host name, or a time API URL starting with `http(s)://` (see [Synchronization Methods](#sync-methods)).
+- `requestTimeout`: request timeout in seconds (default 10); a timeout prints an error log.
+- The generic version specifies the **deserialization format** of the HTTP response (must inherit [TimeApiResponseFormat](#response-format)).
+
+```csharp
+// NTP (UDP) synchronization
+await NtpTime.Synchronize();
+
+// HTTP time API synchronization (WebGL compatible)
+await NtpTime.Synchronize("https://timeapi.io/api/timezone/zone?timeZone=Asia/Taipei");
+```
+
+<Highlight color="#0373fc">Attention</Highlight> When the network is unreachable (`Application.internetReachability` is NotReachable), a warning is printed and the call returns without synchronizing.
+
+### IsSynchronized {#issynchronized}
+
+```csharp
+public static bool IsSynchronized()
+```
+
+Returns whether synchronization with the NTP server has completed.
+
+### GetNow {#getnow}
+
+```csharp
+public static DateTime GetNow()
+```
+
+Gets the corrected **local time**; when the system timezone is close to the server timezone (difference under 0.1 hours), the synchronized time is returned as-is, otherwise it is converted to UTC first and then to the system local time. While not synchronized, prints a warning and returns `DateTime.Now.ToLocalTime()`.
+
+### GetUtcNow {#getutcnow}
+
+```csharp
+public static DateTime GetUtcNow()
+```
+
+Gets the corrected **UTC time** (converted using the UTC offset stored at sync time). While not synchronized, prints a warning and returns `DateTime.Now.ToUniversalTime()`.
+
+### GetNtpDate {#getntpdate}
+
+```csharp
+public static DateTime GetNtpDate()
+```
+
+Gets the corrected time in the **original synchronized timezone** (kept in the timezone it was received in, only advanced by the elapsed time). While not synchronized, prints a warning and returns `DateTime.Now`.
+
+### GetTimeZone {#gettimezone}
+
+```csharp
+public static string GetTimeZone()
+```
+
+Gets the **timezone name** used for synchronization (e.g. `Asia/Taipei`, provided by the HTTP time API); returns an empty string while not synchronized.
+
+### GetUtcOffset {#getutcoffset}
+
+```csharp
+public static double GetUtcOffset()
+```
+
+Gets the **UTC offset (hours)** of the synchronized time; returns 0 while not synchronized.
+
+---
+
+## Response Format {#response-format}
+
+HTTP time API responses are deserialized with `JsonUtility`; the format classes are all marked `[Serializable]`:
+
+```csharp
+public abstract class TimeApiResponseFormat { }
+
+public class TimeApiTimezoneResponse : TimeApiResponseFormat
+{
+    public string timeZone;              // e.g. "Asia/Taipei"
+    public string currentLocalTime;      // e.g. "2025-05-15T12:55:08.5386566"
+    public UtcOffset currentUtcOffset;
+    public UtcOffset standardUtcOffset;
+    public bool hasDayLightSaving;
+    public bool isDayLightSavingActive;
+    public DstInterval dstInterval;
+}
+```
+
+<Highlight color="#0373fc">Attention</Highlight> The built-in processing currently only supports the **`TimeApiTimezoneResponse`** (TimeAPI.io Timezone API) format — it requires the `timeZone`, `currentLocalTime`, and `currentUtcOffset` fields; other formats result in a parse-failure error log.

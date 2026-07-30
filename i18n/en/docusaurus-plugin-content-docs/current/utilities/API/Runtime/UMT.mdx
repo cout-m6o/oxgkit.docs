@@ -1,0 +1,151 @@
+---
+sidebar_position: 7
+description: UMT is a Unity main-thread dispatcher that queues jobs from any thread onto the main thread, with coroutine management support.
+---
+
+# UMT
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`UMT` (**U**nity **M**ain **T**hread) is a **Unity main-thread dispatcher** (a lazy `MonoBehaviour` singleton). Jobs (`Action`) queued from **any thread** are executed in order in **`Update` on the Unity main thread** (the enqueue operation is protected by a thread lock), and it also supports **starting and stopping coroutines**.
+
+|  |  |
+| :--- | :--- |
+| **Namespace** | `OxGKit.Utilities.UnityMainThread` |
+| **Type** | `public class UMT : MonoBehaviour` |
+| **Source** | [UMT.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/Utilities/Scripts/Runtime/UnityMainThread/UMT.cs) |
+
+```csharp
+using OxGKit.Utilities.UnityMainThread;
+```
+
+<Highlight color="#0373fc">Attention</Highlight> The first access to `UMT.worker` **automatically creates a persistent object named `[UMT]`** (parented under an `OxGKit` container with `DontDestroyOnLoad`); avoid first-touching it during **application teardown**, or a stray object may be created.
+
+## Quick Start {#quick-start}
+
+```csharp
+using OxGKit.Utilities.UnityMainThread;
+using System.Threading.Tasks;
+using UnityEngine;
+
+public class UMTDemo : MonoBehaviour
+{
+    private void Start()
+    {
+        Task.Run(() =>
+        {
+            // After finishing work on a background thread...
+            var result = 1 + 1;
+
+            // Queue work that touches Unity APIs back onto the main thread
+            UMT.worker.AddJob(() =>
+            {
+                Debug.Log($"Result: {result} (main thread)");
+                this.transform.position = Vector3.zero;
+            });
+        });
+    }
+}
+```
+
+## General Rules {#general-rules}
+
+### Execution Timing {#execution-timing}
+
+- Jobs queued via [AddJob](#addjob) are **all executed in order within UMT's `Update`** (FIFO).
+- `AddJob` is protected by a **thread lock** and is safe to call from **any thread**; the coroutine methods must still be used on the main thread.
+
+---
+
+## Members {#members}
+
+| Member | Description |
+| :--- | :--- |
+| `public static UMT worker` | Gets the UMT singleton (the persistent object is created on first access). |
+
+---
+
+## Method Overview {#method-overview}
+
+| Method | Description |
+| :--- | :--- |
+| [AddJob](#addjob) | Queues a job to run in Update on the main thread. |
+| [RunCoroutine](#runcoroutine) | Starts a coroutine (IEnumerator or method name). |
+| [CancelCoroutine](#cancelcoroutine) | Stops a coroutine (IEnumerator or method name). |
+| [CancelAllCoroutines](#cancelallcoroutines) | Stops all coroutines started by UMT. |
+| [Clear](#clear) | Clears the pending job queue. |
+
+---
+
+### AddJob {#addjob}
+
+```csharp
+public void AddJob(Action newJob)
+```
+
+Queues a job to be executed in order in **`Update` on the main thread**; callable from **any thread** (thread lock protected).
+
+```csharp
+UMT.worker.AddJob(() =>
+{
+    // Do main thread job
+});
+```
+
+### RunCoroutine {#runcoroutine}
+
+```csharp
+public void RunCoroutine(IEnumerator routine)
+
+public void RunCoroutine(string methodName)
+```
+
+**Starts a coroutine** with UMT as the host; useful for running coroutines from non-MonoBehaviour classes.
+
+```csharp
+UMT.worker.RunCoroutine(this.MyRoutine());
+```
+
+<Highlight color="#00d679">Reminder</Highlight> Following Unity's `StartCoroutine(string)` semantics, the **string overload** can only start methods **defined on UMT itself**; prefer the **IEnumerator overload** in general.
+
+### CancelCoroutine {#cancelcoroutine}
+
+```csharp
+public void CancelCoroutine(IEnumerator routine)
+
+public void CancelCoroutine(string methodName)
+```
+
+Stops the given coroutine (pass the **same** IEnumerator instance or method name used to start it).
+
+### CancelAllCoroutines {#cancelallcoroutines}
+
+```csharp
+public void CancelAllCoroutines()
+```
+
+Stops **all** coroutines started by UMT.
+
+### Clear {#clear}
+
+```csharp
+public void Clear()
+```
+
+Clears the **pending** job queue (jobs that already ran are unaffected).

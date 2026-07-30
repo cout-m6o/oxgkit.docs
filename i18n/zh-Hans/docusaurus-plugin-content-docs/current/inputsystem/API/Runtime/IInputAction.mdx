@@ -1,0 +1,157 @@
+---
+sidebar_position: 2
+description: IInputAction 是 InputSystem 的输入行为接口 (通用信号派送者)，实现者将设备或插件输入转换为 C# 事件供订阅者订阅，并通过 Inputs.IA 进行注册与驱动。
+---
+
+# IInputAction
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`IInputAction` 是 **InputSystem** 的**输入行为接口** (通用信号派送者)：实现者负责将 **Unity New InputSystem** 或**其他输入控制插件**的输入转换为 **C# 事件**进行派送，让游戏中的控制逻辑只需订阅事件，**不需知道平台设备区分**；通过 [Inputs.IA.RegisterInputAction](./Inputs.mdx#registerinputaction) 注册、[Inputs.IA.DriveUpdate](./Inputs.mdx#driveupdate) 驱动。
+
+|  |  |
+| :--- | :--- |
+| **命名空间** | `OxGKit.InputSystem` |
+| **类型** | `public interface IInputAction` |
+| **源码** | [IInputAction.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/InputSystem/Scripts/Runtime/Interface/IInputAction.cs) |
+
+```csharp
+using OxGKit.InputSystem;
+```
+
+## 快速上手 {#quick-start}
+
+```csharp
+using System;
+using OxGKit.InputSystem;
+using UnityEngine;
+using UnityEngine.InputSystem;
+
+public class PlayerAction : IInputAction
+{
+    // 自定义输入事件 (由订阅者订阅)
+    public event Action<Vector2> onMove;
+
+    public void OnCreate()
+    {
+        // 注册时进行事件绑定 (以 Unity New InputSystem 为例)
+        var ctrls = Inputs.CM.GetControlMap<PlayerControls>();
+        if (ctrls == null) return;
+        ctrls.Player.Move.performed += this._OnMove;
+        ctrls.Player.Move.canceled += this._OnMove;
+    }
+
+    public void OnUpdate(float dt)
+    {
+        // 可选的轮询式输入检测 (由 Inputs.IA.DriveUpdate 驱动)
+    }
+
+    public void RemoveAllListeners()
+    {
+        this.onMove = null;
+    }
+
+    private void _OnMove(InputAction.CallbackContext ctx)
+    {
+        // 重新派送为游戏层级的输入信号
+        this.onMove?.Invoke(ctx.ReadValue<Vector2>());
+    }
+}
+```
+
+## 通用规则 {#general-rules}
+
+### 生命周期 {#lifecycle}
+
+1. **OnCreate**：由 [RegisterInputAction](./Inputs.mdx#registerinputaction) 注册时**自动调用一次**，在此绑定 Control Map 或初始其他输入插件。
+2. **OnUpdate**：由 [DriveUpdate](./Inputs.mdx#driveupdate) **每帧驱动**，用于轮询式输入检测 (可留空实现)。
+3. **RemoveAllListeners**：**需自行在适当时机调用** (例如场景转换或功能退场)，清除所有已订阅事件。
+
+<Highlight color="#0373fc">注意</Highlight> 游戏/功能代码应**只订阅 IInputAction 派送的事件**，避免在项目中散落原生 `InputAction` 的直接读取，才能保持控制逻辑与平台设备解耦。
+
+<Highlight color="#00d679">提醒</Highlight> 功能退场时记得**退订事件**；场景/Domain 转换时可调用 `RemoveAllListeners()` 清除订阅，避免残留过期委托 (stale delegates)。
+
+## 方法总览 {#overview}
+
+| 方法 | 说明 |
+| :--- | :--- |
+| [OnCreate](#oncreate) | 注册时调用 (在此绑定 Control Map 或插件输入)。 |
+| [OnUpdate](#onupdate) | 每帧轮询 (由 Inputs.IA.DriveUpdate 驱动)。 |
+| [RemoveAllListeners](#removealllisteners) | 清除所有已订阅事件。 |
+
+---
+
+### OnCreate {#oncreate}
+
+```csharp
+void OnCreate()
+```
+
+由 [Inputs.IA.RegisterInputAction](./Inputs.mdx#registerinputaction) **注册时自动调用**，通常在此通过 [Inputs.CM.GetControlMap](./Inputs.mdx#getcontrolmap) 获取控制表进行事件绑定，或初始其他输入插件的信号来源。
+
+<Highlight color="#ff2f00">重要</Highlight> 若在 `OnCreate` 获取 Control Map，**必须先注册该 Control Map**，否则 `GetControlMap` 会返回 null，导致绑定被静默跳过。
+
+### OnUpdate {#onupdate}
+
+```csharp
+void OnUpdate(float dt)
+```
+
+由 [Inputs.IA.DriveUpdate](./Inputs.mdx#driveupdate) **每帧驱动** (传入 dt)，可在此进行轮询式输入检测 (例如非事件型插件的输入采样)；若无轮询需求可留空实现。
+
+### RemoveAllListeners {#removealllisteners}
+
+```csharp
+void RemoveAllListeners()
+```
+
+清除所有已订阅的事件 (将事件设为 null)，**需自行在适当时机调用** (例如场景转换或功能退场)。
+
+```csharp
+Inputs.IA.GetInputAction<PlayerAction>().RemoveAllListeners();
+```
+
+---
+
+## 脚本模板 {#script-templates}
+
+### Template Input Action.cs {#tpl-input-action}
+
+通过 Right-Click **Create/OxGKit/Input System/Template Input Action.cs (Input Interface For Any)** 快速创建 `IInputAction` 实现脚本 (通用信号派送者，可自由实现任何输入来源)。
+
+### Template Input Binding Composite.cs {#tpl-input-binding-composite}
+
+通过 Right-Click **Create/OxGKit/Input System/New Input System (Extension)/Template Input Binding Composite.cs (For Unity New Input System)** 创建 **Unity New InputSystem** 的 **Binding Composite** 脚本，将多个输入部件合成单一自定义输入值 (例如「修饰键 + 方向键」合成移动输入)：
+
+- 模板继承 `InputBindingComposite<TValue>` 并定义自定义值结构 (struct)。
+- 通过 `[InputControl(layout = "...")]` 声明组合部件 (Button / Integer / Vector2 / Axis)。
+- 在 `ReadValue` 中读取各部件数值，运算后返回自定义值。
+- 通过 `[InitializeOnLoad]` (Editor) 与 `[RuntimeInitializeOnLoadMethod]` 触发静态构造函数执行 `InputSystem.RegisterBindingComposite` 自动注册。
+
+```csharp
+// 在 Input Action 的事件回调中读取自定义 Composite 值 (以 Demo 的 MoveInputComposite 为例)
+protected void OnMoveAction(InputAction.CallbackContext context)
+{
+    // Read your composite values
+    var moveInput = context.ReadValue<MoveInputComposite.MoveInput>();
+    this.onMoveAction?.Invoke(moveInput);
+}
+```
+
+<Highlight color="#00d679">提醒</Highlight> Composite 必须**在绑定首次使用前完成注册**；若要在 Input Action Asset 编辑器中显示，需由 Edit Mode 执行的代码注册。完整示例可参考 Samples **InputSystem Demo** 的 `MoveInputComposite` 与 `PlayerControls.inputactions`。

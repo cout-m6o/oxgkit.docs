@@ -1,0 +1,169 @@
+---
+sidebar_position: 2
+description: PlayerPrefsSaver is the built-in runtime saver of the SaverSystem. It uses UnityEngine.PlayerPrefs as the storage backend, and every save automatically calls PlayerPrefs.Save() to write immediately.
+---
+
+# PlayerPrefsSaver
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`PlayerPrefsSaver` is the built-in **runtime saver** of the **SaverSystem** (inherits [Saver](./Saver.mdx)). It uses `UnityEngine.PlayerPrefs` as the storage backend, and every `Save*` automatically calls `PlayerPrefs.Save()` to **write immediately**; the base class [text-content data feature (Data Map)](./Saver.mdx#data-map) is available directly.
+
+|  |  |
+| :--- | :--- |
+| **Namespace** | `OxGKit.SaverSystem` |
+| **Type** | `public class PlayerPrefsSaver : Saver` |
+| **Source** | [PlayerPrefsSaver.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/SaverSystem/Scripts/Runtime/Core/Saver/Implements/PlayerPrefsSaver.cs) |
+
+```csharp
+using OxGKit.SaverSystem;
+```
+
+## Quick Start {#quick-start}
+
+```csharp
+using OxGKit.SaverSystem;
+
+// Create a runtime saver (PlayerPrefs backend)
+Saver saver = new PlayerPrefsSaver();
+
+// Basic access
+saver.SaveString("name", "michael");
+saver.SaveInt("language", 2);
+saver.SaveFloat("bgmVolume", 0.8f);
+
+// Text-content data feature (provided by the Saver base class)
+saver.SaveData("appPrefs", "lastLogin", "2026-07-29");
+string lastLogin = saver.GetData("appPrefs", "lastLogin", null);
+```
+
+## General Rules {#general-rules}
+
+### Scope {#scope}
+
+| Saver | Storage Backend | Scope |
+| :--- | :--- | :--- |
+| `PlayerPrefsSaver` | `UnityEngine.PlayerPrefs` | **Runtime** (in-game settings, stored per application/platform) |
+| [EditorPrefsSaver](./EditorPrefsSaver.mdx) | `UnityEditor.EditorPrefs` | **Editor only** (editor tool preferences) |
+
+(See the [Module Intro](../../intro.mdx) for an overview)
+
+### Write Timing {#write-timing}
+
+<Highlight color="#0373fc">Attention</Highlight> Every `Save*` automatically calls `PlayerPrefs.Save()` to write to disk immediately; [DeleteKey](#deletekey) / [DeleteAll](#deleteall) do **not** call `Save()` additionally (by Unity default they are written on normal application quit — call `PlayerPrefs.Save()` yourself if needed).
+
+<Highlight color="#00d679">Reminder</Highlight> The `PlayerPrefs` storage location differs per platform (e.g., the registry on Windows, browser IndexedDB on WebGL); on **WebGL** persistence relies on the browser flushing, and **avoid storing huge strings**.
+
+---
+
+## Overridden Members {#overrides}
+
+### Method Overview {#overview}
+
+| Method | Description |
+| :--- | :--- |
+| [SaveString](#savestring) | Saves a string and writes immediately. |
+| [GetString](#getstring) | Gets a string. |
+| [SaveInt](#saveint) | Saves an int and writes immediately. |
+| [GetInt](#getint) | Gets an int. |
+| [SaveFloat](#savefloat) | Saves a float and writes immediately. |
+| [GetFloat](#getfloat) | Gets a float. |
+| [HasKey](#haskey) | Checks whether a key exists. |
+| [DeleteKey](#deletekey) | Deletes a key. |
+| [DeleteAll](#deleteall) | Deletes all PlayerPrefs keys. |
+
+---
+
+### SaveString {#savestring}
+
+```csharp
+public override void SaveString(string key, string value)
+```
+
+Saves a string via `PlayerPrefs.SetString`, then calls `PlayerPrefs.Save()` immediately to write.
+
+```csharp
+saver.SaveString("name", "michael");
+```
+
+### GetString {#getstring}
+
+```csharp
+public override string GetString(string key, string defaultValue = "")
+```
+
+Gets a string via `PlayerPrefs.GetString`; returns `defaultValue` when the key does not exist.
+
+### SaveInt {#saveint}
+
+```csharp
+public override void SaveInt(string key, int value)
+```
+
+Saves an int via `PlayerPrefs.SetInt`, then calls `PlayerPrefs.Save()` immediately to write.
+
+### GetInt {#getint}
+
+```csharp
+public override int GetInt(string key, int defaultValue = 0)
+```
+
+Gets an int via `PlayerPrefs.GetInt`; returns `defaultValue` when the key does not exist.
+
+### SaveFloat {#savefloat}
+
+```csharp
+public override void SaveFloat(string key, float value)
+```
+
+Saves a float via `PlayerPrefs.SetFloat`, then calls `PlayerPrefs.Save()` immediately to write.
+
+### GetFloat {#getfloat}
+
+```csharp
+public override float GetFloat(string key, float defaultValue = 0f)
+```
+
+Gets a float via `PlayerPrefs.GetFloat`; returns `defaultValue` when the key does not exist.
+
+### HasKey {#haskey}
+
+```csharp
+public override bool HasKey(string key)
+```
+
+Checks whether the specified key exists via `PlayerPrefs.HasKey`.
+
+### DeleteKey {#deletekey}
+
+```csharp
+public override void DeleteKey(string key)
+```
+
+Deletes the specified key via `PlayerPrefs.DeleteKey`.
+
+### DeleteAll {#deleteall}
+
+```csharp
+public override void DeleteAll()
+```
+
+Deletes keys via `PlayerPrefs.DeleteAll`.
+
+<Highlight color="#ff2f00">Important</Highlight> `PlayerPrefs.DeleteAll` deletes **ALL PlayerPrefs keys of this application** (including keys not stored through this saver) — use with caution.

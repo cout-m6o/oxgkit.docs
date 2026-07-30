@@ -1,0 +1,210 @@
+---
+sidebar_position: 1
+---
+
+import ReactPlayer from 'react-player'
+
+# 模块介绍
+
+export const Highlight = ({ children, color }) => (
+  <span
+    style={{
+      backgroundColor: color,
+      borderRadius: '5px',
+      color: '#fff',
+      padding: '2.5px'
+    }}>
+    {children}
+  </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+## 基本说明
+
+通知系统 (也称红点系统)，支持**动态新增删除通知条件**，可以**自定义通知条件**，再针对 NoticeItem 进行**条件持有注册**，当 NoticeItem 身上持有的任一条件符合时，则通知显示图标 (红点)。
+
+- 版本：**v1.0.5** (`com.michaelo.oxgkit.noticesystem`)
+- 命名空间：`OxGKit.NoticeSystem`
+
+<Highlight color="#0373fc">注意</Highlight> 本模块依赖 [LoggingSystem](/docs/loggingsystem/intro) 作为日志输出，需先安装 **OxGKit.LoggingSystem**。
+
+---
+
+## 应用说明
+
+### 实现通知条件
+
+通过 Right-Click **Create/OxGKit/Notice System/Template Notice Condition.cs** 实现通知条件，共有以下模板：
+
+- **Template Notice Condition Registers.cs (Manually)**：条件注册器模板 (静态类)，可集中注册所有通知条件。
+- **Template Notice Condition.cs (Manually)**：通知条件模板，需自行通过 `NoticeManager.RegisterCondition<T>()` 进行注册。
+- **Template Notice Condition.cs (RuntimeInitializeLoadType.BeforeSceneLoad)**：通知条件模板，会于场景加载前**自动注册**条件。
+
+### NoticeItem 条件注册
+
+- 将 **NoticeItem prefab** 拖拽至 UI 上，自行指定 ICON，再获取 NoticeItem 身上的组件进行条件注册。
+- 通过 **Package Manager -> Samples** 导入 **NoticeItem Prefab**。
+
+<Highlight color="#0373fc">注意</Highlight> 当 NoticeItem **OnDestroy** 时，会**自动进行 Deregister** (注销自身持有条件)。
+
+### 数据变更通知
+
+- 当有数据状态变更时，必须通知特定**条件 ID** 进行 **Notify**，将会通过条件 ID 进行查找持有的 NoticeItems，并且进行刷新显示。
+
+<Highlight color="#ff2f00">重要</Highlight> 数据变更后**必须 Notify 相关条件 ID**，红点显示才会刷新。
+
+---
+
+## 简单使用
+
+### 实现通知条件
+
+继承 `NoticeCondition` 并实现 `ShowCondition` 条件判断 (惯例上定义静态属性 `id` 获取自动分配的条件 ID)：
+
+```csharp
+using OxGKit.NoticeSystem;
+
+public class NewMailCond : NoticeCondition
+{
+    #region Default
+    public static int id { get { return NoticeManager.GetConditionId<NewMailCond>(); } }
+    #endregion
+
+    public override bool ShowCondition(object data)
+    {
+        if (data != null)
+        {
+            MailBox mailBox = data as MailBox;
+
+            // 有未读邮件则显示红点
+            if (mailBox.unreadCount > 0) return true;
+        }
+
+        return false;
+    }
+}
+```
+
+### 注册通知条件
+
+通过条件注册器 (静态类) 集中注册，并于游戏入口手动触发静态构造函数：
+
+```csharp
+using OxGKit.NoticeSystem;
+
+public static class NoticeConditionRegister
+{
+    static NoticeConditionRegister()
+    {
+        NoticeManager.RegisterCondition<NewMailCond>();
+        NoticeManager.RegisterCondition<CoinInWalletCond>();
+    }
+
+    /// <summary>
+    /// Manually trigger static constructor
+    /// </summary>
+    public static void Init() { }
+}
+```
+
+```csharp
+private void Awake()
+{
+    // 手动触发静态构造函数完成条件注册
+    NoticeConditionRegister.Init();
+}
+```
+
+<Highlight color="#00d679">提醒</Highlight> 亦可使用 **RuntimeInitializeLoadType.BeforeSceneLoad** 模板，于场景加载前自动注册条件。
+
+### NoticeItem 注册条件
+
+获取 NoticeItem 组件后，以 `NoticeInfo` (条件 ID + 数据) 进行条件注册 (注册时会自动检查条件并刷新显示)：
+
+```csharp
+using OxGKit.NoticeSystem;
+
+public NoticeItem mailNoticeItem;
+
+private MailBox _mailBox = new MailBox();
+
+private void Awake()
+{
+    // 单一 NoticeItem 可持有多个条件 (任一条件符合即显示红点)
+    this.mailNoticeItem.RegisterNotice
+    (
+        new NoticeInfo(NewMailCond.id, this._mailBox)
+    );
+}
+```
+
+### 数据变更时通知刷新
+
+```csharp
+// 数据变更
+this._mailBox.unreadCount++;
+
+// 方式一：通过 NoticeManager 以条件 ID 通知 (效率最好)
+NoticeManager.Notify(NewMailCond.id);
+
+// 方式二：重新 RegisterNotice 注册条件与数据 (会更新数据并自动刷新)
+this.mailNoticeItem.RegisterNotice(new NoticeInfo(NewMailCond.id, this._mailBox));
+
+// 方式三：通过 NoticeManager 以 NoticeItem 通知
+NoticeManager.Notify(this.mailNoticeItem);
+
+// 方式四：直接由 NoticeItem 通知自身持有条件
+this.mailNoticeItem.Notify();
+```
+
+<Highlight color="#00d679">提醒</Highlight> 效率：方式一 > 方式二 > 方式三 > 方式四；便利：方式二 > 方式三 > 方式四 > 方式一。
+
+<Highlight color="#ff2f00">重要</Highlight> 若使用**值类型 (Value Type)** 数据 (如 `int`)，`NoticeInfo.data` 存储的是**快照**，数据变更后必须先通过 `RenewNotice` 或重新 `RegisterNotice` 更新数据，再进行 Notify；**引用类型 (Reference Type)** 则持有引用，变更后仅需 Notify。
+
+```csharp
+// 值类型数据：先 RenewNotice 更新数据，再 Notify 刷新显示 (Method Chaining)
+this._coin++;
+this.coinNoticeItem.RenewNotice(new NoticeInfo(CoinInWalletCond.id, this._coin)).Notify();
+```
+
+*[参考 Example]*
+
+---
+
+## Installation
+
+| Install via git URL |
+|:--- |
+| Add https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/NoticeSystem/Scripts to Package Manager |
+
+**第三方库 (需自行安装)**
+
+- 使用 OxGKit.LoggingSystem, Add https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/LoggingSystem/Scripts to Package Manager
+
+**Samples (Package Manager -> Samples)**
+
+- **AI Agent Skills** (参考 [AI Agent Skills](/docs/agent-skills))
+- **NoticeItem Prefab**
+- **NoticeSystem Demo**
+
+---
+
+## 模块 API
+
+- Runtime
+  - [NoticeManager](/docs/noticesystem/API/Runtime/NoticeManager) (using OxGKit.NoticeSystem)
+  - [NoticeItem](/docs/noticesystem/API/Runtime/NoticeItem) (using OxGKit.NoticeSystem)
+  - [NoticeCondition](/docs/noticesystem/API/Runtime/NoticeCondition) (using OxGKit.NoticeSystem)
+
+---
+
+## Demo
+
+**NoticeSystem Demo**
+
+<ReactPlayer controls url='/video/noticesystem_demo.mp4' />

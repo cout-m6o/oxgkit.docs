@@ -1,0 +1,254 @@
+---
+sidebar_position: 1
+---
+
+import ReactPlayer from 'react-player'
+
+# 模块介绍
+
+export const Highlight = ({ children, color }) => (
+  <span
+    style={{
+      backgroundColor: color,
+      borderRadius: '5px',
+      color: '#fff',
+      padding: '2.5px'
+    }}>
+    {children}
+  </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+## 基本说明
+
+日志系统，支持 **Cipher & Plaintext** (可以任意转换)，支持**动态配置**与**覆写原有的日志器**功能，其他还有全局开关配置、全局级别配置、全局颜色配置、个别开关配置、个别级别配置、个别颜色配置。
+
+- 版本：**v1.4.3** (`com.michaelo.oxgkit.loggingsystem`)
+- 命名空间：`OxGKit.LoggingSystem`
+
+<Highlight color="#0373fc">注意</Highlight> OxGKit 多数模块 (InfiniteScrollView、ActionSystem、NoticeSystem、InputSystem、TimeSystem、PoolSystem、Utilities) 皆依赖本模块作为日志输出，**建议最先安装**。
+
+---
+
+## 应用说明
+
+### 创建配置文件
+
+- 通过 Right-Click **Create/OxGKit/Logging System/Create loggersconfig.conf (自动存于 StreamingAssets)** 创建配置文件，方便真机修改配置文件进行调试。
+
+![](/img/loggingsystem/img_7.png)
+
+- 通过 **LoggingLauncher** 进行配置，或直接修改 **StreamingAssets** 中的配置文件。
+
+### Build 激活宏
+
+<Highlight color="#ff2f00">重要</Highlight> 发布 (Build) 时，需在 **Player Settings -> Scripting Define Symbols** 加入以下宏，日志才会输出 (Editor 下不需要)：
+
+```
+OXGKIT_LOGGER_ON
+```
+
+### 配置文件编码格式转换
+
+配置文件支持 **BYTES [Cipher] 与 JSON [Plaintext]** 互相转换 (Right-Click 菜单)。
+
+<Highlight color="#00d679">提醒</Highlight> 发布建议使用 **Cipher**。
+
+![](/img/loggingsystem/img_6.png)
+
+### LoggingLauncher 配置界面
+
+LoggingLauncher 可以配置 **logActive (开关)**、**logLevel (级别)**、**logColor (颜色)**。
+
+- 通过 **Package Manager -> Samples** 导入 **LoggingLauncher Prefab**，再拖拽至场景上激活环境配置 (仅需激活一次)，会自动尝试加载 StreamingAssets 中的配置文件进行日志开关控制。
+
+### Log Level (级别)
+
+Log Level 可切换为以下：
+
+- LogDebug **(Print)**
+- LogInfo **(PrintInfo)**
+- LogWarning **(PrintWarning)**
+- LogError **(PrintError)**
+- LogException **(PrintException)**
+
+表格符号说明：
+
+- G = Global (全局设置 / Master Logging Level)。
+- P = Per-Logger (个别 Logger 的设置)。
+- Gx = 单一全局级别：LogDebug / LogInfo / LogWarning / LogError / LogException。
+- Px = 单一个别级别：LogDebug / LogInfo / LogWarning / LogError / LogException。
+- G ∩ P = 标志交集 (bitwise AND)，代表同时被全局与个别允许的级别集合。
+
+总结规则：**只有当 G 与 P 都包含该级别时，该级别 (Log Level) 才会进行输出**。
+
+| 全局 (G) | 个别 (P) | 生效级别 (输出) |
+| ----------- | ---------- | ---------------------------------------------- |
+| Off | Any | ✗ |
+| Any | Off | ✗ |
+| All | All | DEBUG / INFO / WARNING / ERROR / EXCEPTION → ✓ |
+| All | 单一 `Px` | `Px` → ✓ |
+| 单一 `Gx` | All | `Gx` → ✓ |
+| 单一 `Gx` | 单一 `Px` | 若 `Gx = Px` → `Gx` → ✓；否则 ✗ |
+| 任意集合 `G` | 任意集合 `P` | `G ∩ P` → ✓；若无交集 → ✗ |
+
+![](/img/loggingsystem/img_4.png)
+
+### Log Color (颜色)
+
+Log Color 可切换为以下：
+
+- Disabled
+- Enabled
+- EditorOnly (发布时，不进行 RichText 上色处理)
+
+| 全局 (G) | 个别 (P) | 生效模式 | Editor | Player / 发布 |
+| ----------- | ---------- | ---------- | ------ | --------- |
+| Disabled | Any | Disabled | ✗ | ✗ |
+| Enabled | Disabled | Disabled | ✗ | ✗ |
+| EditorOnly | Disabled | Disabled | ✗ | ✗ |
+| Enabled | Enabled | Enabled | ✓ | ✓ |
+| Enabled | EditorOnly | EditorOnly | ✓ | ✗ |
+| EditorOnly | Enabled | EditorOnly | ✓ | ✗ |
+| EditorOnly | EditorOnly | EditorOnly | ✓ | ✗ |
+
+![](/img/loggingsystem/img_8.png)
+
+---
+
+## 简单使用
+
+### 实现自定义 Logger
+
+新增 Logger 或移除 Logger，皆需调用 `LoggingLauncher.TryLoadLoggers()` 进行重载 (建议定义一个 default constructor，避免搭配 HybridCLR + `Activator.CreateInstance(type)` 出现错误)。
+
+```csharp
+using OxGKit.LoggingSystem;
+
+[LoggerName("MyLogger")]
+public class MyLogger1 : Logging 
+{
+    // If use HybridCLR must create a default constructor
+    public MyLogger1() { }
+}
+```
+
+### 覆写原有 Logger (Override)
+
+```csharp
+// Use same name to override MyLogger1
+[LoggerName("MyLogger", true)]
+public class OverrideMyLogger1 : Logging 
+{
+    // If use HybridCLR must create a default constructor
+    public OverrideMyLogger1() { }
+
+    public override void Log(object message)
+    {
+        UnityEngine.Debug.Log("[Override]" + message);
+    }
+
+    public override void LogInfo(object message)
+    {
+        UnityEngine.Debug.Log("[Override]" + message);
+    }
+
+    public override void LogWarning(object message)
+    {
+        UnityEngine.Debug.LogWarning("[Override]" + message);
+    }
+
+    public override void LogError(object message)
+    {
+        UnityEngine.Debug.LogError("[Override]" + message);
+    }
+
+    public override void LogException(Exception exception)
+    {
+        UnityEngine.Debug.LogException(exception);
+    }
+}
+```
+
+### 搭配 HybridCLR
+
+如果搭配 HybridCLR 有主工程跟热更工程的区分，必须手动拆分创建 AOT 跟 Hotfix 的 Loggers 初始流程，可以参考以下：
+
+```csharp
+// HybridCLR (必须取消 LoggingLauncher 上的 "Initialize On Awake" 选项):
+LoggingLauncher.CreateLogger<LoggingDemoLogger1>();
+LoggingLauncher.CreateLogger<LoggingDemoLogger2>();
+LoggingLauncher.CreateLogger<LoggingDemoLogger3>();
+LoggingLauncher.CreateLogger<LoggingDemoLogger4>();
+LoggingLauncher.TryLoadLoggers();
+```
+
+以下是在 AOT 工程中初始 AOT 工程的 Loggers **(如果 Hotfix 工程的 Loggers 需要在 Hotfix 工程中初始)**：
+
+![](/img/loggingsystem/img_5.png)
+
+### 动态配置日志器
+
+```csharp
+// Reload LoggersConfig at Runtime (方式一)
+var loggersConfig = new LoggersConfig
+(
+    new LoggerSettings("LoggingDemo.Logger1", true, LogLevel.LogDebug),
+    new LoggerSettings("LoggingDemo.Logger2", true, LogLevel.LogWarning),
+    new LoggerSettings("LoggingDemo.Logger3", true, LogLevel.Off)
+);
+LoggingLauncher.SetLoggersConfig(loggersConfig);
+
+// Reload LoggersConfig at Runtime (方式二)
+LoggingLauncher.ConfigureLogger("LoggingDemo.Logger1", false);
+LoggingLauncher.ConfigureLogger("LoggingDemo.Logger2", true, LogLevel.LogWarning | LogLevel.LogError);
+LoggingLauncher.ConfigureLogger("LoggingDemo.Logger3", false);
+```
+
+*[参考 Example]*
+
+---
+
+## Installation
+
+| Install via git URL |
+|:--- |
+| Add https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/LoggingSystem/Scripts to Package Manager |
+
+**第三方库 (需自行安装)**
+
+- 使用 [LWMyBox v1.1.4 or higher](https://github.com/michael811125/LWMyBox), Add https://github.com/michael811125/LWMyBox.git to Package Manager
+
+**Samples (Package Manager -> Samples)**
+
+- **AI Agent Skills** (参考 [AI Agent Skills](/docs/agent-skills))
+- **LoggingLauncher Prefab**
+- **LoggingSystem Demo**
+
+---
+
+## 模块 API
+
+- Runtime
+  - [Logging](/docs/loggingsystem/API/Runtime/Logging) (using OxGKit.LoggingSystem)
+  - [LoggingLauncher](/docs/loggingsystem/API/Runtime/LoggingLauncher) (using OxGKit.LoggingSystem)
+  - [LoggersConfig](/docs/loggingsystem/API/Runtime/LoggersConfig) (using OxGKit.LoggingSystem)
+- Editor
+  - [LoggingHelper](/docs/loggingsystem/API/Editor/LoggingHelper) (using OxGKit.LoggingSystem.Editor)
+
+---
+
+## Demo
+
+**LoggingSystem Demo**
+
+<ReactPlayer controls url='/video/loggingsystem_demo.mp4' />
+
+**LoggingSystem Build Test**
+
+<ReactPlayer controls url='/video/loggingsystem_build_test.mp4' />

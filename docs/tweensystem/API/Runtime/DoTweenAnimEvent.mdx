@@ -1,0 +1,254 @@
+---
+sidebar_position: 2
+description: DoTweenAnimEvent 是 TweenSystem 的補間動畫群組播放器，以 Parallel 或 Sequence 模式統一播放多個 DoTweenAnim，提供 PlayNormal、PlayReverse、PlayTrigger 等播放方法與結束回調。
+---
+
+# DoTweenAnimEvent
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`DoTweenAnimEvent` 是 **TweenSystem** 的**補間動畫群組播放器**，將多個 [DoTweenAnim](./DoTweenAnim.mdx) 統一以 **Parallel (並行)** 或 **Sequence (序列)** 模式播放，提供**正向 (PlayNormal)、反向 (PlayReverse)、觸發切換 (PlayTrigger)** 等播放方法與**結束回調 (endCallback)**；透過 **Add Component/OxGKit/TweenSystem/DoTweenAnimEvent** 添加。
+
+|  |  |
+| :--- | :--- |
+| **命名空間** | `OxGKit.TweenSystem` |
+| **類型** | `public class DoTweenAnimEvent : MonoBehaviour` |
+| **原始碼** | [DoTweenAnimEvent.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/TweenSystem/Scripts/Runtime/DoTweenAnimEvent.cs) |
+
+```csharp
+using OxGKit.TweenSystem;
+```
+
+<Highlight color="#ff2f00">重要</Highlight> DoTweenAnimEvent **僅於運行時 (Runtime) 播放**，不支持編輯器預覽 (Preview Mode 僅支持 DoTweenAnim，參考[模塊介紹](../../intro.mdx#preview-mode))。
+
+## 快速上手 {#quick-start}
+
+```csharp
+using DG.Tweening;
+using OxGKit.TweenSystem;
+using UnityEngine;
+
+public class PanelController : MonoBehaviour
+{
+    // 於 Inspector 拖曳配置 Do Tween Anims 清單 (DriveMode 設為 Event)
+    [SerializeField]
+    private DoTweenAnimEvent _panelAnim;
+
+    // 開啟面板 (正向播放)
+    public void OpenPanel()
+    {
+        this._panelAnim.PlayNormal(() => Debug.Log("Panel opened"));
+    }
+
+    // 關閉面板 (反向播放)
+    public void ClosePanel()
+    {
+        this._panelAnim.PlayReverse(() => this.gameObject.SetActive(false));
+    }
+}
+```
+
+## 通用規則 {#general-rules}
+
+### 播放模式 (PlayMode) {#playmode}
+
+```csharp
+public enum PlayMode
+{
+    Parallel,    // 並行播放 (全部同時)
+    Sequence     // 序列播放 (依清單順序逐個)
+}
+```
+
+- **Parallel**：清單中所有 DoTweenAnim **同時播放**，`endCallback` 於**最大時長**結束後觸發。
+- **Sequence**：依清單順序**逐個播放**，每個 DoTweenAnim 播放完畢 (以其最大軌道時長計) 才播放下一個，`endCallback` 於全部播放結束後觸發。
+
+### 觸發方向 (trigger) {#trigger-direction}
+
+- **trigger = true** 正向播放 (normal)；**trigger = false** 反向播放 (reverse)。
+- 各 DoTweenAnim 依自身軌道的 playMode 進行正向或反向播放 (詳見 [DoTweenAnim](./DoTweenAnim.mdx#playmode))。
+
+<Highlight color="#0373fc">注意</Highlight> 清單中的 [DoTweenAnim](./DoTweenAnim.mdx) 其 **DriveMode 應設為 Event** (Active 模式會於激活時自動重播，請勿混用)；且每個 DoTweenAnim **至少需啟用一個補間軌道**，否則計算群組時長時會發生 `NullReferenceException`。
+
+---
+
+## 成員 {#members}
+
+| 成員 | 說明 |
+| :--- | :--- |
+| `public PlayMode playMode` | 群組播放模式 (預設 `Parallel`)，Inspector: **Play Mode**。 |
+| `public List<DoTweenAnim> doTweenAnims` | 受控的 [DoTweenAnim](./DoTweenAnim.mdx) 清單，Inspector: **Do Tween Anims**。 |
+
+---
+
+## 播放控制 {#play-control}
+
+### 方法總覽 {#play-overview}
+
+| 方法 | 說明 |
+| :--- | :--- |
+| [PlayNormal](#playnormal) | 正向播放。 |
+| [PlayReverse](#playreverse) | 反向播放。 |
+| [PlayTrigger](#playtrigger) | 觸發播放 (自動翻轉或指定方向)。 |
+| [PlayTriggerOnce](#playtriggeronce) | 僅於觸發方向改變時播放一次。 |
+| [ResetTrigger](#resettrigger) | 重置觸發旗標。 |
+| [Kill](#kill) | Kill 當前群組播放序列。 |
+
+---
+
+### PlayNormal {#playnormal}
+
+```csharp
+public void PlayNormal()
+
+public void PlayNormal(TweenCallback endCallback = null)
+```
+
+**正向播放** (trigger = true) 清單中的所有 DoTweenAnim，`endCallback` 於**全部播放結束**後觸發。
+
+```csharp
+this._panelAnim.PlayNormal(() => Debug.Log("All tweens ended"));
+```
+
+### PlayReverse {#playreverse}
+
+```csharp
+public void PlayReverse()
+
+public void PlayReverse(TweenCallback endCallback = null)
+```
+
+**反向播放** (trigger = false) 清單中的所有 DoTweenAnim，`endCallback` 於**全部播放結束**後觸發。
+
+```csharp
+this._panelAnim.PlayReverse(() => this.gameObject.SetActive(false));
+```
+
+### PlayTrigger {#playtrigger}
+
+```csharp
+public void PlayTrigger()
+
+public void PlayTrigger(TweenCallback endCallback = null)
+
+public void PlayTrigger(bool trigger, TweenCallback endCallback = null)
+```
+
+**觸發播放**：無 trigger 參數的版本會**自動記錄並翻轉**觸發旗標 (每次呼叫正反向交替)；指定 **trigger** 的版本則依參數決定方向 (`true` = 正向、`false` = 反向)。
+
+```csharp
+// 每次呼叫正反向交替 (開 -> 關 -> 開...)
+this._panelAnim.PlayTrigger();
+
+// 指定方向 + 結束回調
+this._panelAnim.PlayTrigger(true, () => Debug.Log("Played normally"));
+```
+
+### PlayTriggerOnce {#playtriggeronce}
+
+```csharp
+public void PlayTriggerOnce(bool trigger)
+
+public void PlayTriggerOnce(bool trigger, TweenCallback endCallback = null)
+```
+
+僅於 **trigger 與上次記錄的狀態不同**時才播放 (`true` = 正向、`false` = 反向)，避免同狀態重複播放，適合搭配 **Toggle** 類 UI。
+
+```csharp
+// Toggle 切換時播放 (同狀態不重播)
+toggle.onValueChanged.AddListener((isOn) =>
+{
+    toggle.GetComponent<DoTweenAnimEvent>().PlayTriggerOnce
+    (
+        isOn,
+        () => Debug.Log("Toggle tween finished")
+    );
+});
+```
+
+### ResetTrigger {#resettrigger}
+
+```csharp
+public void ResetTrigger()
+```
+
+**重置觸發旗標** (回到 `false`)，影響 [PlayTrigger](#playtrigger) 的翻轉起點與 [PlayTriggerOnce](#playtriggeronce) 的狀態判斷。
+
+### Kill {#kill}
+
+```csharp
+public void Kill()
+```
+
+**Kill** 當前的群組播放序列 (各播放方法呼叫時，也會先自動 Kill 前一次的序列再重新播放)。
+
+<Highlight color="#00d679">提醒</Highlight> UI 物件**銷毀或回收前**建議先呼叫 `Kill()`，避免 `endCallback` 回調到已銷毀的物件。
+
+---
+
+## 清單管理 {#list-management}
+
+### 方法總覽 {#list-overview}
+
+| 方法 | 說明 |
+| :--- | :--- |
+| [SetPlayMode](#setplaymode) | 設置群組播放模式。 |
+| [AddDoTweenAnim](#adddotweenanim) | 動態加入一個或多個 DoTweenAnim (可鏈式)。 |
+| [RemoveDoTweenAnim](#removedotweenanim) | 移除指定的 DoTweenAnim。 |
+| [ClearDoTweenAnims](#cleardotweenanims) | 清空清單。 |
+
+---
+
+### SetPlayMode {#setplaymode}
+
+```csharp
+public void SetPlayMode(PlayMode playMode)
+```
+
+設置群組播放模式 (**Parallel / Sequence**)。
+
+### AddDoTweenAnim {#adddotweenanim}
+
+```csharp
+public DoTweenAnimEvent AddDoTweenAnim(params DoTweenAnim[] doTweenAnims)
+```
+
+動態加入**一個或多個** DoTweenAnim 至清單，回傳自身**可鏈式呼叫**。
+
+```csharp
+animEvent
+    .AddDoTweenAnim(anim1, anim2)
+    .PlayNormal(() => Debug.Log("Played"));
+```
+
+### RemoveDoTweenAnim {#removedotweenanim}
+
+```csharp
+public void RemoveDoTweenAnim(DoTweenAnim doTweenAnim)
+```
+
+從清單中移除**指定**的 DoTweenAnim。
+
+### ClearDoTweenAnims {#cleardotweenanims}
+
+```csharp
+public void ClearDoTweenAnims()
+```
+
+清空整個 DoTweenAnim 清單。

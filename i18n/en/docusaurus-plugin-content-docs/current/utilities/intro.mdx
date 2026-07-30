@@ -1,0 +1,182 @@
+---
+sidebar_position: 1
+---
+
+import ReactPlayer from 'react-player'
+
+# Module Intro
+
+export const Highlight = ({ children, color }) => (
+  <span
+    style={{
+      backgroundColor: color,
+      borderRadius: '5px',
+      color: '#fff',
+      padding: '2.5px'
+    }}>
+    {children}
+  </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+## Basic Instructions
+
+A collection of essential general-purpose components. Each is an **independent small tool** that can be used on its own:
+
+- **Utilities (Runtime)**
+  - **Adapter**: UISafeAreaAdapter (UI safe area adaptation).
+  - **Cacher**: `ARCCache<TKey, TValue>`, `LRUCache<TKey, TValue>`, `LRUKCache<TKey, TValue>` (capacity-bounded cache containers).
+  - **Requester**: RequestAudio, RequestTexture2D, RequestSprite, RequestBytes, RequestText (UniTask-based web/file requests + caching).
+  - **TextureAnim** (CPU computation): Image sequence animation.
+  - **EasyAnim**: Simple play-then-callback animation wrapper. **You must set an animation event named AnimEnd on the clip to invoke the animEnd callback**.
+  - **DontDestroy**: Cross-scene persistent object marker.
+  - **UnityMainThread**: UMT (Unity main-thread dispatcher).
+- **Editor**
+  - **RectTransform**: RectTransformAdjuster (Hotkey: Shift+R, R: RectTransform).
+  - **MissingScriptsFinder**: Search for Missing Scripts.
+  - **SymlinkUtility**: Folder symlink utility.
+
+- Version: **v1.4.8** (`com.michaelo.oxgkit.utilities`)
+- Namespace: `OxGKit.Utilities` (each tool has its own sub-namespace, e.g. `OxGKit.Utilities.Cacher`, `OxGKit.Utilities.Requester`)
+
+<Highlight color="#0373fc">Attention</Highlight> This module depends on **UniTask**, **LWMyBox**, and [OxGKit.LoggingSystem](/docs/loggingsystem/intro) (for log output). Install the dependencies first (see [Installation](#installation)).
+
+---
+
+## Application Description
+
+### Runtime Tools
+
+- **Cacher**: Generic cache containers with **ARC / LRU / LRU-K** eviction strategies. All operations are protected by thread locks, and a custom removal handler `IRemoveCacheHandler<TKey, TValue>` is supported (defaults to `UnityObjectRemoveCacheHandler<TKey, TValue>`, which automatically destroys evicted Unity objects).
+- **Requester**: A resource requester based on **UniTask + UnityWebRequest**, supporting **AudioClip, Texture2D, Sprite, byte[], string** requests with optional **ARC or LRU caching** (keyed by URL), plus **timeout (180 seconds by default)** and **cancellation (CancellationTokenSource)** mechanisms.
+- **TextureAnim**: A **CPU-computed** image sequence animation component (TextureAnimation) supporting **SpriteRenderer and Image**, with Normal, Reverse, PingPong, and PingPongReverse play modes, and edit-mode preview (ExecuteInEditMode).
+- **EasyAnim**: A **play + end-callback** animation wrapper, split into **EasyAnimation (legacy Animation)** and **EasyAnimator (Animator)**.
+- **Adapter**: **UISafeAreaAdapter** automatically adjusts UI panel anchors based on `Screen.safeArea` to fit notches and irregular screens.
+- **DontDestroy**: Marks the object as **DontDestroyOnLoad** in Awake and renames it according to the configured name.
+- **UnityMainThread**: The **UMT** main-thread dispatcher queues jobs from any thread onto the Unity main thread (with coroutine management support).
+
+<Highlight color="#ff2f00">Important</Highlight> When using **EasyAnim**, you must set an animation event named **AnimEnd** on the clip; the **animEnd** callback is invoked only when the animation reaches that event.
+
+### Editor Tools
+
+- **RectTransformAdjuster**: Select UI objects and press **Shift+R** (or use the menu **GameObject -> Adjust RectTransform Anchors**) to **snap the anchors to the current Rect** and zero out the offsets. Supports multi-selection and Undo.
+- **MissingScriptsFinder**: Use the **MissingScriptsFinder** menu to search for Missing Scripts in **loaded scenes, Build Settings scenes, all project scenes, and all prefabs**.
+- **SymlinkUtility**: Use Right-Click **Create/Folder (Junction / Absolute Symlink / Relative Symlink)** to create folder symlinks, with a `<=>` marker shown in the Project window.
+
+### AI Agent Skills
+
+- Import **AI Agent Skills** via **Package Manager -> Samples**. It contains **oxgkit-unity-skill (SKILL.md)**, which teaches AI coding agents (Claude Code, Codex CLI, Cursor, etc.) how to use this module correctly (see [AI Agent Skills](/docs/agent-skills)).
+
+### Module Logging
+
+- This module logs through **OxGKit.LoggingSystem** with the logger name `OxGKit.Utilities.Logger`; its toggle and level can be configured in **LoggingLauncher**.
+
+---
+
+## Simple Usage
+
+### Request resources with Requester (with caching)
+
+```csharp
+using Cysharp.Threading.Tasks;
+using OxGKit.Utilities.Requester;
+using UnityEngine;
+
+// Initialize the cache per resource type at boot (choose ARC or LRU)
+Requester.InitARCCacheCapacityForTexture2d(60);
+
+// Request a Texture2D (cached with the URL as key)
+Texture2D t2d = await Requester.RequestTexture2D
+(
+    url,
+    (texture) => Debug.Log("Loaded"),
+    (error) => Debug.Log($"Error: {error.message}")
+);
+```
+
+### Cacher containers
+
+```csharp
+using OxGKit.Utilities.Cacher;
+
+// Create an LRU cache with capacity 60 (by default, evicted Unity objects are destroyed automatically)
+var cache = new LRUCache<string, Texture2D>(60);
+cache.Add(key, texture);
+Texture2D t2d = cache.Get(key);
+```
+
+### UMT main-thread dispatching
+
+```csharp
+using OxGKit.Utilities.UnityMainThread;
+
+// Queue a job from any thread; it runs in Update on the Unity main thread
+UMT.worker.AddJob(() =>
+{
+    // Do main thread job
+});
+```
+
+### Play animations with EasyAnim
+
+```csharp
+using OxGKit.Utilities.EasyAnim;
+
+// EasyAnimation takes a clip name; EasyAnimator takes a Trigger parameter name
+// (the clip must have an animation event named AnimEnd for the end callback to fire)
+var easyAnim = this.GetComponent<EasyAnim>();
+easyAnim.Play("Open", () =>
+{
+    // On animation end
+});
+```
+
+*[See Example]*
+
+---
+
+## Installation
+
+| Install via git URL |
+|:--- |
+| Add https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/Utilities/Scripts to Package Manager |
+
+**Third-party libraries (install them yourself; when used with [OxGFrame](https://github.com/michael811125/OxGFrame), UniTask does not need to be installed separately)**
+
+- Use [UniTask v2.5.0 or higher](https://github.com/Cysharp/UniTask), Add https://github.com/Cysharp/UniTask.git?path=src/UniTask/Assets/Plugins/UniTask to Package Manager
+- Use [LWMyBox v1.1.4 or higher](https://github.com/michael811125/LWMyBox), Add https://github.com/michael811125/LWMyBox.git to Package Manager
+- Use [OxGKit.LoggingSystem](/docs/loggingsystem/intro), Add https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/LoggingSystem/Scripts to Package Manager
+
+**Samples (Package Manager -> Samples)**
+
+- **AI Agent Skills** (see [AI Agent Skills](/docs/agent-skills))
+
+---
+
+## Module API
+
+- Runtime
+  - [Cacher](/docs/utilities/API/Runtime/Cacher) (using OxGKit.Utilities.Cacher)
+  - [Requester](/docs/utilities/API/Runtime/Requester) (using OxGKit.Utilities.Requester)
+  - [TextureAnim](/docs/utilities/API/Runtime/TextureAnim) (using OxGKit.Utilities.TextureAnim)
+  - [EasyAnim](/docs/utilities/API/Runtime/EasyAnim) (using OxGKit.Utilities.EasyAnim)
+  - [UISafeAreaAdapter](/docs/utilities/API/Runtime/UISafeAreaAdapter) (using OxGKit.Utilities.Adapter)
+  - [DontDestroy](/docs/utilities/API/Runtime/DontDestroy) (using OxGKit.Utilities.DontDestroy)
+  - [UMT](/docs/utilities/API/Runtime/UMT) (using OxGKit.Utilities.UnityMainThread)
+- Editor
+  - [RectTransformAdjuster](/docs/utilities/API/Editor/RectTransformAdjuster) (using OxGKit.Utilities.RectTrans.Editor)
+  - [MissingScriptsFinder](/docs/utilities/API/Editor/MissingScriptsFinder) (using OxGKit.Utilities.MissingFinder.Editor)
+  - [SymlinkUtility](/docs/utilities/API/Editor/SymlinkUtility) (using OxGKit.Utilities.Symlink.Editor)
+
+---
+
+## Demo
+
+**Utilities Demo (RectTransformAdjuster)**
+
+<ReactPlayer controls url='/video/utilities_rect_adjuster_demo.mp4' />

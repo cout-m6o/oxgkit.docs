@@ -1,0 +1,166 @@
+---
+sidebar_position: 4
+description: EasyAnim is a simple play-then-callback animation wrapper (EasyAnimation and EasyAnimator) whose end callback is triggered by an animation event named AnimEnd.
+---
+
+# EasyAnim
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`EasyAnim` is the abstract base class of a **simple animation playback wrapper** (play + end callback). Its implementations are **EasyAnimation (legacy Animation system)** and **EasyAnimator (Animator)**. Play animations through the unified `Play(name, animEnd)` interface, and the end callback runs when the **AnimEnd animation event** fires.
+
+|  |  |
+| :--- | :--- |
+| **Namespace** | `OxGKit.Utilities.EasyAnim` |
+| **Type** | `public abstract class EasyAnim : MonoBehaviour`, `public class EasyAnimation : EasyAnim`, `public class EasyAnimator : EasyAnim` |
+| **Source** | [EasyAnim.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/Utilities/Scripts/Runtime/EasyAnim/EasyAnim.cs), [EasyAnimation.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/Utilities/Scripts/Runtime/EasyAnim/EasyAnimation.cs), [EasyAnimator.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/Utilities/Scripts/Runtime/EasyAnim/EasyAnimator.cs) |
+
+```csharp
+using OxGKit.Utilities.EasyAnim;
+```
+
+<Highlight color="#ff2f00">Important</Highlight> **You must set an animation event named `AnimEnd` on the animation clip**; the `animEnd` callback fires only when playback reaches that event. **Without the event, the callback never fires** — this is the first thing to check when "the animation callback doesn't run".
+
+## Quick Start {#quick-start}
+
+```csharp
+using OxGKit.Utilities.EasyAnim;
+using UnityEngine;
+
+public class EasyAnimDemo : MonoBehaviour
+{
+    private void Start()
+    {
+        // Get the EasyAnim (EasyAnimation or EasyAnimator)
+        var easyAnim = this.GetComponent<EasyAnim>();
+
+        // EasyAnimation takes a clip name; EasyAnimator takes a Trigger parameter name
+        easyAnim.Play("Open", () =>
+        {
+            Debug.Log("Animation End");
+        });
+
+        // Check whether the animation exists
+        bool hasAnim = easyAnim.HasAnim("Open");
+    }
+}
+```
+
+## General Rules {#general-rules}
+
+### The AnimEnd Animation Event {#animend-event}
+
+1. Select the animation clip in the **Animation window**.
+2. Add an **Animation Event** at the last frame (or wherever the callback should fire).
+3. Set the **Function name to `AnimEnd`** (matching the `protected virtual void AnimEnd()` event function on the `EasyAnim` base class).
+
+### Fail-Open Behavior {#fail-open}
+
+- If `Play` **cannot find the given clip name (EasyAnimation) or parameter name (EasyAnimator)**, it **calls `AnimEnd` directly, firing the callback immediately** (so the flow never stalls).
+
+<Highlight color="#00d679">Reminder</Highlight> Each `Play` **overwrites** the previously set end callback; the callback is cleared after it fires (one-shot).
+
+---
+
+## EasyAnim (Base) {#easyanim-base}
+
+### Method Overview {#base-overview}
+
+| Method | Description |
+| :--- | :--- |
+| [Play](#play) | (abstract) Plays an animation and sets the end callback. |
+| [HasAnim](#hasanim) | (abstract) Checks whether the given animation exists. |
+
+### Play {#play}
+
+```csharp
+public abstract void Play(string name, Action animEnd)
+```
+
+Plays the animation with the given name and sets the **end callback** (triggered by the `AnimEnd` animation event).
+
+### HasAnim {#hasanim}
+
+```csharp
+public abstract bool HasAnim(string name)
+```
+
+Checks whether an animation with the given name exists.
+
+---
+
+## EasyAnimation {#easyanimation}
+
+For the **legacy Animation system**. Add via **AddComponentMenu: OxGKit/Utilities/EasyAnim/EasyAnimation**; the `Animation` component can be assigned in the Inspector, otherwise `Awake` finds it via `GetComponent`.
+
+### GetAnimation {#easyanimation-getanimation}
+
+```csharp
+public Animation GetAnimation()
+```
+
+Gets the bound `Animation` component.
+
+### Play (EasyAnimation) {#easyanimation-play}
+
+```csharp
+public override void Play(string animName, Action animEnd)
+```
+
+Plays a clip by its **clip name** (`Animation.Play`); if the clip is not found, the **callback fires immediately**.
+
+### HasAnim (EasyAnimation) {#easyanimation-hasanim}
+
+```csharp
+public override bool HasAnim(string animName)
+```
+
+Checks whether the `Animation` contains a clip with the given name (`GetClip`).
+
+---
+
+## EasyAnimator {#easyanimator}
+
+For **Animator**. Add via **AddComponentMenu: OxGKit/Utilities/EasyAnim/EasyAnimator**; the `Animator` component can be assigned in the Inspector, otherwise `Awake` finds it via `GetComponent`.
+
+### GetAnimation (EasyAnimator) {#easyanimator-getanimation}
+
+```csharp
+public Animator GetAnimation()
+```
+
+Gets the bound `Animator` component (the method is named `GetAnimation` but **returns `Animator`**).
+
+### Play (EasyAnimator) {#easyanimator-play}
+
+```csharp
+public override void Play(string paramName, Action animEnd)
+```
+
+Plays via a **Trigger parameter name** (`ResetTrigger` first, then `SetTrigger`); if the parameter is not found, the **callback fires immediately**.
+
+<Highlight color="#0373fc">Attention</Highlight> `paramName` must be a **Trigger parameter name** in the Animator Controller (not a State or Clip name).
+
+### HasAnim (EasyAnimator) {#easyanimator-hasanim}
+
+```csharp
+public override bool HasAnim(string paramName)
+```
+
+Checks whether the `Animator` parameter list contains a parameter with the given name (with an internal **parameter cache** optimization; re-cached when the controller changes).

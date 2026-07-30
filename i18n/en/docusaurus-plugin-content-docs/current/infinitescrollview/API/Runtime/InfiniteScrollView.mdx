@@ -1,0 +1,430 @@
+---
+sidebar_position: 1
+description: InfiniteScrollView is the abstract base class of the infinite list, recycling cells with an object-pool concept on top of the UGUI ScrollRect, and providing pool initialization, data add/remove, refreshing, scroll-state, and Snap positioning APIs.
+---
+
+# InfiniteScrollView
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`InfiniteScrollView` is the **abstract base class of the infinite list** (inherits `UIBehaviour` and requires a UGUI `ScrollRect` on the same object via `RequireComponent`). It **recycles cells** ([InfiniteCell](./InfiniteCell.mdx)) **efficiently with an object-pool concept**, so only a handful of GameObjects can carry a large amount of list data; four implementations are built in ([ScrollView Variants](./ScrollViewVariants.mdx)), and you can also inherit from it to customize your own list.
+
+|  |  |
+| :--- | :--- |
+| **Namespace** | `OxGKit.InfiniteScrollView` |
+| **Type** | `[RequireComponent(typeof(ScrollRect))] public abstract class InfiniteScrollView : UIBehaviour` |
+| **Source** | [InfiniteScrollView.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/InfiniteScrollView/Scripts/Runtime/Core/ScrollView/InfiniteScrollView.cs) |
+
+```csharp
+using OxGKit.InfiniteScrollView;
+```
+
+## Quick Start {#quick-start}
+
+```csharp
+using Cysharp.Threading.Tasks;
+using OxGKit.InfiniteScrollView;
+using UnityEngine;
+
+public class ListLauncher : MonoBehaviour
+{
+    // The list component attached to the ScrollRect object in the scene (vertical list as an example)
+    public VerticalInfiniteScrollView scrollView;
+
+    private async void Start()
+    {
+        // 1. Initialize the pool (can be skipped if initializePoolOnAwake is checked on the Inspector)
+        await this.scrollView.InitializePool();
+
+        // 2. Add data in batch, then refresh once (Add does not refresh by default)
+        for (int i = 0; i < 1000; i++)
+            this.scrollView.Add(new InfiniteCellData(new Vector2(100f, 100f), $"Item {i}"));
+        this.scrollView.Refresh();
+
+        // 3. Cell click event (the cell must call base.OnClick() to trigger it)
+        this.scrollView.onCellSelected += (cell) => Debug.Log($"Selected index: {cell.cellData.index}");
+
+        // 4. Move to a specific index (0.1-second tween)
+        this.scrollView.Snap(50, 0.1f);
+    }
+}
+```
+
+## General Rules {#general-rules}
+
+### Initialization Flow {#init-flow}
+
+1. **Initialize Pool On Awake**: check `initializePoolOnAwake` on the Inspector, and the list initializes the pool automatically in `Awake`.
+2. **Manual initialization**: call `await InitializePool(args)` yourself (`args` is forwarded to every cell's [OnCreate](./InfiniteCell.mdx#oncreate)).
+
+<Highlight color="#ff2f00">Important</Highlight> Every operation (Add / Insert / Remove / Clear / Refresh / Snap) only takes effect **after initialization completes**; otherwise the warning `Please InitializePool first!!!` is output.
+
+### Cell Pooling {#cell-pooling}
+
+- On initialization, cells are pre-instantiated according to [cellPoolSize](#members); while scrolling, cells are only assigned to the data **within the visible range** (extended by `extendVisibleRange`), and cells scrolled out of range are recycled back into the pool for reuse.
+- **Data and view are separated**: the data ([InfiniteCellData](./InfiniteCell.mdx#infinitecelldata)) is held by the scroll view, and a cell only gets its data bound (triggering [OnRefresh](./InfiniteCell.mdx#onrefresh)) when it is placed for display.
+
+<Highlight color="#0373fc">Attention</Highlight> `cellPoolSize` must be large enough to cover the **visible count + the extra cells reserved by extendVisibleRange**; an exhausted pool outputs the error `The cell display error occurred, not enough cells in the cell pool!!!`.
+
+<Highlight color="#00d679">Reminder</Highlight> The `content` node does **not** need a LayoutGroup / ContentSizeFitter — cell positions are calculated by the scroll view itself; make sure the `ScrollRect`'s scroll axis (Vertical / Horizontal) matches the implementation you use.
+
+---
+
+## Members {#members}
+
+| Member | Description |
+| :--- | :--- |
+| `public bool initializePoolOnAwake` | Whether to initialize the pool automatically in `Awake`, default `false`. |
+| `public int cellPoolSize` | Number of cells in the pool, default `20`; must cover the visible count plus the cells reserved by `extendVisibleRange`. |
+| `public InfiniteCell cellPrefab` | The cell prefab (a Prefab with an [InfiniteCell](./InfiniteCell.mdx) subclass attached). |
+| `public DataOrder dataOrder` | Data order ([DataOrder](#dataorder)), default `Normal`; `Reverse` reverses the display order of the data indexes. |
+| `public float extendVisibleRange` | Extended distance of the visible range — cells are placed ahead outside the viewport for smoother scrolling. |
+| `public ScrollRect scrollRect { get; protected set; }` | The UGUI `ScrollRect` on the same object (obtained on initialization). |
+| `public SnapAlign snapAlign` | Snap alignment ([SnapAlign](#snapalign)), default `Start`. |
+| `public Padding padding` | Content padding ([Padding](#padding)). |
+| `public int visibleCount { get; protected set; }` | Current number of cells within the visible range. |
+| `public int lastMaxVisibleCount { get; protected set; }` | The maximum visible count reached so far. |
+| `public float lastVisibleRangeSize { get; protected set; }` | The last calculated visible-range size (including `extendVisibleRange`). |
+| `public bool isVisibleRangeFilled { get; protected set; }` | Whether the visible range is filled with cells (useful to check if the data is enough to fill the view). |
+| `public bool isInitialized { get; protected set; }` | Whether the pool initialization has completed. |
+
+## Events {#events}
+
+| Event | Description |
+| :--- | :--- |
+| `public Action<Vector2> onValueChanged` | Invoked while the list scrolls (parameter is the `ScrollRect` normalizedPosition). |
+| `public Action onRectTransformDimensionsChanged` | Invoked when the list's `RectTransform` dimensions change (useful to re-layout). |
+| `public Action onRefreshed` | Invoked after every full refresh ([Refresh](#refresh)) completes. |
+| `public Action<InfiniteCell> onCellSelected` | Invoked when a cell is clicked/selected (the cell must call `base.OnClick()`, see [InfiniteCell.OnClick](./InfiniteCell.mdx#onclick)). |
+
+---
+
+## Initialization and Data Operations {#init-and-data}
+
+### Methods Overview {#data-overview}
+
+| Method | Description |
+| :--- | :--- |
+| [InitializePool](#initializepool) | Initializes the cell pool (prerequisite for every operation). |
+| [DataCount](#datacount) | Gets the data count (equals the cell count). |
+| [Add](#add) | Appends cell data (no refresh by default). |
+| [Insert](#insert) | Inserts cell data at the specified index. |
+| [Remove](#remove) | Removes the cell data at the specified index. |
+| [Clear](#clear) | Clears all data and refreshes. |
+
+---
+
+### InitializePool {#initializepool}
+
+```csharp
+public virtual async UniTask InitializePool(object args = null)
+```
+
+Initializes the pool: instantiates `cellPrefab` under `content` according to [cellPoolSize](#members) and `await`s each cell's [OnCreate](./InfiniteCell.mdx#oncreate) (`args` is forwarded to every cell). Existing `content` children and the data list are cleared, and the scroll listener is registered. Calling it again after initialization (`isInitialized` is `true`) returns immediately.
+
+```csharp
+// Basic initialization
+await this.scrollView.InitializePool();
+
+// Pass custom arguments to every cell's OnCreate
+await this.scrollView.InitializePool(myCellInitArgs);
+```
+
+<Highlight color="#0373fc">Attention</Highlight> Initialization fails with an error when `cellPrefab` is null.
+
+### DataCount {#datacount}
+
+```csharp
+public int DataCount()
+```
+
+Gets the data count (equals the cell count).
+
+### Add {#add}
+
+```csharp
+public virtual void Add(InfiniteCellData data, bool refresh = false)
+```
+
+Appends one [InfiniteCellData](./InfiniteCell.mdx#infinitecelldata) to the end.
+
+<Highlight color="#00d679">Reminder</Highlight> `refresh` defaults to `false` — adding in batch and calling [Refresh](#refresh) once afterwards is more efficient.
+
+```csharp
+for (int i = 0; i < 100; i++)
+    this.scrollView.Add(new InfiniteCellData(new Vector2(100f, 100f), $"Item {i}"));
+this.scrollView.Refresh();
+```
+
+### Insert {#insert}
+
+```csharp
+public virtual bool Insert(int index, InfiniteCellData data, bool refresh = true)
+```
+
+Inserts data at the specified index (`index` may equal `DataCount()`, which appends to the end); subsequent data indexes are updated automatically. Returns `false` when the index is out of range. When `refresh` is `true`, it refreshes by first recycling all active cells (`Refresh(false, true)`).
+
+### Remove {#remove}
+
+```csharp
+public virtual bool Remove(int index, bool refresh = true)
+```
+
+Removes the data at the specified index (the data gets `Dispose`d); subsequent data indexes shift forward automatically. Returns `false` when the index is out of range.
+
+<Highlight color="#0373fc">Attention</Highlight> `VerticalInfiniteScrollView` and `HorizontalInfiniteScrollView` override this method to **adjust the content position** after removal, see [ScrollView Variants](./ScrollViewVariants.mdx).
+
+### Clear {#clear}
+
+```csharp
+public virtual void Clear()
+```
+
+Stops scrolling and resets the content position, recycles all active cells, `Dispose`s all data, then refreshes the view.
+
+---
+
+## Refreshing {#refreshing}
+
+### Methods Overview {#refresh-overview}
+
+| Method | Description |
+| :--- | :--- |
+| [Refresh](#refresh) | Full refresh (recalculates the content size and refreshes visible cells). |
+| [RefreshVisibleCells](#refreshvisiblecells) | Only recalculates and refreshes the cells within the visible range. |
+
+---
+
+### Refresh {#refresh}
+
+```csharp
+public abstract void Refresh(bool refreshOnNextScroll = false, bool recycleActiveCells = false)
+```
+
+Full refresh: recalculates the content size → refreshes the visible cells → invokes the [onRefreshed](#events) event.
+
+| Parameter | Description |
+| :--- | :--- |
+| `refreshOnNextScroll` | When `true`, does not refresh immediately — only marks a full refresh to run on **the next scroll** (`onRefreshed` is not invoked at marking time). |
+| `recycleActiveCells` | When `true`, recycles all active cells back into the pool before refreshing (does not clear the data list). |
+
+<Highlight color="#00d679">Reminder</Highlight> If the viewport size is not ready yet (0, common on the first UI frame), the refresh is automatically deferred to `LastPostLateUpdate`.
+
+### RefreshVisibleCells {#refreshvisiblecells}
+
+```csharp
+public void RefreshVisibleCells()
+```
+
+Only recalculates the visible range and places/recycles cells (does not recalculate the content size); called internally while the list scrolls.
+
+---
+
+## Scrolling and State {#scroll-operation}
+
+### Methods Overview {#scroll-overview}
+
+| Method | Description |
+| :--- | :--- |
+| [ScrollToTop / ScrollToBottom](#scrollto-vertical) | Scrolls to the top/bottom immediately (vertical). |
+| [ScrollToLeft / ScrollToRight](#scrollto-horizontal) | Scrolls to the far left/right immediately (horizontal). |
+| [VerticalNormalizedPosition / HorizontalNormalizedPosition](#normalized-position) | Gets the normalized scroll position. |
+| [IsAtTop / IsAtBottom / IsAtLeft / IsAtRight](#boundary-check) | Whether the view has scrolled to each boundary. |
+
+---
+
+### ScrollToTop / ScrollToBottom {#scrollto-vertical}
+
+```csharp
+public void ScrollToTop()
+public void ScrollToBottom()
+```
+
+Directly sets `verticalNormalizedPosition` to scroll to the top (1) / bottom (0); for vertical lists.
+
+### ScrollToLeft / ScrollToRight {#scrollto-horizontal}
+
+```csharp
+public void ScrollToLeft()
+public void ScrollToRight()
+```
+
+Directly sets `horizontalNormalizedPosition` to scroll to the far left (0) / far right (1); for horizontal lists.
+
+### VerticalNormalizedPosition / HorizontalNormalizedPosition {#normalized-position}
+
+```csharp
+public float VerticalNormalizedPosition()
+public float HorizontalNormalizedPosition()
+```
+
+Gets the normalized scroll position (0~1) of the `ScrollRect`; returns `-1` when `scrollRect` is not obtained yet.
+
+### IsAtTop / IsAtBottom / IsAtLeft / IsAtRight {#boundary-check}
+
+```csharp
+public bool IsAtTop()
+public bool IsAtBottom()
+public bool IsAtLeft()
+public bool IsAtRight()
+```
+
+Whether the view has scrolled to the top/bottom/left/right boundary (adjusted internally by the content direction pivot). The boundary states are updated on visible refresh — vertical implementations update Top / Bottom, horizontal implementations update Left / Right.
+
+```csharp
+// Load more when scrolled to the bottom (vertical list)
+this.scrollView.onValueChanged += (pos) =>
+{
+    if (this.scrollView.IsAtBottom())
+        this.LoadMore();
+};
+```
+
+---
+
+## Snapping {#snapping}
+
+### Methods Overview {#snap-overview}
+
+| Method | Description |
+| :--- | :--- |
+| [Snap](#snap) | Moves to the cell at the specified index. |
+| [SnapFirst](#snapfirst) | Moves to the first cell. |
+| [SnapMiddle](#snapmiddle) | Moves to the middle cell. |
+| [SnapLast](#snaplast) | Moves to the last cell. |
+
+---
+
+### Snap {#snap}
+
+```csharp
+public abstract void Snap(int index, float duration)
+```
+
+Moves to the cell at the specified index, aligned according to [snapAlign](#members) (Start / Center / End):
+
+- `duration` less than or equal to 0 → **sync**, positions immediately.
+- `duration` greater than 0 → **async tween** (UniTask), moves smoothly within `duration` seconds (calling again interrupts the previous tween).
+
+When finished, the target cell's [OnSnap](./InfiniteCell.mdx#onsnap) is invoked if it is displayed; when `dataOrder` is `Reverse`, the index is converted automatically.
+
+```csharp
+// Jump to index 10 immediately
+this.scrollView.Snap(10, 0);
+
+// Move smoothly to index 10 within 0.1 seconds
+this.scrollView.Snap(10, 0.1f);
+```
+
+### SnapFirst {#snapfirst}
+
+```csharp
+public void SnapFirst(float duration)
+```
+
+Moves to the first cell (same as `Snap(0, duration)`).
+
+### SnapMiddle {#snapmiddle}
+
+```csharp
+public void SnapMiddle(float duration)
+```
+
+Moves to the middle cell (index `(DataCount() - 1) / 2`).
+
+### SnapLast {#snaplast}
+
+```csharp
+public void SnapLast(float duration)
+```
+
+Moves to the last cell (same as `Snap(DataCount() - 1, duration)`).
+
+```csharp
+// Chat-room-like usage: auto-scroll to the newest message after appending
+this.chatScrollView.Add(cellData);
+this.chatScrollView.Refresh();
+this.chatScrollView.SnapLast(0.1f);
+```
+
+---
+
+## Type Definitions {#type-definitions}
+
+### DataOrder {#dataorder}
+
+```csharp
+public enum DataOrder
+{
+    Normal,
+    Reverse
+}
+```
+
+Data order; `Reverse` reverses the display order of the data indexes (laid out from the opposite direction).
+
+### SnapAlign {#snapalign}
+
+```csharp
+public enum SnapAlign
+{
+    Start = 1,
+    Center = 2,
+    End = 3,
+}
+```
+
+Snap alignment: aligns the target cell to the **start / center / end** of the visible range.
+
+### Padding {#padding}
+
+```csharp
+[Serializable]
+public class Padding
+{
+    public int top;
+    public int bottom;
+    public int left;
+    public int right;
+}
+```
+
+Content padding (top / bottom / left / right).
+
+---
+
+## Inheritance Extension (protected) {#inheritance}
+
+When inheriting `InfiniteScrollView` (or a built-in implementation) to customize a list, the following `protected` members are available:
+
+| Member | Description |
+| :--- | :--- |
+| `protected List<InfiniteCellData> _dataList` | The data list. |
+| `protected List<InfiniteCell> _cellList` | The active cell list mapped to the data (indexes not displayed are `null`). |
+| `protected Queue<InfiniteCell> _cellPool` | The cell pool. |
+| `protected abstract void DoRefreshVisibleCells()` | Implements the cell placement/recycling logic of the visible range. |
+| `protected abstract void DoRefresh(bool refreshOnNextScroll, bool recycleActiveCells)` | Implements the full refresh logic. |
+| `protected abstract UniTask DoDelayRefresh(bool refreshOnNextScroll, bool recycleActiveCells)` | Implements the deferred refresh (when the viewport size is not ready). |
+| `protected void SetupCell(InfiniteCell cell, int index, Vector2 pos)` | Binds data to a cell and places it at the given position for display. |
+| `protected void RecycleCell(int index)` | Recycles the cell at the index back into the pool (invokes `OnRecycle`). |
+| `protected void RecycleActiveCells()` | Recycles all active cells (does not clear the data list). |
+| `protected void ClearAllData()` | `Dispose`s all data. |
+| `protected void DoSnapping(int index, Vector2 target, float duration)` | Runs the snap movement tween. |
+| `protected float CalculateSnapPos(ScrollType scrollType, SnapAlign snapPosType, float originValue, InfiniteCellData cellData)` | Calculates the snap target position according to the alignment. |
+| `protected bool IsInitialized()` | Checks whether initialization is done (outputs a warning if not). |

@@ -1,0 +1,133 @@
+---
+sidebar_position: 2
+description: NewSingleton 為 SingletonSystem 的純 C# class 單例基類，以雙重檢查鎖定的延遲建立實例，適用於非 MonoBehaviour 的資料或邏輯管理類。
+---
+
+# NewSingleton
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`NewSingleton<T>` 為 **SingletonSystem** 的**純 C# class 單例基類** (非 `MonoBehaviour`)，以**雙重檢查鎖定 (Double-Checked Locking)** 的延遲建立 (`new T()`) 確保多線程下僅建立一次實例，適用於**不需要掛載於 GameObject** 的資料或邏輯管理類。
+
+|  |  |
+| :--- | :--- |
+| **命名空間** | `OxGKit.SingletonSystem` |
+| **類型** | `public class NewSingleton<T> where T : class, new()` |
+| **原始碼** | [NewSingleton.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/SingletonSystem/Scripts/Runtime/Core/NewSingleton.cs) |
+
+```csharp
+using OxGKit.SingletonSystem;
+```
+
+<Highlight color="#0373fc">注意</Highlight> 泛型約束為 `where T : class, new()`，類型 `T` 必須具備 **public 無參數建構子**。
+
+<Highlight color="#00d679">提醒</Highlight> 需要 Unity 生命週期與場景物件的管理類，請改用 [MonoSingleton](./MonoSingleton.mdx)。
+
+## 快速上手 {#quick-start}
+
+```csharp
+using OxGKit.SingletonSystem;
+
+// 方式一：繼承使用
+public class ScoreManager : NewSingleton<ScoreManager>
+{
+    public int score = 0;
+
+    public static void AddScore()
+    {
+        GetInstance().score++;
+    }
+}
+
+// 取得實例 (延遲 new T() 建立)
+var scoreManager = ScoreManager.GetInstance();
+ScoreManager.AddScore();
+```
+
+```csharp
+// 方式二：不繼承，直接作為泛型容器使用
+public class ScoreService
+{
+    public int score = 0;
+}
+
+NewSingleton<ScoreService>.GetInstance().score++;
+```
+
+## 方法總覽 {#methods-overview}
+
+| 方法 | 說明 |
+| :--- | :--- |
+| [GetInstance](#getinstance) | 取得單例實例 (延遲建立)。 |
+| [InitInstance](#initinstance) | 初始單例實例 (等同呼叫 GetInstance)。 |
+| [CheckInstanceExists](#checkinstanceexists) | 檢查實例是否存在。 |
+| [DestroyInstance](#destroyinstance) | 銷毀單例實例 (僅清空靜態引用)。 |
+
+---
+
+### GetInstance {#getinstance}
+
+```csharp
+public static T GetInstance()
+```
+
+取得單例實例；若實例尚不存在，以**雙重檢查鎖定**確保多線程競爭下僅以 `new T()` 建立一次。
+
+```csharp
+var scoreManager = ScoreManager.GetInstance();
+```
+
+### InitInstance {#initinstance}
+
+```csharp
+public static void InitInstance()
+```
+
+初始單例實例 (等同呼叫 [GetInstance](#getinstance))，適合於開機流程**明確控制建立順序** (warm-up)。
+
+```csharp
+ScoreManager.InitInstance();
+```
+
+### CheckInstanceExists {#checkinstanceexists}
+
+```csharp
+public static bool CheckInstanceExists()
+```
+
+檢查實例是否存在 (**不會**觸發建立)。
+
+```csharp
+if (ScoreManager.CheckInstanceExists())
+    ScoreManager.AddScore();
+```
+
+### DestroyInstance {#destroyinstance}
+
+```csharp
+public static void DestroyInstance()
+```
+
+銷毀單例實例 (**僅清空靜態引用**)；若其他地方仍持有舊實例的引用，該物件並不會因此被釋放，**並非資源釋放機制**。
+
+```csharp
+ScoreManager.DestroyInstance();
+```
+
+<Highlight color="#0373fc">注意</Highlight> 清空後再次呼叫 [GetInstance](#getinstance) 會建立**全新實例**，舊實例的狀態不會保留。

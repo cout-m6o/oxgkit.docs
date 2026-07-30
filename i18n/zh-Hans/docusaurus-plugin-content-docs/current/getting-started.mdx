@@ -1,0 +1,186 @@
+---
+sidebar_position: 1
+---
+
+# 快速上手
+
+export const Highlight = ({ children, color }) => (
+  <span
+    style={{
+      backgroundColor: color,
+      borderRadius: '5px',
+      color: '#fff',
+      padding: '2.5px'
+    }}>
+    {children}
+  </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+**开始安装 OxGKit**
+
+<Highlight color="#0373fc">注意</Highlight> OxGKit **皆为独立工具系统**，没有一次安装全部的必要，**需要什么装什么**，依照各模块需求安装对应的依赖即可。
+
+## 步骤 1. (安装依赖)
+
+**依照你要安装的模块**，先安装其依赖的第三方库 (各模块依赖请参考[步骤 2 的依赖标注](#install-modules))。
+
+- <Highlight color="#ff2f00">1</Highlight> **[UniTask](https://github.com/Cysharp/UniTask)** (InfiniteScrollView、ActionSystem、TimeSystem、PoolSystem、Utilities 依赖)
+
+通过 Package Manager 安装 **(Install via git)**
+
+```
+https://github.com/Cysharp/UniTask.git?path=src/UniTask/Assets/Plugins/UniTask
+```
+
+- <Highlight color="#ff2f00">2</Highlight> **[LWMyBox](https://github.com/michael811125/LWMyBox)** (LoggingSystem、TweenSystem、PoolSystem、Utilities 依赖)
+
+通过 Package Manager 安装 **(Install via git)**
+
+```
+https://github.com/michael811125/LWMyBox.git
+```
+
+- <Highlight color="#ff2f00">3</Highlight> **[Unity New InputSystem](https://docs.unity3d.com/Packages/com.unity.inputsystem@1.8/manual/index.html)** (InputSystem 依赖)
+
+通过 Package Manager 安装 **(Install by name)**
+
+```
+com.unity.inputsystem
+```
+
+- <Highlight color="#ff2f00">4</Highlight> **[DoTween Pro](https://assetstore.unity.com/packages/tools/visual-scripting/dotween-pro-32416)** (TweenSystem 依赖，**需自行购买安装**)
+
+- <Highlight color="#00d679">提醒</Highlight> **OxGKit.LoggingSystem** 为多数模块的共同依赖 (InfiniteScrollView、ActionSystem、NoticeSystem、InputSystem、TimeSystem、PoolSystem、Utilities)，**建议最先安装**。
+
+```
+https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/LoggingSystem/Scripts
+```
+
+---
+
+## 步骤 2. (安装模块) {#install-modules}
+
+### 方法一
+
+依需求通过 Package Manager 逐一安装 **(Install via git)**。
+
+<Highlight color="#ff2f00">重要</Highlight> Package Manager **不会自动安装**套件内声明的 git 依赖，安装任一模块前，请**先安装其依赖** (依赖标注如下)。
+
+- [LoggingSystem](/docs/loggingsystem/intro) (依赖 LWMyBox)
+```
+https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/LoggingSystem/Scripts
+```
+- [InfiniteScrollView](/docs/infinitescrollview/intro) (依赖 UniTask, OxGKit.LoggingSystem)
+```
+https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/InfiniteScrollView/Scripts
+```
+- [ActionSystem](/docs/actionsystem/intro) (依赖 UniTask, OxGKit.LoggingSystem)
+```
+https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/ActionSystem/Scripts
+```
+- [NoticeSystem](/docs/noticesystem/intro) (依赖 OxGKit.LoggingSystem)
+```
+https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/NoticeSystem/Scripts
+```
+- [InputSystem](/docs/inputsystem/intro) (依赖 Unity New InputSystem, OxGKit.LoggingSystem)
+```
+https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/InputSystem/Scripts
+```
+- [TweenSystem](/docs/tweensystem/intro) (依赖 DoTween Pro, LWMyBox, OxGKit.TimeSystem)
+```
+https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/TweenSystem/Scripts
+```
+- [ButtonSystem](/docs/buttonsystem/intro)
+```
+https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/ButtonSystem/Scripts
+```
+- [TimeSystem](/docs/timesystem/intro) (依赖 UniTask, OxGKit.LoggingSystem)
+```
+https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/TimeSystem/Scripts
+```
+- [CursorSystem](/docs/cursorsystem/intro)
+```
+https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/CursorSystem/Scripts
+```
+- [PoolSystem](/docs/poolsystem/intro) (依赖 UniTask, LWMyBox, OxGKit.LoggingSystem)
+```
+https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/PoolSystem/Scripts
+```
+- [SingletonSystem](/docs/singletonsystem/intro)
+```
+https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/SingletonSystem/Scripts
+```
+- [SaverSystem](/docs/saversystem/intro)
+```
+https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/SaverSystem/Scripts
+```
+- [LocalizationSystem](/docs/localizationsystem/intro)
+```
+https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/LocalizationSystem/Scripts
+```
+- [VirtualJoystick](/docs/virtualjoystick/intro)
+```
+https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/VirtualJoystick/Scripts
+```
+- [Utilities](/docs/utilities/intro) (依赖 UniTask, LWMyBox, OxGKit.LoggingSystem)
+```
+https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/Utilities/Scripts
+```
+
+### 方法二
+
+**直接下载源码 ([Code Download ZIP](https://github.com/michael811125/OxGKit))**
+
+复制所需模块的文件夹 (Assets/OxGKit/[模块名]) 到 Unity 项目的 Assets 底下。
+
+<Highlight color="#00d679">提醒</Highlight> **如果没有要自行更改工具组的需求，建议直接使用 Package Manager 方式安装**。
+
+---
+
+## 管理组件导入 (Samples)
+
+各模块皆附有 **Example 示例**与 **AI Agent Skills**，可通过 **Package Manager -> 选择模块 -> Samples** 进行导入。
+
+<Highlight color="#00d679">提醒</Highlight> 有很多调用的方式，都可以参考各模块的 Samples，里面都有完整的示例。
+
+---
+
+## Build 激活宏
+
+- **OXGKIT_LOGGER_ON** ([LoggingSystem](/docs/loggingsystem/intro) 日志输出开关，**发布时需在 Player Settings -> Scripting Define Symbols 加入才会输出日志**)
+
+---
+
+## AI 辅助开发 (AI Agent Skills) {#ai-agent-skills}
+
+OxGKit **各系统模块**皆支持使用 **AI 编码代理** (Claude Code、OpenAI Codex CLI、Cursor、Copilot 等) 辅助开发，各模块的 Samples 内置「**AI Agent Skills**」(SKILL.md)，教导 AI 代理正确使用该模块 API。
+
+<Highlight color="#0373fc">注意</Highlight> 完整的导入与使用说明，请参考 [AI Agent Skills](/docs/agent-skills)。
+
+---
+
+## 工具组 API
+
+- [LoggingSystem](/docs/loggingsystem/intro) (using OxGKit.LoggingSystem)
+- [InfiniteScrollView](/docs/infinitescrollview/intro) (using OxGKit.InfiniteScrollView)
+- [ActionSystem](/docs/actionsystem/intro) (using OxGKit.ActionSystem)
+- [NoticeSystem](/docs/noticesystem/intro) (using OxGKit.NoticeSystem)
+- [InputSystem](/docs/inputsystem/intro) (using OxGKit.InputSystem)
+- [TweenSystem](/docs/tweensystem/intro) (using OxGKit.TweenSystem)
+- [ButtonSystem](/docs/buttonsystem/intro) (using OxGKit.ButtonSystem)
+- [TimeSystem](/docs/timesystem/intro) (using OxGKit.TimeSystem)
+- [CursorSystem](/docs/cursorsystem/intro) (using OxGKit.CursorSystem)
+- [PoolSystem](/docs/poolsystem/intro) (using OxGKit.PoolSystem)
+- [SingletonSystem](/docs/singletonsystem/intro) (using OxGKit.SingletonSystem)
+- [SaverSystem](/docs/saversystem/intro) (using OxGKit.SaverSystem)
+- [LocalizationSystem](/docs/localizationsystem/intro) (using OxGKit.LocalizationSystem)
+- [VirtualJoystick](/docs/virtualjoystick/intro) (using OxGKit.VirtualJoystick)
+- [Utilities](/docs/utilities/intro) (using OxGKit.Utilities.*)
+
+<Highlight color="#ff2f00">重要</Highlight> 建议详看各模块的 Example 与 API 章节。

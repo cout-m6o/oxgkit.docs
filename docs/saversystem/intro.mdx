@@ -1,0 +1,169 @@
+---
+sidebar_position: 1
+---
+
+# 模塊介紹
+
+export const Highlight = ({ children, color }) => (
+  <span
+    style={{
+      backgroundColor: color,
+      borderRadius: '5px',
+      color: '#fff',
+      padding: '2.5px'
+    }}>
+    {children}
+  </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+## 基本說明
+
+簡易儲存系統，支持**以文本形式儲存** (Text-Content Data Map)，預設提供 **EditorPrefsSaver**、**PlayerPrefsSaver**，可自行擴展 (自定義 Saver)。
+
+- 版本：**v1.0.2** (`com.michaelo.oxgkit.saversystem`)
+- 命名空間：`OxGKit.SaverSystem`
+
+<Highlight color="#00d679">提醒</Highlight> 本模組定位為**設定值與小型數據**的鍵值儲存 (例如語系、音量、偏好設定等)；大型/結構化/需版本管理的存檔數據，建議採用更完整的儲存方案。
+
+---
+
+## 應用說明
+
+### 儲存器架構
+
+- **`ISaver`**：定義基本鍵值存取介面 (`SaveString` / `GetString`、`SaveInt` / `GetInt`、`SaveFloat` / `GetFloat`、`HasKey` / `DeleteKey` / `DeleteAll`)。
+- **`Saver`**：抽象基類 (實作 `ISaver`)，基本存取方法皆為抽象方法 (由子類決定儲存後端)，並額外提供**文本形式儲存數據**功能 (`SaveData` / `GetData` / `DeleteData` / `DeleteContext` / `ParsingDataMap`)，具備解析緩存 (Dirty Flag) 機制。
+- **內建儲存器**：
+
+| 儲存器 | 儲存後端 | 命名空間 | 適用 |
+| :--- | :--- | :--- | :--- |
+| [PlayerPrefsSaver](/docs/saversystem/API/Runtime/PlayerPrefsSaver) | `UnityEngine.PlayerPrefs` | `OxGKit.SaverSystem` | 運行時 (遊戲設定) |
+| [EditorPrefsSaver](/docs/saversystem/API/Runtime/EditorPrefsSaver) | `UnityEditor.EditorPrefs` | `OxGKit.SaverSystem.Editor` | 僅編輯器 (編輯器工具) |
+
+<Highlight color="#0373fc">注意</Highlight> **EditorPrefsSaver** 位於 **Editor Assembly** (`OxGKit.SaverSystem.Editor`)，**僅能於編輯器腳本中引用**，不可用於運行時腳本。
+
+### 文本形式儲存 (Data Map)
+
+`Saver` 支持將**多筆 `key value` 數據打包儲存於單一字串鍵 (contentKey)** 中，儲存格式為每行一筆 `key value`：
+
+```
+# 以 '#' 開頭的行視為註解
+lastLogin 2026-07-29
+resolution 1920x1080
+```
+
+- 每行以**第一個空格**分隔 key 與 value：**key 不可包含空格**；value 可包含空格，但**不可包含換行** (逐行解析)。
+- `#` 開頭的行視為**註解** (解析時忽略)，因此此格式也適合作為**可手動編輯的配置文件格式**。
+- `GetData` 具備**解析緩存 (Dirty Flag)**，僅於 `SaveData` / `DeleteData` 後才會重新解析文本。
+
+<Highlight color="#0373fc">注意</Highlight> 無 bool 與物件 API，bool 可以 int (0/1) 儲存；物件可自行序列化為 JSON 字串後透過 `SaveString` 儲存。
+
+---
+
+## 簡單使用
+
+### 基本存取
+
+```csharp
+using OxGKit.SaverSystem;
+
+// 建立儲存器 (以 PlayerPrefs 作為儲存後端)
+Saver saver = new PlayerPrefsSaver();
+
+// 基本類型存取
+saver.SaveString("name", "michael");
+string name = saver.GetString("name", "");
+
+saver.SaveInt("language", 2);
+int language = saver.GetInt("language", 0);
+
+saver.SaveFloat("bgmVolume", 0.8f);
+float bgmVolume = saver.GetFloat("bgmVolume", 0f);
+
+// 鍵值管理
+if (saver.HasKey("language")) saver.DeleteKey("language");
+saver.DeleteAll();
+```
+
+### 文本形式儲存數據
+
+```csharp
+// 將多筆 key value 數據儲存於單一 contentKey 文本中
+saver.SaveData("appPrefs", "lastLogin", "2026-07-29");
+saver.SaveData("appPrefs", "resolution", "1920x1080");
+
+// 獲取文本中的特定數據 (具解析緩存)
+string lastLogin = saver.GetData("appPrefs", "lastLogin", null);
+
+// 刪除文本中的特定數據
+saver.DeleteData("appPrefs", "lastLogin");
+
+// 刪除整份文本數據 (含解析緩存)
+saver.DeleteContext("appPrefs");
+```
+
+### 集中管理 (推薦寫法)
+
+建議以**設定門面 (Facade)** 集中管理鍵名，並**共用同一個 Saver 實例** (解析緩存以實例為單位)：
+
+```csharp
+using OxGKit.SaverSystem;
+
+public static class GameSettings
+{
+    private static readonly Saver _saver = new PlayerPrefsSaver();
+    private const string KEY_LANGUAGE = "language";
+
+    public static int Language
+    {
+        get => _saver.GetInt(KEY_LANGUAGE, 0);
+        set => _saver.SaveInt(KEY_LANGUAGE, value);
+    }
+}
+```
+
+### 自定義 Saver (擴展)
+
+繼承 `Saver` 並覆寫抽象方法，即可將數據儲存至任意後端 (檔案、加密儲存、雲端等)，文本數據功能由基類提供無需另行實作 (詳見 [Saver](/docs/saversystem/API/Runtime/Saver#custom-saver))：
+
+```csharp
+using OxGKit.SaverSystem;
+
+public class FileSaver : Saver
+{
+    public override void SaveString(string key, string value) { /* 寫入檔案 */ }
+
+    // ... 覆寫其餘抽象方法
+}
+```
+
+*[參考 Example]*
+
+---
+
+## Installation
+
+| Install via git URL |
+|:--- |
+| Add https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/SaverSystem/Scripts to Package Manager |
+
+**無第三方依賴**
+
+**Samples (Package Manager -> Samples)**
+
+- **AI Agent Skills** (參考 [AI Agent Skills](/docs/agent-skills))
+
+---
+
+## 模塊 API
+
+- Runtime
+  - [Saver](/docs/saversystem/API/Runtime/Saver) (using OxGKit.SaverSystem)
+  - [PlayerPrefsSaver](/docs/saversystem/API/Runtime/PlayerPrefsSaver) (using OxGKit.SaverSystem)
+  - [EditorPrefsSaver](/docs/saversystem/API/Runtime/EditorPrefsSaver) (using OxGKit.SaverSystem.Editor)

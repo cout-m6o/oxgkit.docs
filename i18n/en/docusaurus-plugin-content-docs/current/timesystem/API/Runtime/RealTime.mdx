@@ -1,0 +1,100 @@
+---
+sidebar_position: 7
+description: RealTime is a static utility that records the application startup time, initialized once by the main program via InitStartupTime (first call only), serving as a global game startup time base.
+---
+
+# RealTime
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`RealTime` is a **static utility that records the application startup time**. The main program (a Main MonoBehaviour `Awake`) calls `InitStartupTime()` to initialize it (**only the first call takes effect**); afterwards the startup time can be read from `timeSinceStartup`, serving as a global game startup time base.
+
+|  |  |
+| :--- | :--- |
+| **Namespace** | `OxGKit.TimeSystem` |
+| **Type** | `public static class RealTime` |
+| **Source** | [RealTime.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/TimeSystem/Scripts/Runtime/Core/Time/RealTime.cs) |
+
+```csharp
+using OxGKit.TimeSystem;
+```
+
+## Quick Start {#quick-start}
+
+```csharp
+using OxGKit.TimeSystem;
+using UnityEngine;
+
+public class Main : MonoBehaviour
+{
+    private void Awake()
+    {
+        // Initialized by the main program at startup (first call only)
+        RealTime.InitStartupTime();
+    }
+
+    private void Start()
+    {
+        if (RealTime.IsInitStartupTime())
+        {
+            // Read the game startup time
+            System.DateTime startup = RealTime.timeSinceStartup;
+        }
+    }
+}
+```
+
+<Highlight color="#00d679">Reminder</Highlight> Call `InitStartupTime()` **at main program startup** so the recorded value is the actual game startup time.
+
+---
+
+## Members {#members}
+
+| Member | Description |
+| :--- | :--- |
+| `public static DateTime timeSinceStartup { get; }` | The application startup time (system time recorded by [InitStartupTime](#initstartuptime)). |
+
+---
+
+## Methods {#methods}
+
+### Method Overview {#methods-overview}
+
+| Method | Description |
+| :--- | :--- |
+| [InitStartupTime](#initstartuptime) | Initializes the startup time (first call only). |
+| [IsInitStartupTime](#isinitstartuptime) | Checks whether the startup time has been initialized. |
+
+---
+
+### InitStartupTime {#initstartuptime}
+
+```csharp
+public static void InitStartupTime()
+```
+
+Records the current system time (`DateTime.Now`) as the startup time; **only the first call takes effect** — subsequent calls are ignored.
+
+### IsInitStartupTime {#isinitstartuptime}
+
+```csharp
+public static bool IsInitStartupTime()
+```
+
+Checks whether the startup time has been initialized; if not, a log hint is printed (`Please call RealTime.InitStartupTime() in main program first`) and false is returned.

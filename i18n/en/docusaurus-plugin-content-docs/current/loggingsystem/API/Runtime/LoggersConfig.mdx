@@ -1,0 +1,225 @@
+---
+sidebar_position: 3
+description: LoggersConfig is the logger configuration data of LoggingSystem, containing the global toggle/level/color and per-logger settings, and covering config types such as LoggerSettings, LogLevel, LogColor, LoggerNameAttribute, and LoggingSettings.
+---
+
+# LoggersConfig
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`LoggersConfig` is the logger configuration data of **LoggingSystem** (serializable), containing the **global toggle/level/color** and the **settings list of each logger ([LoggerSettings](#loggersettings))**; the config can be saved as a StreamingAssets config file (Cipher/Plaintext), or applied dynamically at runtime via [LoggingLauncher.SetLoggersConfig](./LoggingLauncher.mdx#setloggersconfig).
+
+|  |  |
+| :--- | :--- |
+| **Namespace** | `OxGKit.LoggingSystem` |
+| **Type** | `[Serializable] public class LoggersConfig` |
+| **Source** | [LoggersConfig.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/LoggingSystem/Scripts/Runtime/Logging/Config/LoggersConfig.cs) |
+
+```csharp
+using OxGKit.LoggingSystem;
+```
+
+## Quick Start {#quick-start}
+
+```csharp
+// Create a config (multiple LoggerSettings can be passed in)
+var loggersConfig = new LoggersConfig
+(
+    new LoggerSettings("Game.Logger", true, LogLevel.All),
+    new LoggerSettings("Net.Logger", true, LogLevel.LogError, LogColor.Enabled)
+);
+
+// Apply the config and reload
+LoggingLauncher.SetLoggersConfig(loggersConfig);
+```
+
+## Members {#members}
+
+| Member | Description |
+| :--- | :--- |
+| `public bool logMainActive` | Master toggle (Inspector: **Master Logging Toggle**), defaults to `true`. |
+| `public LogLevel logMainLevel` | Global level (Inspector: **Master Logging Level**), defaults to `LogLevel.All`. |
+| `public LogColor logMainColor` | Global color mode (Inspector: **Master Logging Color**), defaults to `LogColor.EditorOnly`. |
+| `public List<LoggerSettings> loggerSettings` | The config list of each logger. |
+
+## Constructors {#constructors}
+
+```csharp
+public LoggersConfig()
+public LoggersConfig(params LoggerSettings[] loggerSettings)
+```
+
+## Methods {#methods}
+
+| Method | Description |
+| :--- | :--- |
+| [ClearLoggerSettings](#clearloggersettings) | Clears all logger settings. |
+| [AddLoggerSettings](#addloggersettings) | Adds a logger setting entry. |
+| [RemoveLoggerSettings](#removeloggersettings) | Removes a logger setting entry. |
+
+### ClearLoggerSettings {#clearloggersettings}
+
+```csharp
+public void ClearLoggerSettings()
+```
+
+### AddLoggerSettings {#addloggersettings}
+
+```csharp
+public void AddLoggerSettings(LoggerSettings loggerSettings)
+```
+
+### RemoveLoggerSettings {#removeloggersettings}
+
+```csharp
+public void RemoveLoggerSettings(LoggerSettings loggerSettings)
+```
+
+---
+
+## LoggerSettings {#loggersettings}
+
+A single logger's configuration (serializable).
+
+|  |  |
+| :--- | :--- |
+| **Type** | `[Serializable] public class LoggerSettings` |
+| **Source** | [LoggerSettings.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/LoggingSystem/Scripts/Runtime/Logging/Config/LoggerSettings.cs) |
+
+| Member | Description |
+| :--- | :--- |
+| `public string loggerName` | Logger name (read-only in the Inspector). |
+| `public bool logActive` | Logger toggle. |
+| `public LogLevel logLevel` | Logger level, defaults to `All`. |
+| `public LogColor logColor` | Logger color mode, defaults to `EditorOnly`. |
+
+```csharp
+public LoggerSettings(string loggerName, bool logActive)
+public LoggerSettings(string loggerName, bool logActive, LogLevel logLevel)
+public LoggerSettings(string loggerName, bool logActive, LogLevel logLevel, LogColor logColor)
+```
+
+---
+
+## LogLevel {#loglevel}
+
+Log level (**Flags**; multiple levels can be combined with `|`).
+
+```csharp
+[Flags]
+public enum LogLevel
+{
+    Off = 0,
+    LogDebug = 1 << 0,
+    LogInfo = 1 << 1,
+    LogWarning = 1 << 2,
+    LogError = 1 << 3,
+    LogException = 1 << 4,
+    All = ~0
+}
+```
+
+```csharp
+// Combination example: only output Warning + Error
+LoggingLauncher.ConfigureLogger("Game.Logger", true, LogLevel.LogWarning | LogLevel.LogError);
+```
+
+<Highlight color="#0373fc">Attention</Highlight> The effective rule is the **intersection of the global and per-logger settings** (G ∩ P); see the [level rules table](../../intro.mdx#log-level).
+
+---
+
+## LogColor {#logcolor}
+
+Log color mode.
+
+```csharp
+public enum LogColor
+{
+    Disabled = 0,   // Colors disabled
+    Enabled = 1,    // Colors always enabled
+    EditorOnly = 2  // Colors enabled only in the Editor (automatically stripped in release builds)
+}
+```
+
+<Highlight color="#0373fc">Attention</Highlight> The effective rule takes the **stricter of the global and per-logger settings**; see the [color rules table](../../intro.mdx#log-color).
+
+---
+
+## ConfigFileType {#configfiletype}
+
+Config file type.
+
+```csharp
+public enum ConfigFileType
+{
+    Json,   // JSON [Plaintext]
+    Bytes   // BYTES [Cipher]
+}
+```
+
+---
+
+## LoggerNameAttribute {#loggernameattribute}
+
+Logger name attribute, used to **customize the logger name** and **override a logger with the same name** (Override).
+
+|  |  |
+| :--- | :--- |
+| **Type** | `[AttributeUsage(AttributeTargets.Class)] public class LoggerNameAttribute : Attribute` |
+| **Source** | [LoggerNameAttribute.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/LoggingSystem/Scripts/Runtime/Logging/Attribute/LoggerNameAttribute.cs) |
+
+| Member | Description |
+| :--- | :--- |
+| `public string loggerName` | Logger name. |
+| `public bool isOverride` | Whether to override the logger with the same name. |
+
+```csharp
+public LoggerNameAttribute(string loggerName)
+public LoggerNameAttribute(string loggerName, bool isOverride)
+```
+
+```csharp
+[LoggerName("MyLogger")]
+public class MyLogger1 : Logging { }
+
+// Use same name to override MyLogger1
+[LoggerName("MyLogger", true)]
+public class OverrideMyLogger1 : Logging { }
+```
+
+---
+
+## LoggingSettings {#loggingsettings}
+
+The settings file (`ScriptableObject`) of LoggingSystem, allowing customization of the **config file name, extension, and cipher key**.
+
+|  |  |
+| :--- | :--- |
+| **Type** | `public class LoggingSettings : ScriptableObject` |
+| **Source** | [LoggingSettings.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/LoggingSystem/Scripts/Runtime/Logging/ScriptableObject/LoggingSettings.cs) |
+
+| Member | Description |
+| :--- | :--- |
+| `public const short CIPHER_HEADER` | Config file header (`0x584F`). |
+| `public byte cipher` | Config file cipher key, defaults to `0x42`. |
+| `public string loggerCfgName` | Config file name, defaults to `"LoggerConfig"`. |
+| `public string loggerCfgExtension` | Config file extension (**must include the dot**, e.g. `.dat`, `.cfg`, `.json`), defaults to `".dat"`. |
+| `public static LoggingSettings settings` | Settings singleton (automatically loaded from `Resources`; uses default values if none exists). |
+
+<Highlight color="#00d679">Reminder</Highlight> Create the settings asset via Right-Click **Create/OxGKit/Create Settings/Create Logging Settings in Resources** to customize the config file name.

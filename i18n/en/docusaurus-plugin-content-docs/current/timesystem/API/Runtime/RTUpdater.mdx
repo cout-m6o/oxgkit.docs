@@ -1,0 +1,155 @@
+---
+sidebar_position: 4
+description: RTUpdater is a real-time UniTask update loop independent of MonoBehaviour, unaffected by Unity Time.timeScale, exposing onUpdate, onFixedUpdate, and onLateUpdate callbacks, with StartOnThread for running on the thread pool.
+---
+
+# RTUpdater
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`RTUpdater` is a **real-time update loop independent of MonoBehaviour** (UniTask-driven), exposing `onUpdate`, `onFixedUpdate`, and `onLateUpdate` callbacks with a configurable **targetFrameRate (loop frequency)** and **timeScale (own time scale)**. It is **unaffected by Unity `Time.timeScale`** (keeps running while the game is paused), and additionally supports `StartOnThread()` to switch the loop to the thread pool — suitable for network heartbeats, background polling, and similar scenarios.
+
+|  |  |
+| :--- | :--- |
+| **Namespace** | `OxGKit.TimeSystem` |
+| **Type** | `public class RTUpdater` |
+| **Source** | [RTUpdater.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/TimeSystem/Scripts/Runtime/Core/Updater/RTUpdater.cs) |
+
+```csharp
+using OxGKit.TimeSystem;
+```
+
+## Quick Start {#quick-start}
+
+```csharp
+using OxGKit.TimeSystem;
+
+var rtUpdater = new RTUpdater();
+
+// Subscribe update callbacks
+rtUpdater.onUpdate += (dt) => { /* per update (actual elapsed time) */ };
+rtUpdater.onFixedUpdate += (fdt) => { /* fixed-interval update */ };
+rtUpdater.onLateUpdate += (dt) => { /* late update */ };
+
+// Configurable loop frequency and time scale
+rtUpdater.targetFrameRate = 60f; // default 60
+rtUpdater.timeScale = 1f;        // 0 ~ 64, default 1
+
+// Start the update loop (keeps running even while Time.timeScale = 0)
+rtUpdater.Start();
+
+// Always stop when the feature exits
+rtUpdater.Stop();
+```
+
+## General Rules {#general-rules}
+
+### Loop Frequency and Time Scaling {#update-rate}
+
+- Per cycle, the loop frequency = `targetFrameRate` × `timeScale` (**Unity `Time.timeScale` is NOT multiplied in**), and the wait interval is `fixedDeltaTime = 1 / frequency`.
+- Each cycle fires in order: `onFixedUpdate(fixedDeltaTime)` → `onUpdate(deltaTime)` → `onLateUpdate(deltaTime)`, where `deltaTime` is the **actual elapsed time of the previous cycle** measured by the system clock, and `fixedDeltaTime` is the fixed interval value.
+
+<Highlight color="#0373fc">Attention</Highlight> The loop only runs while **`targetFrameRate` is greater than 0 AND `timeScale` is greater than 0**; if either is 0, the loop **idles** (no callbacks). For an update loop that follows `Time.timeScale` and game pause, use a [DTUpdater](./DTUpdater.mdx) instead (see [Picking the Right Tool](../../intro.mdx#picking-the-right-tool-by-time-base)).
+
+### Lifecycle {#lifecycle}
+
+<Highlight color="#ff2f00">Important</Highlight> The update loop is a **UniTask loop** — when the owner (feature/scene) exits, **always call [Stop](#stop)**, otherwise the loop keeps running; if a callback throws inside the loop, the updater stops automatically and rethrows.
+
+---
+
+## Delegates {#delegates}
+
+```csharp
+public delegate void RealTimeUpdate(float deltaTime);
+public delegate void RealTimeFixedUpdate(float fixedDeltaTime);
+public delegate void RealTimeLateUpdate(float deltaTime);
+```
+
+## Members {#members}
+
+| Member | Description |
+| :--- | :--- |
+| `public RealTimeUpdate onUpdate` | Per-cycle update callback (parameter is the previous cycle's actual elapsed deltaTime). |
+| `public RealTimeFixedUpdate onFixedUpdate` | Per-cycle fixed-interval callback (parameter is fixedDeltaTime). |
+| `public RealTimeLateUpdate onLateUpdate` | Per-cycle late-update callback (fires after onUpdate). |
+| `public float timeSinceStartup { get; }` | Elapsed time since instance creation (seconds, system clock). |
+| `public float timeAtLastFrame { get; }` | Time point of the previous cycle (seconds). |
+| `public float timeScale { get; set; }` | Own time scale; **assigned values are clamped to 0 ~ 64** (default 1). |
+| `public float targetFrameRate { get; set; }` | Target loop frequency (times per second); negative values are clamped to 0 (default 60). |
+| `public float deltaTime { get; }` | Actual elapsed time of the previous cycle (seconds). |
+| `public float fixedDeltaTime { get; }` | Current fixed interval (1 / frequency). |
+
+## Constructors {#constructors}
+
+```csharp
+public RTUpdater()
+```
+
+Creates the updater, using the system time at creation as the base for `timeSinceStartup`.
+
+---
+
+## Methods {#methods}
+
+### Method Overview {#methods-overview}
+
+| Method | Description |
+| :--- | :--- |
+| [Start](#start) | Starts the update loop. |
+| [StartOnThread](#startonthread) | Starts the update loop switched to the thread pool. |
+| [Stop](#stop) | Stops the update loop. |
+| [IsRunning](#isrunning) | Whether the loop is running. |
+
+---
+
+### Start {#start}
+
+```csharp
+public void Start()
+```
+
+Starts the update loop (UniTask); calling it again while already running has **no effect**.
+
+### StartOnThread {#startonthread}
+
+```csharp
+public void StartOnThread()
+```
+
+Starts the update loop **switched to the thread pool first (`UniTask.SwitchToThreadPool`)**; calling it again while already running has **no effect**.
+
+<Highlight color="#ff2f00">Important</Highlight> Callbacks may run **off the Unity main thread** — **do not access UnityEngine objects directly** (marshal back to the main thread yourself).
+
+<Highlight color="#0373fc">Attention</Highlight> **WebGL does not support multithreading** — no switch happens on WebGL (behaves the same as [Start](#start)).
+
+### Stop {#stop}
+
+```csharp
+public void Stop()
+```
+
+Stops the update loop and cancels the internal CancellationTokenSource; after stopping, [Start](#start) can be called again to restart.
+
+### IsRunning {#isrunning}
+
+```csharp
+public bool IsRunning()
+```
+
+Returns whether the update loop is currently running.

@@ -1,0 +1,169 @@
+---
+sidebar_position: 2
+description: PlayerPrefsSaver 是 SaverSystem 內建的運行時儲存器，以 UnityEngine.PlayerPrefs 作為儲存後端，每次儲存皆會自動呼叫 PlayerPrefs.Save() 立即寫入。
+---
+
+# PlayerPrefsSaver
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`PlayerPrefsSaver` 是 **SaverSystem** 內建的**運行時儲存器** (繼承 [Saver](./Saver.mdx))，以 `UnityEngine.PlayerPrefs` 作為儲存後端，每次 `Save*` 皆會自動呼叫 `PlayerPrefs.Save()` **立即寫入**；並可直接使用基類提供的[文本數據功能 (Data Map)](./Saver.mdx#data-map)。
+
+|  |  |
+| :--- | :--- |
+| **命名空間** | `OxGKit.SaverSystem` |
+| **類型** | `public class PlayerPrefsSaver : Saver` |
+| **原始碼** | [PlayerPrefsSaver.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/SaverSystem/Scripts/Runtime/Core/Saver/Implements/PlayerPrefsSaver.cs) |
+
+```csharp
+using OxGKit.SaverSystem;
+```
+
+## 快速上手 {#quick-start}
+
+```csharp
+using OxGKit.SaverSystem;
+
+// 建立運行時儲存器 (PlayerPrefs 後端)
+Saver saver = new PlayerPrefsSaver();
+
+// 基本存取
+saver.SaveString("name", "michael");
+saver.SaveInt("language", 2);
+saver.SaveFloat("bgmVolume", 0.8f);
+
+// 文本數據功能 (由 Saver 基類提供)
+saver.SaveData("appPrefs", "lastLogin", "2026-07-29");
+string lastLogin = saver.GetData("appPrefs", "lastLogin", null);
+```
+
+## 通用規則 {#general-rules}
+
+### 適用範圍 {#scope}
+
+| 儲存器 | 儲存後端 | 適用 |
+| :--- | :--- | :--- |
+| `PlayerPrefsSaver` | `UnityEngine.PlayerPrefs` | **運行時** (遊戲內設定，隨應用程式/平台儲存) |
+| [EditorPrefsSaver](./EditorPrefsSaver.mdx) | `UnityEditor.EditorPrefs` | **僅編輯器** (編輯器工具偏好設定) |
+
+(模組概觀詳見[模塊介紹](../../intro.mdx))
+
+### 寫入時機 {#write-timing}
+
+<Highlight color="#0373fc">注意</Highlight> 每次 `Save*` 皆會自動呼叫 `PlayerPrefs.Save()` 立即寫入磁碟；[DeleteKey](#deletekey) / [DeleteAll](#deleteall) 則**不會**額外呼叫 `Save()` (依 Unity 預設於應用程式正常退出時寫入，必要時可自行呼叫 `PlayerPrefs.Save()`)。
+
+<Highlight color="#00d679">提醒</Highlight> `PlayerPrefs` 儲存位置依平台而異 (例如 Windows 為註冊表、WebGL 為瀏覽器 IndexedDB)；**WebGL** 的持久化依賴瀏覽器落盤，並**避免儲存過大的字串**。
+
+---
+
+## 覆寫成員 {#overrides}
+
+### 方法總覽 {#overview}
+
+| 方法 | 說明 |
+| :--- | :--- |
+| [SaveString](#savestring) | 儲存字串並立即寫入。 |
+| [GetString](#getstring) | 取得字串。 |
+| [SaveInt](#saveint) | 儲存整數並立即寫入。 |
+| [GetInt](#getint) | 取得整數。 |
+| [SaveFloat](#savefloat) | 儲存浮點數並立即寫入。 |
+| [GetFloat](#getfloat) | 取得浮點數。 |
+| [HasKey](#haskey) | 檢查指定鍵是否存在。 |
+| [DeleteKey](#deletekey) | 刪除指定鍵。 |
+| [DeleteAll](#deleteall) | 刪除所有 PlayerPrefs 鍵值。 |
+
+---
+
+### SaveString {#savestring}
+
+```csharp
+public override void SaveString(string key, string value)
+```
+
+透過 `PlayerPrefs.SetString` 儲存字串，並立即呼叫 `PlayerPrefs.Save()` 寫入。
+
+```csharp
+saver.SaveString("name", "michael");
+```
+
+### GetString {#getstring}
+
+```csharp
+public override string GetString(string key, string defaultValue = "")
+```
+
+透過 `PlayerPrefs.GetString` 取得字串，鍵不存在時返回 `defaultValue`。
+
+### SaveInt {#saveint}
+
+```csharp
+public override void SaveInt(string key, int value)
+```
+
+透過 `PlayerPrefs.SetInt` 儲存整數，並立即呼叫 `PlayerPrefs.Save()` 寫入。
+
+### GetInt {#getint}
+
+```csharp
+public override int GetInt(string key, int defaultValue = 0)
+```
+
+透過 `PlayerPrefs.GetInt` 取得整數，鍵不存在時返回 `defaultValue`。
+
+### SaveFloat {#savefloat}
+
+```csharp
+public override void SaveFloat(string key, float value)
+```
+
+透過 `PlayerPrefs.SetFloat` 儲存浮點數，並立即呼叫 `PlayerPrefs.Save()` 寫入。
+
+### GetFloat {#getfloat}
+
+```csharp
+public override float GetFloat(string key, float defaultValue = 0f)
+```
+
+透過 `PlayerPrefs.GetFloat` 取得浮點數，鍵不存在時返回 `defaultValue`。
+
+### HasKey {#haskey}
+
+```csharp
+public override bool HasKey(string key)
+```
+
+透過 `PlayerPrefs.HasKey` 檢查指定鍵是否存在。
+
+### DeleteKey {#deletekey}
+
+```csharp
+public override void DeleteKey(string key)
+```
+
+透過 `PlayerPrefs.DeleteKey` 刪除指定鍵。
+
+### DeleteAll {#deleteall}
+
+```csharp
+public override void DeleteAll()
+```
+
+透過 `PlayerPrefs.DeleteAll` 刪除鍵值。
+
+<Highlight color="#ff2f00">重要</Highlight> `PlayerPrefs.DeleteAll` 會刪除**此應用程式的所有 PlayerPrefs 鍵值** (包含非經由本儲存器儲存的鍵)，請謹慎使用。

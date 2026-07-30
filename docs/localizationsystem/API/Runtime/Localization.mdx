@@ -1,0 +1,450 @@
+---
+sidebar_position: 1
+description: Localization 是 LocalizationSystem 的本地化核心，透過回調驅動自定義解表與自定義支持語系，提供語系切換、系統語系偵測與代碼取字 API，並涵蓋 LangType 與 LanguageMapping 型別。
+---
+
+# Localization
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`Localization` 是 **LocalizationSystem** 的本地化核心 (成員皆為 `static`)，由專案透過**回調**提供支持語系與語言表解析 ([onAddSupportedLanguages](#onaddsupportedlanguages)、[onParsingLanguageData](#onparsinglanguagedata)、[onChangeLanguage](#onchangelanguage))，並提供**語系切換 ([ChangeLanguage](#changelanguage))**、**系統語系偵測**與**代碼取字 ([GetStringByCode](#getstringbycode))** API；完整初始流程可參考[模塊介紹](../../intro.mdx)。
+
+|  |  |
+| :--- | :--- |
+| **命名空間** | `OxGKit.LocalizationSystem` |
+| **類型** | `public class Localization` (成員皆為 `static`) |
+| **原始碼** | [Localization.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/LocalizationSystem/Scripts/Runtime/Core/Localization.cs) |
+
+```csharp
+using OxGKit.LocalizationSystem;
+```
+
+## 快速上手 {#quick-start}
+
+```csharp
+using System.Collections.Generic;
+using OxGKit.LocalizationSystem;
+
+// 1. 宣告支持語系
+Localization.onAddSupportedLanguages = (supportedLanguages) =>
+{
+    supportedLanguages.Add(LangType.English);
+    supportedLanguages.Add(LangType.ChineseTraditional);
+};
+
+// 2. 提供語言表解析 (數據來源由專案自行決定: JSON、表格導出、伺服器...)
+Localization.onParsingLanguageData = (langType, langData) =>
+{
+    foreach (var pair in langSheet[langType.ToString()])
+        langData.TryAdd(pair.Key, pair.Value);
+    return true; // 解析成功返回 true
+};
+
+// 3. 語系切換成功後刷新 UI 文字
+Localization.onChangeLanguage = (langType) => RefreshAllLocalizedTexts();
+
+// 4. 首次切換 (例如使用系統語系，不支持時自動回退 English)
+Localization.ChangeLanguage(Localization.systemLanguage);
+
+// 5. UI 一律透過代碼取字
+string title = Localization.GetStringByCode("ui.title");
+```
+
+## 通用規則 {#general-rules}
+
+### 必須實現的回調 {#required-callbacks}
+
+1. 賦值 [onAddSupportedLanguages](#onaddsupportedlanguages) 宣告支持語系。
+2. 賦值 [onParsingLanguageData](#onparsinglanguagedata) 提供語言表解析 (解表所需的數據來源需先準備完成)。
+3. (建議) 訂閱 [onChangeLanguage](#onchangelanguage) 刷新 UI 文字。
+
+<Highlight color="#ff2f00">重要</Highlight> `onParsingLanguageData` **未賦值或解析返回 `false`** 時，[ChangeLanguage](#changelanguage) 會直接**拋出例外**。
+
+### 緩存機制 {#cache-rules}
+
+<Highlight color="#0373fc">注意</Highlight> [GetSupportedLanguages](#getsupportedlanguages) 與轉譯表 API **首次呼叫後即緩存結果** (不會再次觸發回調)，因此必須**先賦值 `onAddSupportedLanguages`**，再呼叫任何支持語系相關 API (含 [systemLanguage](#systemlanguage)、[IsSupportedLanguage](#issupportedlanguage) 等)。
+
+### 語系保存 {#persist-language}
+
+<Highlight color="#00d679">提醒</Highlight> 模組**不負責保存所選語系**，由專案自行保存/還原 `LangType`，還原時建議先以 [GetAndCheckIsSupportedLanguage](#getandcheckissupportedlanguage) 校正。
+
+---
+
+## 回調成員 {#callbacks}
+
+### 成員總覽 {#callback-overview}
+
+| 成員 | 說明 |
+| :--- | :--- |
+| [onAddSupportedLanguages](#onaddsupportedlanguages) | 新增支持語系回調。 |
+| [onParsingLanguageData](#onparsinglanguagedata) | 解析語言表數據回調 (ChangeLanguage 時調用解析)。 |
+| [onChangeLanguage](#onchangelanguage) | 切換語系回調 (切換成功後通知)。 |
+
+---
+
+### onAddSupportedLanguages {#onaddsupportedlanguages}
+
+```csharp
+public static Action<HashSet<LangType>> onAddSupportedLanguages
+```
+
+新增**支持語系**回調；於 [GetSupportedLanguages](#getsupportedlanguages) **首次**被呼叫時觸發，將專案支持的語系加入 `supportedLanguages` 集合。
+
+```csharp
+Localization.onAddSupportedLanguages = (supportedLanguages) =>
+{
+    supportedLanguages.Add(LangType.English);
+    supportedLanguages.Add(LangType.ChineseTraditional);
+    supportedLanguages.Add(LangType.ChineseSimplified);
+    supportedLanguages.Add(LangType.Japanese);
+    supportedLanguages.Add(LangType.Korean);
+};
+```
+
+### onParsingLanguageData {#onparsinglanguagedata}
+
+```csharp
+public static Func<LangType, Dictionary<string, string>, bool> onParsingLanguageData
+```
+
+解析**語言表數據**回調；[ChangeLanguage](#changelanguage) 時調用解析，需將指定語系的 **Code -> Text** 鍵值填入 `langData` (切換成功後該字典會被緩存為**當前語言表**)，解析成功返回 `true`。
+
+```csharp
+Localization.onParsingLanguageData = (langType, langData) =>
+{
+    // Your lang sheet (can load from json or server)
+    if (langSheet.ContainsKey(langType.ToString()))
+    {
+        // The ref langData will be cached by Localization
+        foreach (var pair in langSheet[langType.ToString()])
+            langData.TryAdd(pair.Key, pair.Value);
+        return true;
+    }
+    return false;
+};
+```
+
+<Highlight color="#ff2f00">重要</Highlight> 未賦值或返回 `false` 時，`ChangeLanguage` 會拋出例外；解表所需的數據來源 (遊戲資料庫、下載的語言表等) 需**在初始本地化前準備完成**。
+
+### onChangeLanguage {#onchangelanguage}
+
+```csharp
+public static Action<LangType> onChangeLanguage
+```
+
+切換**語系成功後**的通知回調，參數為切換後的語系；適合在此刷新 UI 顯示文字 (搭配 [GetStringByCode](#getstringbycode))。
+
+```csharp
+private void _InitEvents()
+{
+    // Refresh lang text callback
+    Localization.onChangeLanguage += this._RefreshLanguage;
+}
+
+private void _RefreshLanguage(LangType langType)
+{
+    this.titleText.text = Localization.GetStringByCode("ui.title");
+}
+```
+
+<Highlight color="#00d679">提醒</Highlight> 每次切換成功都會觸發，回調內容需可**重複執行** (建議僅做文字/數據重繪，勿在其中進行一次性註冊)。
+
+---
+
+## 屬性 {#properties}
+
+### 成員總覽 {#property-overview}
+
+| 成員 | 說明 |
+| :--- | :--- |
+| [currentLanguage](#currentlanguage) | 當前語系 (唯讀)。 |
+| [systemLanguage](#systemlanguage) | 系統語系 (經支持語系檢測，不支持回退 English)。 |
+
+---
+
+### currentLanguage {#currentlanguage}
+
+```csharp
+public static LangType currentLanguage { get; private set; }
+```
+
+當前語系 (唯讀)；初始值取自 [systemLanguage](#systemlanguage)，僅在 [ChangeLanguage](#changelanguage) **切換成功後**更新。
+
+```csharp
+// 保存所選語系 (模組不負責保存)
+PlayerPrefs.SetInt("language", (int)Localization.currentLanguage);
+```
+
+### systemLanguage {#systemlanguage}
+
+```csharp
+public static LangType systemLanguage { get; }
+```
+
+獲取**系統語系**：將 OS 系統語言透過 [GetSystemLanguageToLangType](#getsystemlanguagetolangtype) 對應為 [LangType](#langtype)，再經 [GetAndCheckIsSupportedLanguage](#getandcheckissupportedlanguage) 檢測，**不屬於支持語系則一律回退 `LangType.English`**。
+
+```csharp
+// 首次進入遊戲無保存語系時，以系統語系作為預設
+Localization.ChangeLanguage(Localization.systemLanguage);
+```
+
+---
+
+## 語系切換與取字 {#change-and-get}
+
+### 方法總覽 {#change-overview}
+
+| 方法 | 說明 |
+| :--- | :--- |
+| [ChangeLanguage](#changelanguage) | 切換語系與驗證語系合法性。 |
+| [GetStringByCode](#getstringbycode) | 根據代碼取得語言表中的對應文字。 |
+
+---
+
+### ChangeLanguage {#changelanguage}
+
+```csharp
+public static void ChangeLanguage(LangType langType)
+```
+
+切換語系與驗證語系合法性，流程如下：
+
+1. 調用 [onParsingLanguageData](#onparsinglanguagedata) 解析指定語系的語言表。
+2. 驗證 `langType` 是否屬於支持語系：
+   - **是**：緩存語言表數據、更新 [currentLanguage](#currentlanguage)，並觸發 [onChangeLanguage](#onchangelanguage)。
+   - **否**：輸出警告 (`The language type is not supported`) 並**維持當前語系** (不更新、不觸發回調)。
+
+```csharp
+Localization.ChangeLanguage(LangType.Japanese);
+
+// 保存所選語系 (模組不負責保存)
+PlayerPrefs.SetInt("language", (int)Localization.currentLanguage);
+```
+
+<Highlight color="#ff2f00">重要</Highlight> `onParsingLanguageData` **未賦值或解析失敗 (返回 `false`)** 會拋出 `Exception`。
+
+<Highlight color="#0373fc">注意</Highlight> 傳入前可先以 [GetAndCheckIsSupportedLanguage](#getandcheckissupportedlanguage) 校正 (避免保存的舊語系值已不受支持)。
+
+### GetStringByCode {#getstringbycode}
+
+```csharp
+public static string GetStringByCode(string code)
+```
+
+根據**代碼 (Code)** 取得**當前語言表**中的對應文字；查無代碼時返回 `"Unknown Text"`。
+
+```csharp
+this.titleText.text = Localization.GetStringByCode("ui.title");
+```
+
+<Highlight color="#0373fc">注意</Highlight> 尚未成功執行過 [ChangeLanguage](#changelanguage) (無語言表數據) 時會**拋出 `Exception`**；QA 驗證時可將 `"Unknown Text"` 視為**缺漏字串代碼**的訊號。
+
+---
+
+## 支持語系查詢 {#supported-queries}
+
+### 方法總覽 {#query-overview}
+
+| 方法 | 說明 |
+| :--- | :--- |
+| [GetSupportedLanguages](#getsupportedlanguages) | 獲取當前支持語系集合。 |
+| [IsSupportedLanguage](#issupportedlanguage) | 是否屬於支持語系。 |
+| [GetAndCheckIsSupportedLanguage](#getandcheckissupportedlanguage) | 檢測語系，不支持一律返回 English。 |
+| [GetSystemLanguageToLangType](#getsystemlanguagetolangtype) | 獲取系統語言對應的 LangType 定義。 |
+| [GetSupportedLanguagesMappingByLangType](#getsupportedlanguagesmappingbylangtype) | 獲取語系文字對照表 (Key = LangType)。 |
+| [GetSupportedLanguagesMappingByLangDesc](#getsupportedlanguagesmappingbylangdesc) | 獲取語系文字對照表 (Key = LangDesc)。 |
+
+---
+
+### GetSupportedLanguages {#getsupportedlanguages}
+
+```csharp
+public static HashSet<LangType> GetSupportedLanguages()
+```
+
+獲取當前**支持語系集合**；首次呼叫時觸發 [onAddSupportedLanguages](#onaddsupportedlanguages) 收集並**緩存**，之後直接返回緩存結果。
+
+### IsSupportedLanguage {#issupportedlanguage}
+
+```csharp
+public static bool IsSupportedLanguage(LangType langType)
+```
+
+是否屬於**支持語系**。
+
+### GetAndCheckIsSupportedLanguage {#getandcheckissupportedlanguage}
+
+```csharp
+public static LangType GetAndCheckIsSupportedLanguage(LangType langType)
+```
+
+獲取與檢測是否屬於支持語系類型：**支持則原值返回；不支持一律返回 `LangType.English`**。適合用於校正**保存值/系統值**。
+
+```csharp
+var savedLang = (LangType)PlayerPrefs.GetInt("language", (int)Localization.systemLanguage);
+Localization.ChangeLanguage(Localization.GetAndCheckIsSupportedLanguage(savedLang));
+```
+
+### GetSystemLanguageToLangType {#getsystemlanguagetolangtype}
+
+```csharp
+public static LangType GetSystemLanguageToLangType()
+```
+
+獲取 OS 系統語言 (`UnityEngine.Application.systemLanguage`) 對應的 [LangType](#langtype) 定義 (**不經**支持語系檢測)；無法對應時返回 `LangType.Unspecified`。
+
+<Highlight color="#00d679">提醒</Highlight> 部分語言 Unity `SystemLanguage` 未內建 (詳見 [LangType 對照表](#langtype)的系統偵測欄)，**系統偵測無法返回**，但仍可作為自定義支持語系使用；`Hindi` 需 **Unity 2022.3 / Unity 6000.0 以上**才支持偵測。
+
+### GetSupportedLanguagesMappingByLangType {#getsupportedlanguagesmappingbylangtype}
+
+```csharp
+public static Dictionary<LangType, string> GetSupportedLanguagesMappingByLangType()
+```
+
+獲取**支持語系**的語系文字對照表，**Key = LangType** (ex: `LangType.Spanish` -> `"Español"`)；適合用於產生語言選單的顯示文字 (首次呼叫後緩存)。
+
+### GetSupportedLanguagesMappingByLangDesc {#getsupportedlanguagesmappingbylangdesc}
+
+```csharp
+public static Dictionary<string, LangType> GetSupportedLanguagesMappingByLangDesc()
+```
+
+獲取**支持語系**的語系文字對照表，**Key = LangDesc** (ex: `"Español"` -> `LangType.Spanish`)；適合用於語言選單**由選項文字反查語系**進行切換 (首次呼叫後緩存)。
+
+```csharp
+// 語言選單: 以對照文字顯示選項，選擇後反查 LangType 進行切換
+var mapping = Localization.GetSupportedLanguagesMappingByLangDesc();
+Localization.ChangeLanguage(mapping["繁體中文"]);
+```
+
+---
+
+## LangType {#langtype}
+
+世界語言定義 (`byte` 枚舉)，共 **72 個值** (`Unspecified` + 71 種世界語言)。
+
+|  |  |
+| :--- | :--- |
+| **類型** | `public enum LangType : byte` |
+| **原始碼** | [Languages.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/LocalizationSystem/Scripts/Runtime/Core/Definitions/Languages.cs) |
+
+表格符號說明：
+
+- **對照文字** = [LanguageMapping.GetLanguageDesc](#getlanguagedesc) 返回的語系顯示文字。
+- **系統偵測** = [GetSystemLanguageToLangType](#getsystemlanguagetolangtype) 是否可能返回該值；✗ 表示 Unity `SystemLanguage` 未內建該語言 (無法藉由系統偵測獲取，但仍可作為**自定義支持語系**使用)。
+
+| 枚舉值 | 語言 | 對照文字 | 系統偵測 |
+| :--- | :--- | :--- | :--- |
+| `Unspecified` | 未指定 | ─ | ✓ (無法對應時的回退值) |
+| `Arabic` | 阿拉伯語 | العربية | ✓ |
+| `ChineseSimplified` | 中文簡體 | 简体中文 | ✓ |
+| `ChineseTraditional` | 中文繁體 | 繁體中文 | ✓ |
+| `Dutch` | 荷蘭語 | Nederlands | ✓ |
+| `English` | 英語 | English | ✓ |
+| `French` | 法語 | Français | ✓ |
+| `German` | 德文 | Deutsch | ✓ |
+| `Italian` | 義大利語 | Italiano | ✓ |
+| `Portuguese` | 葡萄牙語 | Protuguês | ✓ |
+| `Spanish` | 西班牙語 | Español | ✓ |
+| `Bengali` | 孟加拉語 | বাংলা | ✗ |
+| `Croatian` | 克羅埃西亞語 | hrvatski | ✗ |
+| `Czech` | 捷克語 | čeština | ✓ |
+| `Danish` | 丹麥語 | Dansk | ✓ |
+| `Greek` | 希臘文 | ελληνικά | ✓ |
+| `Hebrew` | 希伯來文 | עברית | ✓ |
+| `Hindi` | 印度語 | हिंदी | ✓ (Unity 2022.3+) |
+| `Hungarian` | 匈牙利語 | Magyar | ✓ |
+| `Indonesian` | 印尼語 | Bahasa Indonesia | ✓ |
+| `Japanese` | 日語 | 日本語 | ✓ |
+| `Korean` | 韓語 | 한국의 | ✓ |
+| `Malay` | 馬來語 | Bahasa Melayu | ✗ |
+| `Perisan` | 波斯語 | فارسی | ✗ |
+| `Polish` | 波蘭語 | Polski | ✓ |
+| `Romanian` | 羅馬尼亞語 | româna | ✓ |
+| `Russian` | 俄語 | Русский | ✓ |
+| `Serbian` | 塞爾維亞語 | српски | ✓ |
+| `Swedish` | 瑞典語 | Svenska | ✓ |
+| `Thai` | 泰語 | ไทย | ✓ |
+| `Turkish` | 土耳其語 | Türkçe | ✓ |
+| `Urdu` | 烏爾都語 | اردو | ✗ |
+| `Vietnamese` | 越南語 | tiếng việt | ✓ |
+| `Catalan` | 加泰隆語 (西班牙) | catalá | ✓ |
+| `Latvian` | 拉脫維亞語 | Latviski | ✓ |
+| `Lithuanian` | 立陶宛語 | Lietuvių | ✓ |
+| `Norwegian` | 挪威語 | Norsk bokmal | ✓ |
+| `Slovak` | 斯洛伐克語 | Slovenčina | ✓ |
+| `Slovenian` | 斯洛維尼亞語 | Slovenščina | ✓ |
+| `Bulgarian` | 保加利亞語 | български | ✓ |
+| `Ukrainian` | 烏克蘭語 | українська | ✓ |
+| `Filipino` | 菲律賓語 | Tagalog | ✗ |
+| `Finnish` | 芬蘭語 | Suomi | ✓ |
+| `Afrikaans` | 南非荷蘭語 | Afrikaans | ✓ |
+| `Romansh` | 羅曼什語 (瑞士) | Rumantsch | ✗ |
+| `Burmese` | 緬甸語 (官方) | ဗမာ | ✗ |
+| `Khmer` | 柬埔寨語 | ខ្មែរ | ✗ |
+| `Amharic` | 阿姆哈拉語 (衣索比亞) | አማርኛ | ✗ |
+| `Belarusian` | 白俄羅斯語 | беларуская | ✓ |
+| `Estonian` | 愛沙尼亞語 | eesti | ✓ |
+| `Swahili` | 斯瓦希里語 (坦尚尼亞) | Kiswahili | ✗ |
+| `Zulu` | 祖魯語 (南非) | isiZulu | ✗ |
+| `Azerbaijani` | 亞塞拜然語 | azərbaycanca | ✗ |
+| `Armenian` | 亞美尼亞語 (亞美尼亞) | Հայերէն | ✗ |
+| `Georgian` | 格魯吉亞語 (格魯吉亞) | ქართული | ✗ |
+| `Laotian` | 寮語 (寮國) | ລາວ | ✗ |
+| `Mongolian` | 蒙古語 | Монгол | ✗ |
+| `Nepali` | 尼泊爾語 | नेपाली | ✗ |
+| `Kazakh` | 哈薩克語 | қазақ тілі | ✗ |
+| `Galician` | 加利西亞語 | Galego | ✗ |
+| `Icelandic` | 冰島語 | íslenska | ✓ |
+| `Kannada` | 坎納達語 | ಕನ್ನಡ | ✗ |
+| `Kyrgyz` | 吉爾吉斯語 | кыргыз тили; قىرعىز تىلى | ✗ |
+| `Malayalam` | 馬拉亞拉姆語 | മലയാളം | ✗ |
+| `Marathi` | 馬拉提語/馬拉地語 | मराठी | ✗ |
+| `Tamil` | 泰米爾語 | தமிழ் | ✗ |
+| `Macedonian` | 馬其頓語 | македонски јазик | ✗ |
+| `Telugu` | 泰盧固語 | తెలుగు | ✗ |
+| `Uzbek` | 烏茲別克語 | Ўзбек тили | ✗ |
+| `Basque` | 巴斯克語 | Euskara | ✓ |
+| `Sinhala` | 僧加羅語 (斯里蘭卡) | සිංහල | ✗ |
+| `Faroese` | 法羅語 | Føroyskt | ✗ |
+
+<Highlight color="#0373fc">注意</Highlight> 波斯語的枚舉值拼寫為 `Perisan`、葡萄牙語的對照文字為 `"Protuguês"` (皆為原始碼中的實際定義，使用時請以原始碼為準)。
+
+---
+
+## LanguageMapping {#languagemapping}
+
+語系類型與**語系顯示文字**的對照輔助 (靜態類)。
+
+|  |  |
+| :--- | :--- |
+| **類型** | `public static class LanguageMapping` |
+| **原始碼** | [LanguageMapping.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/LocalizationSystem/Scripts/Runtime/Core/Definitions/LanguageMapping.cs) |
+
+### GetLanguageDesc {#getlanguagedesc}
+
+```csharp
+public static string GetLanguageDesc(LangType langType)
+```
+
+獲取對應的**語系文字說明** (詳見 [LangType 對照表](#langtype))；未定義對照文字時返回 `"Unknown Language"`。
+
+```csharp
+string desc = LanguageMapping.GetLanguageDesc(LangType.Spanish); // "Español"
+```

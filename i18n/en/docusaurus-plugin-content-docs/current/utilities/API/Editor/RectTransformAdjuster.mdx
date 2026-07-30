@@ -1,0 +1,68 @@
+---
+sidebar_position: 1
+description: RectTransformAdjuster is a RectTransform anchor adjustment tool that snaps the selection's anchors to the current Rect with the Shift+R hotkey.
+---
+
+import ReactPlayer from 'react-player'
+
+# RectTransformAdjuster
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`RectTransformAdjuster` is a **RectTransform anchor adjustment tool** that **snaps the anchors of the selected UI objects to their current Rect** and zeroes the offsets (converting the current rect into anchor ratios relative to the parent), so the UI scales by anchor ratios across resolutions. It supports **multi-selection batch processing** and **Undo**.
+
+|  |  |
+| :--- | :--- |
+| **Namespace** | `OxGKit.Utilities.RectTrans.Editor` |
+| **Type** | `public class RectTransformAdjuster` |
+| **Source** | [RectTransformAdjuster.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/Utilities/Scripts/Editor/RectTransform/RectTransformAdjuster.cs) |
+
+<Highlight color="#00d679">Reminder</Highlight> The hotkey is **Shift+R** (**R**: RectTransform).
+
+## Quick Start {#quick-start}
+
+1. Select one or more **UI objects** in the **Hierarchy** (they need a `RectTransform` and a parent).
+2. Press **Shift+R**, or use the menu **GameObject -> Adjust RectTransform Anchors (Shift+R)**.
+3. The selection's **anchors snap to the current Rect**, and `offsetMin` / `offsetMax` become zero (position and size stay visually unchanged).
+
+| Menu | Description |
+| :--- | :--- |
+| `GameObject/Adjust RectTransform Anchors (Shift+R)` | Snaps the selection's anchors to the current Rect (multi-selection and Undo supported). |
+
+<Highlight color="#0373fc">Attention</Highlight> Objects **without a `RectTransform`** or **without a parent** are skipped automatically and remain unchanged.
+
+---
+
+## Methods {#methods}
+
+### AdjustAnchors {#adjustanchors}
+
+```csharp
+public static void AdjustAnchors()
+```
+
+Performs the anchor adjustment on **all currently selected objects**: converts the current position and size into anchor ratios relative to the parent (`anchorMin` / `anchorMax`) and zeroes `offsetMin` / `offsetMax`; every object gets an **Undo record**.
+
+---
+
+## Demo
+
+**Utilities Demo (RectTransformAdjuster)**
+
+<ReactPlayer controls url='/video/utilities_rect_adjuster_demo.mp4' />

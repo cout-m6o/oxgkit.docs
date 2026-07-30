@@ -1,0 +1,68 @@
+---
+sidebar_position: 1
+description: LoggingHelper 為 LoggingSystem 的 Editor 輔助工具，提供配置文件的建立、寫入與 BYTES/JSON 格式轉換。
+---
+
+# LoggingHelper
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`LoggingHelper` 為 **LoggingSystem** 的 Editor 輔助工具，提供**配置文件的建立、寫入與格式轉換** (BYTES [Cipher] 與 JSON [Plaintext])，額外有需要編寫 BuildTool 的可以調用。
+
+|  |  |
+| :--- | :--- |
+| **命名空間** | `OxGKit.LoggingSystem.Editor` |
+| **類型** | `public static class LoggingHelper` |
+| **原始碼** | [LoggingHelper.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/LoggingSystem/Scripts/Editor/LoggingHelper.cs) |
+
+```csharp
+using OxGKit.LoggingSystem.Editor;
+```
+
+## 選單功能 (Menu Items) {#menu-items}
+
+| 選單 | 說明 |
+| :--- | :--- |
+| `Assets/Create/OxGKit/Logging System/[JSON - Plaintext] Create LoggerConfig.dat (In StreamingAssets)` | 建立 **JSON (明文)** 配置文件至 StreamingAssets。 |
+| `Assets/Create/OxGKit/Logging System/[BYTES - Cipher] Create LoggerConfig.dat (In StreamingAssets)` | 建立 **BYTES (加密)** 配置文件至 StreamingAssets。 |
+| `Assets/OxGKit/Logging System/Convert LoggerConfig.dat (BYTES [Cipher] <-> JSON [Plaintext])` | 對選中的 StreamingAssets 配置文件進行**格式互轉**。 |
+
+<Highlight color="#00d679">提醒</Highlight> 發布建議使用 **Cipher**；配置文件名稱與擴展名可透過 [LoggingSettings](../Runtime/LoggersConfig.mdx#loggingsettings) 客製化。
+
+## 方法 {#methods}
+
+### WriteConfig {#writeconfig}
+
+```csharp
+public static void WriteConfig(LoggersConfig loggersConfig, ConfigFileType configFileType = ConfigFileType.Bytes)
+```
+
+將 [LoggersConfig](../Runtime/LoggersConfig.mdx) 依指定的 [ConfigFileType](../Runtime/LoggersConfig.mdx#configfiletype) 寫入 StreamingAssets 配置文件。
+
+```csharp
+using OxGKit.LoggingSystem;
+using OxGKit.LoggingSystem.Editor;
+
+// BuildTool 範例：建置前輸出加密配置
+var loggersConfig = new LoggersConfig();
+LoggingLauncher.ReloadLoggersConfigAndSet(loggersConfig, (result) =>
+{
+    LoggingHelper.WriteConfig(result, ConfigFileType.Bytes);
+});
+```

@@ -1,0 +1,127 @@
+---
+sidebar_position: 5
+description: IntervalTimer 是類 JavaScript setInterval 的間隔觸發計時器 (UniTask 驅動)，每隔指定毫秒觸發一次 Action，支持 ignoreTimeScale 與執行緒池運轉。
+---
+
+# IntervalTimer
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`IntervalTimer` 是**類 JavaScript setInterval 的間隔觸發計時器** (UniTask 驅動)，每隔指定毫秒觸發一次 `Action`，支持 `ignoreTimeScale` (是否忽略 `Time.timeScale`) 與 `SetIntervalOnThread` (切至執行緒池運轉)；也可透過靜態管理器 [IntervalSetter](./IntervalSetter.mdx) 統一建立與管理。
+
+|  |  |
+| :--- | :--- |
+| **命名空間** | `OxGKit.TimeSystem` |
+| **類型** | `public class IntervalTimer` |
+| **原始碼** | [IntervalTimer.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/TimeSystem/Scripts/Runtime/Core/Ticker/IntervalTimer.cs) |
+
+```csharp
+using OxGKit.TimeSystem;
+```
+
+## 快速上手 {#quick-start}
+
+```csharp
+using OxGKit.TimeSystem;
+
+var intervalTimer = new IntervalTimer();
+
+// 每 1000 毫秒觸發一次
+intervalTimer.SetInterval(() =>
+{
+    // 週期性工作
+}, 1000);
+
+// 功能結束時務必停止
+intervalTimer.StopInterval();
+```
+
+## 通用規則 {#general-rules}
+
+- **首次觸發**發生於**第一個間隔之後** (先等待、後觸發)，之後持續循環。
+- 同一實例**已在運轉中**時，再次呼叫 `SetInterval` / `SetIntervalOnThread` **無作用**，需先 [StopInterval](#stopinterval) 再重新設置。
+- `ignoreTimeScale` 預設 false：間隔以 **Unity 縮放時間**計算 (`Time.timeScale = 0` 時不會觸發)；設為 true 則以**未縮放時間**計算。
+
+<Highlight color="#ff2f00">重要</Highlight> 間隔觸發為 **UniTask 迴圈**，擁有者 (功能/場景) 結束時**務必呼叫 [StopInterval](#stopinterval) 停止**，否則迴圈會持續運轉；迴圈中回調擲出例外時會自動停止並重新擲出。
+
+---
+
+## 建構子 {#constructors}
+
+```csharp
+public IntervalTimer()
+```
+
+建立間隔觸發計時器 (建立後需再呼叫 [SetInterval](#setinterval) 啟動)。
+
+---
+
+## 方法 {#methods}
+
+### 方法總覽 {#methods-overview}
+
+| 方法 | 說明 |
+| :--- | :--- |
+| [SetInterval](#setinterval) | 啟動間隔觸發 (每隔指定毫秒觸發一次 Action)。 |
+| [SetIntervalOnThread](#setintervalonthread) | 啟動間隔觸發並切換至執行緒池運轉。 |
+| [StopInterval](#stopinterval) | 停止間隔觸發。 |
+| [IsRunning](#isrunning) | 是否正在運轉中。 |
+
+---
+
+### SetInterval {#setinterval}
+
+```csharp
+public void SetInterval(Action action, int milliseconds, bool ignoreTimeScale = false)
+```
+
+啟動間隔觸發，每隔 `milliseconds` 毫秒觸發一次 `action`；已在運轉中時再次呼叫**無作用**。
+
+```csharp
+// 每 500 毫秒觸發一次，忽略 Time.timeScale
+intervalTimer.SetInterval(() => { /* ... */ }, 500, true);
+```
+
+### SetIntervalOnThread {#setintervalonthread}
+
+```csharp
+public void SetIntervalOnThread(Action action, int milliseconds, bool ignoreTimeScale = false)
+```
+
+啟動間隔觸發並**先切換至執行緒池 (`UniTask.SwitchToThreadPool`)** 運轉；已在運轉中時再次呼叫**無作用**。
+
+<Highlight color="#ff2f00">重要</Highlight> 回調可能於**非 Unity 主執行緒**執行，**請勿直接存取 UnityEngine 物件** (需自行封送回主執行緒)。
+
+<Highlight color="#0373fc">注意</Highlight> **WebGL 平台不支持多執行緒**，於 WebGL 上不會進行切換 (行為等同 [SetInterval](#setinterval))。
+
+### StopInterval {#stopinterval}
+
+```csharp
+public void StopInterval()
+```
+
+停止間隔觸發並取消內部的 CancellationTokenSource；停止後可再次 [SetInterval](#setinterval) 重新啟動。
+
+### IsRunning {#isrunning}
+
+```csharp
+public bool IsRunning()
+```
+
+返回間隔觸發是否正在運轉中。

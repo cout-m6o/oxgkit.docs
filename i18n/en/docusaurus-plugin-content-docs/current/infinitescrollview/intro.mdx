@@ -1,0 +1,170 @@
+---
+sidebar_position: 1
+---
+
+# Module Intro
+
+export const Highlight = ({ children, color }) => (
+  <span
+    style={{
+      backgroundColor: color,
+      borderRadius: '5px',
+      color: '#fff',
+      padding: '2.5px'
+    }}>
+    {children}
+  </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+## Basic Instructions
+
+An infinite scroll view (modified edition) based on **native UGUI** — simply **inherit** from or **use the built-in Infinite ScrollViews**, recycling objects efficiently with an **object pool** concept so that only a handful of GameObjects can carry a large amount of list data.
+
+Reference: [howtungtung - InfiniteScrollView](https://github.com/howtungtung/InfiniteScrollView)
+
+- Version: **v1.7.1** (`com.michaelo.oxgkit.infinitescrollview`)
+- Namespace: `OxGKit.InfiniteScrollView`
+
+<Highlight color="#0373fc">Attention</Highlight> This module depends on **UniTask** and **OxGKit.LoggingSystem**, which must be installed manually first (see [Installation](#installation)).
+
+---
+
+## Application Description
+
+### Built-in ScrollView Implementations
+
+| Component | Description |
+| :--- | :--- |
+| [`VerticalInfiniteScrollView`](/docs/infinitescrollview/API/Runtime/ScrollViewVariants#verticalinfinitescrollview) | Vertical list (scrolls up and down). |
+| [`HorizontalInfiniteScrollView`](/docs/infinitescrollview/API/Runtime/ScrollViewVariants#horizontalinfinitescrollview) | Horizontal list (scrolls left and right). |
+| [`VerticalGridInfiniteScrollView`](/docs/infinitescrollview/API/Runtime/ScrollViewVariants#verticalgridinfinitescrollview) | Vertical grid (`columnCount` cells side by side per row). |
+| [`HorizontalGridInfiniteScrollView`](/docs/infinitescrollview/API/Runtime/ScrollViewVariants#horizontalgridinfinitescrollview) | Horizontal grid (`rowCount` cells stacked per column). |
+
+All of them inherit from the abstract base class [`InfiniteScrollView`](/docs/infinitescrollview/API/Runtime/InfiniteScrollView) — attach the component to the UGUI `ScrollRect` object and it is ready to use; you can also inherit and extend them to customize list behaviors.
+
+### Object Pool Recycling
+
+- When initializing the pool (`InitializePool`), the cell pool is pre-created according to `cellPoolSize`; while scrolling, cells are only assigned to the data **within the visible range**, and cells scrolled out of range are **recycled back into the pool** for reuse.
+- **Data and view are separated**: the data list ([`InfiniteCellData`](/docs/infinitescrollview/API/Runtime/InfiniteCell#infinitecelldata)) is held by the scroll view, and a cell ([`InfiniteCell`](/docs/infinitescrollview/API/Runtime/InfiniteCell)) only gets its data bound (triggering a refresh) when it is placed for display.
+
+<Highlight color="#ff2f00">Important</Highlight> The pool **must be initialized before use** — `await InitializePool()` or check **initializePoolOnAwake** on the Inspector.
+
+<Highlight color="#0373fc">Attention</Highlight> `cellPoolSize` must be large enough to cover the **visible count + the extra cells reserved by extendVisibleRange**; an exhausted pool outputs an error log.
+
+<Highlight color="#00d679">Reminder</Highlight> The `content` node does **not** need a LayoutGroup / ContentSizeFitter — cell positions are calculated by the scroll view itself.
+
+### Create Cell Templates
+
+- Create a cell script template via Right-Click **Create/OxGKit/Infinite ScrollView/Template Infinite Cell.cs (Script)**.
+- Create a cell RectTransform Prefab template via Right-Click **Create/OxGKit/Infinite ScrollView/Template Infinite Cell (RectTransform Prefab)**.
+
+---
+
+## Simple Usage
+
+### Build a List
+
+1. Create a UGUI **Scroll View** and attach the desired Infinite ScrollView component (e.g. `VerticalInfiniteScrollView`) to the `ScrollRect` object.
+2. Author a **Cell Prefab** (root is a `RectTransform` with a script inheriting `InfiniteCell`) and assign it to `cellPrefab`.
+3. Configure `cellPoolSize`, `dataOrder` (Normal / Reverse), `snapAlign`, `extendVisibleRange`, `padding`, etc. as needed.
+4. Initialize the pool and fill in the data.
+
+```csharp
+using Cysharp.Threading.Tasks;
+using OxGKit.InfiniteScrollView;
+using UnityEngine;
+
+public class ListLauncher : MonoBehaviour
+{
+    // The list component attached to the ScrollRect object in the scene (vertical list as an example)
+    public VerticalInfiniteScrollView scrollView;
+
+    private async void Start()
+    {
+        // 1. Initialize the pool (can be skipped if initializePoolOnAwake is checked on the Inspector)
+        await this.scrollView.InitializePool();
+
+        // 2. Add data in batch, then refresh once (Add does not refresh by default)
+        for (int i = 0; i < 1000; i++)
+            this.scrollView.Add(new InfiniteCellData(new Vector2(100f, 100f), $"Item {i}"));
+        this.scrollView.Refresh();
+
+        // 3. Cell click event (the cell must call base.OnClick() to trigger it)
+        this.scrollView.onCellSelected += (cell) => Debug.Log($"Selected index: {cell.cellData.index}");
+
+        // 4. Move to a specific index (0.1-second tween)
+        this.scrollView.Snap(50, 0.1f);
+    }
+}
+```
+
+### Implement a Custom Cell
+
+```csharp
+using Cysharp.Threading.Tasks;
+using OxGKit.InfiniteScrollView;
+using UnityEngine.UI;
+
+public class ItemCell : InfiniteCell
+{
+    public Text titleTxt;
+    public Button button;
+
+    public override async UniTask OnCreate(object args)
+    {
+        // One-time initialization on creation (args forwarded from InitializePool(args))
+        this.button.onClick.AddListener(this.OnClick);
+    }
+
+    public override void OnRefresh()
+    {
+        // Cells are pooled and recycled — rendering must be fully driven by cellData
+        string text = (string)this.cellData.data;
+        this.titleTxt.text = $"[{this.cellData.index}] {text}";
+    }
+
+    public override void OnRecycle()
+    {
+        // Cleanup when recycled back into the pool
+    }
+}
+```
+
+*[Refer to the Example]*
+
+---
+
+## Installation
+
+| Install via git URL |
+|:--- |
+| Add https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/InfiniteScrollView/Scripts to Package Manager |
+
+**Third-Party Libraries (must be installed manually)**
+
+- Uses [UniTask v2.5.0 or higher](https://github.com/Cysharp/UniTask), Add https://github.com/Cysharp/UniTask.git?path=src/UniTask/Assets/Plugins/UniTask to Package Manager
+- Uses OxGKit.LoggingSystem, Add https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/LoggingSystem/Scripts to Package Manager
+
+**Samples (Package Manager -> Samples)**
+
+- **AI Agent Skills** (see [AI Agent Skills](/docs/agent-skills))
+- **Infinite Vertical Demo** (vertical list: Normal / Reverse data order with add/remove operations)
+- **Infinite Horizontal Demo** (horizontal list: Normal / Reverse data order with add/remove operations)
+- **Infinite Grid Demo** (vertical/horizontal grid: columnCount / rowCount / spacing setup)
+- **Infinite TabPage Demo** (tab pages: switching pages via Snap)
+- **Infinite ChatRoom Demo** (chat room: dynamic cell heights + SnapLast auto-scroll to the newest message)
+
+---
+
+## Module API
+
+- Runtime
+  - [InfiniteScrollView](/docs/infinitescrollview/API/Runtime/InfiniteScrollView) (using OxGKit.InfiniteScrollView)
+  - [ScrollView Variants](/docs/infinitescrollview/API/Runtime/ScrollViewVariants) (using OxGKit.InfiniteScrollView)
+  - [InfiniteCell](/docs/infinitescrollview/API/Runtime/InfiniteCell) (using OxGKit.InfiniteScrollView)

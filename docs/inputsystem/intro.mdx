@@ -1,0 +1,200 @@
+---
+sidebar_position: 1
+---
+
+import ReactPlayer from 'react-player'
+
+# 模塊介紹
+
+export const Highlight = ({ children, color }) => (
+  <span
+    style={{
+      backgroundColor: color,
+      borderRadius: '5px',
+      color: '#fff',
+      padding: '2.5px'
+    }}>
+    {children}
+  </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+## 基本說明
+
+輸入控制系統，支援 **Unity New InputSystem**，如果使用 Unity New InputSystem 需自行建立 Unity New InputSystem 的**控制表 (Control Maps)**，並且還有提供使用於 Unity New InputSystem 的 **Binding Composite 腳本模板**，最後再由 **Input Action 派送輸入訊號**控制由**訂閱者訂閱**，進而做到遊戲中的**控制邏輯不需要知道平台裝置區分**，皆由 Input Action 進行整合，當然 Input Action 也支援**其他輸入控制插件**，作為單純的輸入控制派送者。
+
+- 版本：**v1.0.4** (`com.michaelo.oxgkit.inputsystem`)
+- 命名空間：`OxGKit.InputSystem`
+
+<Highlight color="#0373fc">注意</Highlight> 本模組依賴 **Unity New InputSystem** 與 [OxGKit.LoggingSystem](/docs/loggingsystem/intro) (作為日誌輸出)，需先安裝依賴庫。
+
+---
+
+## 應用說明
+
+### 主要層級驅動區分
+
+- **For Unity New InputSystem**
+  - Control Maps (Input Action Asset)
+  - Binding Composites
+- **For Any Inputs**
+  - Input Actions (此為獨立作為通用訊號派送者，不依賴任何輸入控制插件，皆可自由實現)
+
+### 腳本模板 (Right-Click)
+
+- 透過 Right-Click **Create/OxGKit/Input System/Template Input Action.cs (Input Interface For Any)** 實作 InputAction 介面 (通用訊號派送者)。
+- 透過 Right-Click **Create/OxGKit/Input System/New Input System (Extension)/Template Input Binding Composite.cs (For Unity New Input System)** 建立 Unity New InputSystem 的 Binding Composite 腳本 (自定義組合輸入)。
+
+<Highlight color="#00d679">提醒</Highlight> 本模組的 Editor 部分僅提供以上**腳本模板 MenuItems** (`InputSystemCreateScriptEditor`)，作為腳本建立輔助，無其他 Editor API。
+
+### 調用 Inputs API
+
+- 調用 [Inputs](/docs/inputsystem/API/Runtime/Inputs) API (`using OxGKit.InputSystem`)，透過 **Inputs.CM** (Control Maps) 與 **Inputs.IA** (Input Actions) 進行註冊、取得、開關與驅動更新。
+
+### 模組日誌
+
+- 本模組的日誌透過 **OxGKit.LoggingSystem** 輸出，日誌器名稱為 `OxGKit.InputSystem.Logger`，可於 **LoggingLauncher** 進行開關與級別配置。
+
+---
+
+## 簡單使用
+
+### 實作 Input Action (訊號派送者)
+
+```csharp
+using System;
+using OxGKit.InputSystem;
+using UnityEngine.InputSystem;
+
+public class PlayerAction : IInputAction
+{
+    // 自定義輸入事件 (由訂閱者訂閱)
+    public event Action<MoveInputComposite.MoveInput> onMoveAction;
+
+    public void OnCreate()
+    {
+        // 註冊時取得已註冊的 Control Map 進行事件綁定
+        var ctrls = Inputs.CM.GetControlMap<PlayerControls>();
+        if (ctrls != null)
+        {
+            // add move input performed (player move)
+            ctrls.Player.Move.performed += this.OnMoveAction;
+            // add move input canceled to reset input data
+            ctrls.Player.Move.canceled += this.OnMoveAction;
+        }
+    }
+
+    public void OnUpdate(float dt)
+    {
+        // 可於此進行輪詢式輸入檢測 (由 Inputs.IA.DriveUpdate 驅動)
+    }
+
+    public void RemoveAllListeners()
+    {
+        this.onMoveAction = null;
+    }
+
+    protected void OnMoveAction(InputAction.CallbackContext context)
+    {
+        // If there is a special input can make composite by yourself
+        // Read your composite values
+        var moveInput = context.ReadValue<MoveInputComposite.MoveInput>();
+        this.onMoveAction?.Invoke(moveInput);
+    }
+}
+```
+
+### 註冊與驅動更新
+
+```csharp
+using OxGKit.InputSystem;
+using UnityEngine;
+
+public class InputDemo : MonoBehaviour
+{
+    private void Awake()
+    {
+        // If use Unity New Input System must register control maps
+        Inputs.CM.RegisterControlMap<PlayerControls>();
+
+        // Register an input action (after control maps registered)
+        Inputs.IA.RegisterInputAction<PlayerAction>();
+    }
+
+    private void OnEnable()
+    {
+        // Add handle event
+        Inputs.IA.GetInputAction<PlayerAction>().onMoveAction += this._OnMoveAction;
+    }
+
+    private void OnDisable()
+    {
+        // Del handle event
+        Inputs.IA.GetInputAction<PlayerAction>().onMoveAction -= this._OnMoveAction;
+    }
+
+    private void Update()
+    {
+        // Call by Main MonoBehaviour (Main Program)
+        Inputs.IA.DriveUpdate(Time.unscaledDeltaTime);
+    }
+
+    private void _OnMoveAction(MoveInputComposite.MoveInput moveInput)
+    {
+        // Records move input signals and input data
+    }
+}
+```
+
+<Highlight color="#ff2f00">重要</Highlight> 註冊順序：**先註冊 Control Maps，再註冊 Input Actions** (Input Action 的 `OnCreate` 通常會取得 Control Map 進行綁定)。
+
+### 開關控制表 (Control Map)
+
+```csharp
+// 停用整組控制表 (例如 UI 模式或過場動畫時)
+Inputs.CM.SetActive<PlayerControls>(false);
+
+// 檢查控制表啟用狀態
+bool isActive = Inputs.CM.IsActive<PlayerControls>();
+```
+
+*[參考 Example]*
+
+---
+
+## Installation
+
+| Install via git URL |
+|:--- |
+| Add https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/InputSystem/Scripts to Package Manager |
+
+**第三方庫 (需自行安裝)**
+
+- 使用 [Unity New InputSystem v1.5.1 or higher](https://docs.unity3d.com/Packages/com.unity.inputsystem@1.5/manual/Installation.html)，透過 Package Manager -> Add package by name **com.unity.inputsystem** 安裝
+- 使用 OxGKit.LoggingSystem, Add https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/LoggingSystem/Scripts to Package Manager
+
+**Samples (Package Manager -> Samples)**
+
+- **AI Agent Skills** (參考 [AI Agent Skills](/docs/agent-skills))
+- **InputSystem Demo**
+
+---
+
+## 模塊 API
+
+- Runtime
+  - [Inputs](/docs/inputsystem/API/Runtime/Inputs) (using OxGKit.InputSystem)
+  - [IInputAction](/docs/inputsystem/API/Runtime/IInputAction) (using OxGKit.InputSystem)
+
+---
+
+## Demo
+
+**InputSystem Demo**
+
+<ReactPlayer controls url='/video/inputsystem_demo.mp4' />

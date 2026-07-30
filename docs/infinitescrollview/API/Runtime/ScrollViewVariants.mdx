@@ -1,0 +1,180 @@
+---
+sidebar_position: 2
+description: InfiniteScrollView 的四種內建實作，包含 VerticalInfiniteScrollView (垂直)、HorizontalInfiniteScrollView (水平)、VerticalGridInfiniteScrollView (垂直網格) 與 HorizontalGridInfiniteScrollView (水平網格) 的成員與覆寫行為。
+---
+
+# ScrollView Variants
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+**InfiniteScrollView** 內建 **4 種實作** (皆繼承 [InfiniteScrollView](./InfiniteScrollView.mdx))，將對應組件掛載至 `ScrollRect` 物件上並指定 `cellPrefab` 即可使用；初始、數據操作、刷新、滾動與 Snap 等**共用 API** 詳見[基底類頁面](./InfiniteScrollView.mdx)。
+
+|  |  |
+| :--- | :--- |
+| **命名空間** | `OxGKit.InfiniteScrollView` |
+| **類型** | `VerticalInfiniteScrollView`、`HorizontalInfiniteScrollView`、`VerticalGridInfiniteScrollView`、`HorizontalGridInfiniteScrollView` (皆繼承 `InfiniteScrollView`) |
+| **原始碼** | [VerticalInfiniteScrollView.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/InfiniteScrollView/Scripts/Runtime/Core/ScrollView/VerticalInfiniteScrollView.cs)、[HorizontalInfiniteScrollView.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/InfiniteScrollView/Scripts/Runtime/Core/ScrollView/HorizontalInfiniteScrollView.cs)、[VerticalGridInfiniteScrollView.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/InfiniteScrollView/Scripts/Runtime/Core/ScrollView/VerticalGridInfiniteScrollView.cs)、[HorizontalGridInfiniteScrollView.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/InfiniteScrollView/Scripts/Runtime/Core/ScrollView/HorizontalGridInfiniteScrollView.cs) |
+
+```csharp
+using OxGKit.InfiniteScrollView;
+```
+
+## 快速上手 {#quick-start}
+
+### 實作總覽 {#variants-overview}
+
+| 實作 | 排列方式 | 專屬成員 |
+| :--- | :--- | :--- |
+| [VerticalInfiniteScrollView](#verticalinfinitescrollview) | 垂直列表 (上下滾動) | `spacing` (`float`) |
+| [HorizontalInfiniteScrollView](#horizontalinfinitescrollview) | 水平列表 (左右滾動) | `spacing` (`float`) |
+| [VerticalGridInfiniteScrollView](#verticalgridinfinitescrollview) | 垂直網格 (上下滾動) | `spacing` (`Vector2`)、`columnCount` |
+| [HorizontalGridInfiniteScrollView](#horizontalgridinfinitescrollview) | 水平網格 (左右滾動) | `spacing` (`Vector2`)、`rowCount` |
+
+```csharp
+using Cysharp.Threading.Tasks;
+using OxGKit.InfiniteScrollView;
+using UnityEngine;
+
+public class GridLauncher : MonoBehaviour
+{
+    public VerticalGridInfiniteScrollView gridScrollView;
+
+    private async void Start()
+    {
+        // 網格設置 (亦可於 Inspector 配置)
+        this.gridScrollView.columnCount = 4;
+        this.gridScrollView.spacing = new Vector2(10f, 10f);
+
+        await this.gridScrollView.InitializePool();
+
+        for (int i = 0; i < 500; i++)
+            this.gridScrollView.Add(new InfiniteCellData(new Vector2(100f, 100f), i));
+        this.gridScrollView.Refresh();
+    }
+}
+```
+
+## 通用規則 {#general-rules}
+
+- 4 種實作的差異僅在**排列計算與專屬成員**，數據操作、刷新與 Snap 等 API 皆共用[基底類行為](./InfiniteScrollView.mdx)。
+- 列表**不會自動配置** `ScrollRect` 的滾動軸向，請自行將 `ScrollRect` 的 **Vertical / Horizontal** 勾選與所用實作對應。
+
+<Highlight color="#0373fc">注意</Highlight> Grid 實作以**每一排第一筆數據的 `cellSize`** 推進排列與 content 尺寸計算，建議 Grid 使用**一致的 cellSize** (動態尺寸適用於 Vertical / Horizontal 列表)。
+
+---
+
+## VerticalInfiniteScrollView {#verticalinfinitescrollview}
+
+垂直無限列表 (上下滾動)，適用排行榜、聊天室等直向清單。
+
+|  |  |
+| :--- | :--- |
+| **類型** | `public class VerticalInfiniteScrollView : InfiniteScrollView` |
+| **原始碼** | [VerticalInfiniteScrollView.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/InfiniteScrollView/Scripts/Runtime/Core/ScrollView/VerticalInfiniteScrollView.cs) |
+
+| 成員 | 說明 |
+| :--- | :--- |
+| `public float spacing` | Cell 的垂直間距。 |
+
+**覆寫行為**
+
+```csharp
+public override void Snap(int index, float duration)
+public override bool Remove(int index, bool refresh = true)
+```
+
+- `Snap`：依 `snapAlign` 累計 `cellSize.y + spacing` 計算**垂直**目標位置 (content 高度小於 viewport 無法滾動時不動作)。
+- `Remove`：移除後會將 content 位置**回移一格** (`cellSize.y + spacing`)，避免移除當下的視覺跳動。
+
+---
+
+## HorizontalInfiniteScrollView {#horizontalinfinitescrollview}
+
+水平無限列表 (左右滾動)，適用卡片列、橫向選單等橫向清單。
+
+|  |  |
+| :--- | :--- |
+| **類型** | `public class HorizontalInfiniteScrollView : InfiniteScrollView` |
+| **原始碼** | [HorizontalInfiniteScrollView.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/InfiniteScrollView/Scripts/Runtime/Core/ScrollView/HorizontalInfiniteScrollView.cs) |
+
+| 成員 | 說明 |
+| :--- | :--- |
+| `public float spacing` | Cell 的水平間距。 |
+
+**覆寫行為**
+
+```csharp
+public override void Snap(int index, float duration)
+public override bool Remove(int index, bool refresh = true)
+```
+
+- `Snap`：依 `snapAlign` 累計 `cellSize.x + spacing` 計算**水平**目標位置 (content 寬度小於 viewport 無法滾動時不動作)。
+- `Remove`：移除後會將 content 位置回移一格 (`cellSize.x + spacing`)。
+
+<Highlight color="#00d679">提醒</Highlight> 頁籤分頁 (TabPage) 應用可以水平列表搭配 [Snap](./InfiniteScrollView.mdx#snap) 進行頁面切換 (參考 Samples 的 **Infinite TabPage Demo**，詳見[模塊介紹](../../intro.mdx#installation))。
+
+---
+
+## VerticalGridInfiniteScrollView {#verticalgridinfinitescrollview}
+
+垂直網格無限列表 (上下滾動)，每一橫排並排 `columnCount` 個 Cell，適用背包、商店等網格清單。
+
+|  |  |
+| :--- | :--- |
+| **類型** | `public class VerticalGridInfiniteScrollView : InfiniteScrollView` |
+| **原始碼** | [VerticalGridInfiniteScrollView.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/InfiniteScrollView/Scripts/Runtime/Core/ScrollView/VerticalGridInfiniteScrollView.cs) |
+
+| 成員 | 說明 |
+| :--- | :--- |
+| `public Vector2 spacing` | Cell 間距 (x = 水平、y = 垂直)。 |
+| `public int columnCount` | 欄數 (每一橫排並排的 Cell 數量)，預設 `1` (小於等於 0 時自動視為 1)。 |
+
+**覆寫行為**
+
+```csharp
+public override void Snap(int index, float duration)
+```
+
+- `Snap`：依目標索引所在的排數 (`index / columnCount`) 計算**垂直**目標位置。
+
+<Highlight color="#0373fc">注意</Highlight> `columnCount` 於 **v1.7.1** 由 `columeCount` 更名 (拼寫修正)，已標註 `FormerlySerializedAs`，舊場景 / Prefab 的序列化數據會自動遷移。
+
+---
+
+## HorizontalGridInfiniteScrollView {#horizontalgridinfinitescrollview}
+
+水平網格無限列表 (左右滾動)，每一直排並排 `rowCount` 個 Cell。
+
+|  |  |
+| :--- | :--- |
+| **類型** | `public class HorizontalGridInfiniteScrollView : InfiniteScrollView` |
+| **原始碼** | [HorizontalGridInfiniteScrollView.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/InfiniteScrollView/Scripts/Runtime/Core/ScrollView/HorizontalGridInfiniteScrollView.cs) |
+
+| 成員 | 說明 |
+| :--- | :--- |
+| `public Vector2 spacing` | Cell 間距 (x = 水平、y = 垂直)。 |
+| `public int rowCount` | 列數 (每一直排並排的 Cell 數量)，預設 `1` (小於等於 0 時自動視為 1)。 |
+
+**覆寫行為**
+
+```csharp
+public override void Snap(int index, float duration)
+```
+
+- `Snap`：依目標索引所在的排數 (`index / rowCount`) 計算**水平**目標位置。

@@ -1,0 +1,157 @@
+---
+sidebar_position: 6
+description: IntervalSetter is the static manager for IntervalTimer, creating and managing interval tickers keyed by int id, string id, or anonymous handle, with unified cleanup APIs.
+---
+
+# IntervalSetter
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`IntervalSetter` is the **static manager** for [IntervalTimer](./IntervalTimer.mdx), creating and managing interval tickers centrally, keyed by **int id / string id / anonymous handle**, with the unified cleanup APIs `TryClearInterval` and `ClearAllIntervalTimers`.
+
+|  |  |
+| :--- | :--- |
+| **Namespace** | `OxGKit.TimeSystem` |
+| **Type** | `public static class IntervalSetter` |
+| **Source** | [IntervalSetter.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/TimeSystem/Scripts/Runtime/Core/Ticker/IntervalSetter.cs) |
+
+```csharp
+using OxGKit.TimeSystem;
+```
+
+## Quick Start {#quick-start}
+
+```csharp
+using OxGKit.TimeSystem;
+
+// Create with an int id, firing every 1000 milliseconds
+IntervalSetter.SetInterval(1001, () => { /* ... */ }, 1000);
+
+// Create with a string id
+IntervalSetter.SetInterval("poll", () => { /* ... */ }, 1000);
+
+// Create anonymously, returning an IntervalTimer handle
+IntervalTimer handle = IntervalSetter.SetInterval(() => { /* ... */ }, 1000);
+
+// Check running state (int id)
+bool isRunning = IntervalSetter.CheckIsRunning(1001);
+
+// Clear by key
+IntervalSetter.TryClearInterval(1001);
+IntervalSetter.TryClearInterval("poll");
+IntervalSetter.TryClearInterval(handle);
+
+// Clear all
+IntervalSetter.ClearAllIntervalTimers();
+```
+
+## General Rules {#general-rules}
+
+- When the **same id already exists**, calling `SetInterval` again is **silently ignored** (no new timer is created and no exception is thrown) — `TryClearInterval` that id first to recreate it.
+- The managed capacity limit is **32768** (`1 << 15`); exceeding it throws an `InvalidOperationException`.
+- `ignoreTimeScale` and threading behavior are the same as [IntervalTimer](./IntervalTimer.mdx#general-rules).
+
+<Highlight color="#0373fc">Attention</Highlight> `CheckIsRunning` is **only provided for int ids**; for string ids and anonymous handles, check via `IntervalTimer.IsRunning()` directly.
+
+<Highlight color="#ff2f00">Important</Highlight> When the owner (feature/scene) exits, **always call [TryClearInterval](#tryclearinterval) or [ClearAllIntervalTimers](#clearallintervaltimers)** — otherwise the timers keep running and occupy managed capacity.
+
+---
+
+## Methods {#methods}
+
+### Method Overview {#methods-overview}
+
+| Method | Description |
+| :--- | :--- |
+| [SetInterval](#setinterval) | Creates and starts an interval ticker (int id / string id / anonymous handle). |
+| [SetIntervalOnThread](#setintervalonthread) | Creates and starts an interval ticker (switched to the thread pool). |
+| [CheckIsRunning](#checkisrunning) | Checks whether the timer with the given int id is running. |
+| [TryClearInterval](#tryclearinterval) | Stops and removes the specified timer. |
+| [ClearAllIntervalTimers](#clearallintervaltimers) | Stops and clears all timers. |
+
+---
+
+### SetInterval {#setinterval}
+
+```csharp
+public static void SetInterval(int id, Action action, int milliseconds, bool ignoreTimeScale = false)
+
+public static void SetInterval(string id, Action action, int milliseconds, bool ignoreTimeScale = false)
+
+public static IntervalTimer SetInterval(Action action, int milliseconds, bool ignoreTimeScale = false)
+```
+
+Creates an [IntervalTimer](./IntervalTimer.mdx) and starts interval ticking, invoking `action` every `milliseconds` milliseconds:
+
+- **int id / string id versions**: managed by the given key; silently ignored if the same id already exists.
+- **Anonymous version**: keyed by the timer's HashCode and **returns the `IntervalTimer` handle**, which is later used for clearing.
+
+```csharp
+// Managed by string id, polling every second
+IntervalSetter.SetInterval("poll", () => Poll(), 1000);
+```
+
+### SetIntervalOnThread {#setintervalonthread}
+
+```csharp
+public static void SetIntervalOnThread(int id, Action action, int milliseconds, bool ignoreTimeScale = false)
+
+public static void SetIntervalOnThread(string id, Action action, int milliseconds, bool ignoreTimeScale = false)
+
+public static IntervalTimer SetIntervalOnThread(Action action, int milliseconds, bool ignoreTimeScale = false)
+```
+
+Same as [SetInterval](#setinterval), but the loop is **switched to the thread pool first (`UniTask.SwitchToThreadPool`)**.
+
+<Highlight color="#ff2f00">Important</Highlight> The callback may run **off the Unity main thread** — **do not access UnityEngine objects directly** (marshal back to the main thread yourself); **WebGL does not support multithreading**, so on WebGL it behaves the same as [SetInterval](#setinterval).
+
+### CheckIsRunning {#checkisrunning}
+
+```csharp
+public static bool CheckIsRunning(int id)
+```
+
+Checks whether the timer with the given **int id** is currently running; returns false if the id does not exist.
+
+### TryClearInterval {#tryclearinterval}
+
+```csharp
+public static bool TryClearInterval(int id)
+
+public static bool TryClearInterval(string id)
+
+public static bool TryClearInterval(IntervalTimer intervalTimer)
+```
+
+Stops and removes the specified timer, returning true on success:
+
+- **int id / string id versions**: looked up by key; returns false if not found.
+- **Handle version**: looked up and removed by the handle's HashCode; even if it is not in the managed list, `StopInterval()` is still called on the handle and true is returned (returns false when the handle is null).
+
+```csharp
+IntervalSetter.TryClearInterval("poll");
+```
+
+### ClearAllIntervalTimers {#clearallintervaltimers}
+
+```csharp
+public static void ClearAllIntervalTimers()
+```
+
+Stops and clears **all** timers managed by `IntervalSetter`.

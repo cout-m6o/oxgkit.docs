@@ -1,0 +1,70 @@
+---
+sidebar_position: 2
+---
+
+# AI Agent Skills
+
+export const Highlight = ({ children, color }) => (
+  <span
+    style={{
+      backgroundColor: color,
+      borderRadius: '5px',
+      color: '#fff',
+      padding: '2.5px'
+    }}>
+    {children}
+  </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+## Basic Instructions
+
+OxGKit supports development assisted by **AI coding agents** (Claude Code, OpenAI Codex CLI, Cursor, Copilot, etc.). **Every system module** ships a built-in "**AI Agent Skills**" sample — an Agent Skill (a `SKILL.md` entry file: YAML frontmatter + instructions) that teaches the agent how to use **that module's** API, coding style, and common pitfalls. API usage is verified against the source of that package version.
+
+<Highlight color="#0373fc">Attention</Highlight> **All modules share the same skill folder/name `oxgkit-unity-skill`**, while the content is module-specific (so each module can ship one independently). If your project uses several OxGKit modules, **merge them into ONE skill** (see [Merging skills from multiple modules](#merge-skills)).
+
+---
+
+## Import & Install {#import-install}
+
+1. Import through **Package Manager -> select an OxGKit module -> Samples -> AI Agent Skills**. The files are copied to `Assets/Samples/OxGKit.[ModuleName]/<version>/AI Agent Skills/`.
+2. Copy (or symlink) the `oxgkit-unity-skill` folder to wherever your AI agent discovers skills:
+
+| Agent | Location |
+| :--- | :--- |
+| Claude Code | `<project>/.claude/skills/oxgkit-unity-skill/` (or `~/.claude/skills/` for all projects) |
+| OpenAI Codex CLI | `<project>/.agents/skills/oxgkit-unity-skill/` (or `~/.codex/skills/`) |
+| Other agents (Cursor, Copilot, etc.) | Reference the folder from your agent context file (`AGENTS.md`, `CLAUDE.md`, `.cursorrules`, ...), e.g. "Read `oxgkit-unity-skill/SKILL.md` before working with OxGKit.ActionSystem APIs." |
+
+<Highlight color="#0373fc">Attention</Highlight> The skill must live in the skills directory for the agent to **discover it automatically and trigger it when the task is relevant** (loaded on demand — no need to mention it every conversation). If it only stays under `Assets/Samples/`, the agent will not know it exists, and that path contains a version number that breaks after upgrades.
+
+<Highlight color="#00d679">Reminder</Highlight> Committing the skills directory to version control is recommended so the whole team benefits automatically.
+
+3. After copying, you may delete the imported copy under `Assets/Samples/` (the skill files are plain Markdown and don't need to live inside the Unity project; keeping them is harmless — they import as TextAssets).
+
+---
+
+## Merging Skills from Multiple Modules {#merge-skills}
+
+All OxGKit module skills share the folder/skill name `oxgkit-unity-skill`. If your project uses several modules, merge them into ONE skill folder:
+
+1. Keep a **single** `SKILL.md` frontmatter block (`name: oxgkit-unity-skill`, with a combined `description:` covering the systems you use).
+2. Concatenate the bodies — each module's body starts at its own `# OxGKit.[ModuleName] Unity Skill` heading, so bodies can be appended as-is.
+
+```
+.claude/skills/oxgkit-unity-skill/
+└── SKILL.md   <- single frontmatter + concatenated module bodies
+```
+
+---
+
+## Notes
+
+<Highlight color="#00d679">Reminder</Highlight> The skill content is written in English (readable by agents in any locale; replies follow your language). API signatures are verified per package version, and the skill also instructs the agent to re-verify against the installed package source when in doubt.
+
+<Highlight color="#0373fc">Attention</Highlight> The [OxGFrame](https://github.com/michael811125/OxGFrame) framework provides its own `oxgframe-unity-skill` separately — both can coexist in the skills directory.

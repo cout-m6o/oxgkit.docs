@@ -1,0 +1,71 @@
+---
+sidebar_position: 6
+description: DontDestroy 組件於 Awake 時將物件標記為 DontDestroyOnLoad，並支援以配置名稱重新命名物件。
+---
+
+# DontDestroy
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`DontDestroy` 為**跨場景常駐物件標記組件**，於 `Awake` 時將物件依 Inspector 配置的 **Runtime Name** 重新命名，並執行 `DontDestroyOnLoad` 使其**切換場景時不被銷毀**。
+
+|  |  |
+| :--- | :--- |
+| **命名空間** | `OxGKit.Utilities.DontDestroy` |
+| **類型** | `public class DontDestroy : MonoBehaviour` |
+| **原始碼** | [DontDestroy.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/Utilities/Scripts/Runtime/DontDestroy/DontDestroy.cs) |
+
+```csharp
+using OxGKit.Utilities.DontDestroy;
+```
+
+<Highlight color="#0373fc">注意</Highlight> `DontDestroyOnLoad` 僅對**根物件 (Root GameObject)** 生效，請將本組件掛載於場景根層級的物件上 (同物件僅允許一個, DisallowMultipleComponent)。
+
+## 快速上手 {#quick-start}
+
+1. 透過 **AddComponentMenu: OxGKit/Utilities/DontDestroy/DontDestroy** 將組件掛載於**根物件**。
+2. 於 Inspector 配置 **Runtime Name** (預設 `DontDestroy`)，`Awake` 時物件會自動改名並標記為常駐。
+
+```csharp
+using OxGKit.Utilities.DontDestroy;
+using UnityEngine;
+
+public class DontDestroyDemo : MonoBehaviour
+{
+    private void Start()
+    {
+        var dontDestroy = this.GetComponent<DontDestroy>();
+
+        // 執行時重新命名物件
+        dontDestroy.SetRuntimeName("GameManager");
+    }
+}
+```
+
+---
+
+## 方法 {#methods}
+
+### SetRuntimeName {#setruntimename}
+
+```csharp
+public void SetRuntimeName(string runtimeName)
+```
+
+以指定名稱**重新命名物件** (同步更新 GameObject 名稱與內部記錄的 Runtime Name)。

@@ -1,0 +1,196 @@
+---
+sidebar_position: 1
+description: Logging 是 LoggingSystem 的日誌器抽象基類，透過泛型靜態方法輸出各級別日誌，並可繼承實作自定義日誌器與覆寫輸出行為。
+---
+
+# Logging
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`Logging` 是 **LoggingSystem** 的日誌器抽象基類，**繼承此類即可實作自定義日誌器**，並透過泛型靜態方法 (`Print<TLogging>` 系列) 以指定日誌器輸出各級別日誌；輸出時會依[全域與個別的級別/顏色規則](../../intro.mdx#log-level-級別)過濾與上色。
+
+|  |  |
+| :--- | :--- |
+| **命名空間** | `OxGKit.LoggingSystem` |
+| **類型** | `public abstract class Logging : ILogging` |
+| **原始碼** | [Logging.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/LoggingSystem/Scripts/Runtime/Logging/Logging.cs) |
+
+```csharp
+using OxGKit.LoggingSystem;
+```
+
+<Highlight color="#0373fc">注意</Highlight> 日誌器需先經由 [LoggingLauncher](./LoggingLauncher.mdx) 初始 (`TryInitLoggers` 或 `CreateLogger` + `TryLoadLoggers`)，泛型輸出才會生效；發布 (Build) 時需加入 **OXGKIT_LOGGER_ON** 宏。
+
+## 快速上手 {#quick-start}
+
+```csharp
+using OxGKit.LoggingSystem;
+
+// 1. 實作自定義日誌器 (使用 [LoggerName] 自定義名稱)
+[LoggerName("Game.Logger")]
+public class GameLogger : Logging
+{
+    // If use HybridCLR must create a default constructor
+    public GameLogger() { }
+}
+
+// 2. 透過泛型靜態方法輸出日誌 (以日誌器類型指定輸出者)
+Logging.Print<GameLogger>("Debug message");
+Logging.PrintInfo<GameLogger>("Info message");
+Logging.PrintWarning<GameLogger>("Warning message");
+Logging.PrintError<GameLogger>("Error message");
+Logging.PrintException<GameLogger>(new System.Exception("Exception message"));
+```
+
+## 通用規則 {#general-rules}
+
+### 日誌器名稱 {#logger-name}
+
+日誌器以**名稱**作為唯一識別，預設為類型名稱 (Type Name)，可透過 [LoggerNameAttribute](./LoggersConfig.mdx#loggernameattribute) 自定義名稱；配置文件 ([LoggersConfig](./LoggersConfig.mdx)) 即以此名稱對應各日誌器的開關/級別/顏色設定。
+
+### 覆寫日誌器 (Override) {#override-logger}
+
+以 `[LoggerName("相同名稱", true)]` 標記新的日誌器類，初始時會**取代**原有同名日誌器，可用於覆寫輸出行為 (如轉送至檔案、遠端收集器等)。
+
+```csharp
+[LoggerName("Game.Logger", true)]
+public class OverrideGameLogger : Logging
+{
+    public OverrideGameLogger() { }
+
+    public override void Log(object message)
+    {
+        UnityEngine.Debug.Log("[Override] " + message);
+    }
+}
+```
+
+### 輸出過濾與上色 {#filter-colorize}
+
+每次輸出會依序檢查：**全域開關/級別 (Master) → 個別開關/級別 (Per-Logger)**，兩者皆允許該級別才會輸出 (詳見[級別規則表](../../intro.mdx#log-level-級別))；上色模式由全域與個別 [LogColor](./LoggersConfig.mdx#logcolor) 取較嚴格者生效。
+
+---
+
+## 靜態輸出方法 {#static-print}
+
+### 方法總覽 {#print-overview}
+
+| 方法 | 說明 |
+| :--- | :--- |
+| [Print](#print) | 輸出 Debug 級別日誌 (對應 `Log`)。 |
+| [PrintInfo](#printinfo) | 輸出 Info 級別日誌 (對應 `LogInfo`)。 |
+| [PrintWarning](#printwarning) | 輸出 Warning 級別日誌 (對應 `LogWarning`)。 |
+| [PrintError](#printerror) | 輸出 Error 級別日誌 (對應 `LogError`)。 |
+| [PrintException](#printexception) | 輸出 Exception 級別日誌 (對應 `LogException`)。 |
+
+<Highlight color="#00d679">提醒</Highlight> 各方法皆可傳入 `UnityEngine.Object context`，點擊 Console 日誌時會高亮該物件 (與 `Debug.Log(message, context)` 行為相同)。
+
+---
+
+### Print {#print}
+
+```csharp
+public static void Print<TLogging>(object message, UnityEngine.Object context = null) where TLogging : Logging
+```
+
+以 `TLogging` 指定的日誌器輸出 **LogDebug** 級別日誌。
+
+```csharp
+Logging.Print<GameLogger>("Hello OxGKit");
+Logging.Print<GameLogger>("With context", this.gameObject);
+```
+
+### PrintInfo {#printinfo}
+
+```csharp
+public static void PrintInfo<TLogging>(object message, UnityEngine.Object context = null) where TLogging : Logging
+```
+
+以 `TLogging` 指定的日誌器輸出 **LogInfo** 級別日誌。
+
+### PrintWarning {#printwarning}
+
+```csharp
+public static void PrintWarning<TLogging>(object message, UnityEngine.Object context = null) where TLogging : Logging
+```
+
+以 `TLogging` 指定的日誌器輸出 **LogWarning** 級別日誌。
+
+### PrintError {#printerror}
+
+```csharp
+public static void PrintError<TLogging>(object message, UnityEngine.Object context = null) where TLogging : Logging
+```
+
+以 `TLogging` 指定的日誌器輸出 **LogError** 級別日誌。
+
+### PrintException {#printexception}
+
+```csharp
+public static void PrintException<TLogging>(Exception exception, UnityEngine.Object context = null) where TLogging : Logging
+```
+
+以 `TLogging` 指定的日誌器輸出 **LogException** 級別日誌。
+
+---
+
+## 可覆寫方法 (virtual) {#virtual-methods}
+
+繼承 `Logging` 後可覆寫以下輸出行為，預設實作為 `UnityEngine.Debug` 對應方法：
+
+| 方法 | 預設實作 |
+| :--- | :--- |
+| `public virtual void Log(object message)` | `Debug.Log` |
+| `public virtual void LogInfo(object message)` | `Debug.Log` |
+| `public virtual void LogWarning(object message)` | `Debug.LogWarning` |
+| `public virtual void LogError(object message)` | `Debug.LogError` |
+| `public virtual void LogException(Exception exception)` | `Debug.LogException` |
+| `public virtual void Log(object message, UnityEngine.Object context)` | `Debug.Log` |
+| `public virtual void LogInfo(object message, UnityEngine.Object context)` | `Debug.Log` |
+| `public virtual void LogWarning(object message, UnityEngine.Object context)` | `Debug.LogWarning` |
+| `public virtual void LogError(object message, UnityEngine.Object context)` | `Debug.LogError` |
+| `public virtual void LogException(Exception exception, UnityEngine.Object context)` | `Debug.LogException` |
+
+---
+
+## 輔助方法 {#helper-methods}
+
+### CheckLogActive {#checklogactive}
+
+```csharp
+public bool CheckLogActive(LogLevel logLevel)
+```
+
+檢查該日誌器於指定級別是否允許輸出 (全域與個別規則交集判斷)。
+
+### ShouldColorize {#shouldcolorize}
+
+```csharp
+public bool ShouldColorize()
+```
+
+檢查該日誌器當前是否啟用 RichText 上色 (全域與個別 [LogColor](./LoggersConfig.mdx#logcolor) 取較嚴格者，Editor 下 `EditorOnly` 視為啟用)。
+
+### ColorizeLogMessage {#colorizelogmessage}
+
+```csharp
+public object ColorizeLogMessage(LogLevel logLevel, object message)
+```
+
+依級別對訊息進行 RichText 上色格式化 (未啟用上色時原樣返回)。

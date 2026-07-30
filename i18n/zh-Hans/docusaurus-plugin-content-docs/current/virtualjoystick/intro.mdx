@@ -1,0 +1,152 @@
+---
+sidebar_position: 1
+---
+
+# 模块介绍
+
+export const Highlight = ({ children, color }) => (
+  <span
+    style={{
+      backgroundColor: color,
+      borderRadius: '5px',
+      color: '#fff',
+      padding: '2.5px'
+    }}>
+    {children}
+  </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+## 基本说明
+
+UGUI 虚拟摇杆系统 (调整版)，支持 **Fixed、Floating** 显示，通过 `onStickInput` 回调输出 `Vector2` 摇杆向量，并支持 **Normalized / Delta** 向量模式、**轴向限制 (AxisConstraint)** 与**死区 (Dead Zone)** 过滤。
+
+- 版本：**v1.0.1** (`com.michaelo.oxgkit.virtualjoystick`)
+- 命名空间：`OxGKit.VirtualJoystick`
+
+Reference: [annulusgames - EnhancedOnScreenStick](https://github.com/AnnulusGames/EnhancedOnScreenStick)
+
+<Highlight color="#0373fc">注意</Highlight> 本模块为**纯 UGUI 事件驱动** (`UnityEngine.EventSystems`)，**不依赖** Unity New InputSystem 的 OnScreen 控件 (Old / New Input 后端均可搭配使用)，但场景中必须有 **Canvas** 与 **EventSystem**。
+
+---
+
+## 应用说明
+
+### 组件设置
+
+通过 **Add Component -> OxGKit -> VirtualJoystick -> VirtualJoystick** 添加组件，挂载对象需具备 `RectTransform` 与 `Image` (RequireComponent 会自动附加)，**挂载对象本身即为触控区域** (Image 可设为透明作为触控感应面)，并需于 Inspector 指定 **Background (摇杆底图)** 与 **Handle (摇杆把手)**。
+
+<Highlight color="#0373fc">注意</Highlight> 组件必须位于 **Canvas** 之下，`Awake` 找不到父级 Canvas 会报错并自我禁用。
+
+<Highlight color="#00d679">提醒</Highlight> 可通过 **Package Manager -> Samples** 导入 **VirtualJoystickUI Prefab** (已预先配置组件与摇杆图片)，拖拽至 Canvas 下即可直接使用。
+
+### 显示类型 (StickType)
+
+- **Fixed**：摇杆固定于原位置。
+- **Floating**：每次按下时，摇杆背景会重新定位至按压点。
+
+搭配 **Show Only When Pressed** 选项，可让摇杆仅在按下时显示 (松开即隐藏)，适合浮动摇杆的操作体验。
+
+### 向量模式 (StickVectorMode)
+
+- **Normalized**：输出范围限制在 **-1.00 ~ 1.00** (适合移动控制)。
+- **Delta**：模仿 **Mouse Delta**，输出可大于 1 (适合视角控制)。
+
+### 轴向限制 (AxisConstraint)
+
+- **Both**：双轴输出。
+- **Horizontal**：仅输出水平轴。
+- **Vertical**：仅输出垂直轴。
+
+### 死区 (Dead Zone)
+
+死区范围 **0 ~ 1**，低于此值的摇杆输入将视为无效 (避免误触)。
+
+<Highlight color="#00d679">提醒</Highlight> 死区为控制范围的比例值，约 **0.05 ~ 0.15** 即可过滤误触且不影响操作灵敏度。
+
+---
+
+## 简单使用
+
+### 订阅摇杆输出
+
+```csharp
+using OxGKit.VirtualJoystick;
+using UnityEngine;
+
+public class PlayerController : MonoBehaviour
+{
+    [SerializeField]
+    private VirtualJoystick _joystick;
+    [SerializeField]
+    private float _speed = 5f;
+
+    private Vector2 _move;
+
+    private void Awake()
+    {
+        // 配置摇杆 (亦可直接于 Inspector 配置)
+        this._joystick.stickType = StickType.Floating;
+        this._joystick.deadZone = 0.1f;
+
+        // 订阅摇杆输出回调 (松开时会收到 Vector2.zero)
+        this._joystick.onStickInput += this._OnStickInput;
+    }
+
+    private void _OnStickInput(Vector2 v2)
+    {
+        this._move = v2;
+    }
+
+    private void Update()
+    {
+        this.transform.Translate(new Vector3(this._move.x, 0f, this._move.y) * this._speed * Time.deltaTime);
+    }
+
+    private void OnDestroy()
+    {
+        // 对象销毁时取消订阅
+        this._joystick.onStickInput -= this._OnStickInput;
+    }
+}
+```
+
+<Highlight color="#ff2f00">重要</Highlight> `onStickInput` 为 `Action<Vector2>` 委托字段，使用 `=` 直接赋值会**覆盖所有已有订阅**，建议使用 `+=` / `-=` 进行订阅与取消订阅。
+
+*[参考 Example]*
+
+---
+
+## Installation
+
+| Install via git URL |
+|:--- |
+| Add https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/VirtualJoystick/Scripts to Package Manager |
+
+<Highlight color="#00d679">提醒</Highlight> 本模块**无任何依赖** (`package.json` 的 `dependencies` 为空)，无需额外安装第三方库。
+
+**Samples (Package Manager -> Samples)**
+
+- **AI Agent Skills** (参考 [AI Agent Skills](/docs/agent-skills))
+- **VirtualJoystickUI Prefab**
+- **VirtualJoystick Demo**
+
+---
+
+## 模块 API
+
+- Runtime
+  - [VirtualJoystick](/docs/virtualjoystick/API/Runtime/VirtualJoystick) (using OxGKit.VirtualJoystick)
+
+---
+
+## Demo
+
+**VirtualJoystick Demo**
+
+![](/img/virtualjoystick/gif_4.gif)

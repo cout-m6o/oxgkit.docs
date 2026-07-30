@@ -1,0 +1,169 @@
+---
+sidebar_position: 1
+---
+
+# Module Intro
+
+export const Highlight = ({ children, color }) => (
+  <span
+    style={{
+      backgroundColor: color,
+      borderRadius: '5px',
+      color: '#fff',
+      padding: '2.5px'
+    }}>
+    {children}
+  </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+## Basic Instructions
+
+A simple saver system that supports **text-content storage** (Text-Content Data Map). **EditorPrefsSaver** and **PlayerPrefsSaver** are provided by default, and it can be extended with custom savers.
+
+- Version: **v1.0.2** (`com.michaelo.oxgkit.saversystem`)
+- Namespace: `OxGKit.SaverSystem`
+
+<Highlight color="#00d679">Reminder</Highlight> This module targets key/value storage for **settings and small data** (language, volume, preferences, etc.). For large / structured / versioned save-game data, use a more complete storage solution.
+
+---
+
+## Application Description
+
+### Saver Architecture
+
+- **`ISaver`**: Defines the basic key/value storage interface (`SaveString` / `GetString`, `SaveInt` / `GetInt`, `SaveFloat` / `GetFloat`, `HasKey` / `DeleteKey` / `DeleteAll`).
+- **`Saver`**: Abstract base class (implements `ISaver`). All basic storage methods are abstract (the storage backend is decided by subclasses), and it additionally provides the **text-content data storage** feature (`SaveData` / `GetData` / `DeleteData` / `DeleteContext` / `ParsingDataMap`) with a parse-cache (Dirty Flag) mechanism.
+- **Built-in savers**:
+
+| Saver | Storage Backend | Namespace | Scope |
+| :--- | :--- | :--- | :--- |
+| [PlayerPrefsSaver](/docs/saversystem/API/Runtime/PlayerPrefsSaver) | `UnityEngine.PlayerPrefs` | `OxGKit.SaverSystem` | Runtime (game settings) |
+| [EditorPrefsSaver](/docs/saversystem/API/Runtime/EditorPrefsSaver) | `UnityEditor.EditorPrefs` | `OxGKit.SaverSystem.Editor` | Editor only (editor tools) |
+
+<Highlight color="#0373fc">Attention</Highlight> **EditorPrefsSaver** lives in the **Editor Assembly** (`OxGKit.SaverSystem.Editor`) and can **only be referenced from editor scripts** — never from runtime scripts.
+
+### Text-Content Storage (Data Map)
+
+`Saver` can pack **multiple `key value` entries into ONE stored string key (contentKey)**, one `key value` entry per line:
+
+```
+# lines starting with '#' are comments
+lastLogin 2026-07-29
+resolution 1920x1080
+```
+
+- Each line is split on the **first space** into key and value: **keys must not contain spaces**; values may contain spaces but **must not contain newlines** (line-based parsing).
+- Lines starting with `#` are treated as **comments** (ignored while parsing), so the format also works as a **hand-editable config file format**.
+- `GetData` has a **parse cache (Dirty Flag)** — the text is re-parsed only after `SaveData` / `DeleteData`.
+
+<Highlight color="#0373fc">Attention</Highlight> There is no bool or object API — store bools as int (0/1), and serialize objects to JSON strings yourself and store them via `SaveString`.
+
+---
+
+## Simple Usage
+
+### Basic Storage Access
+
+```csharp
+using OxGKit.SaverSystem;
+
+// Create a saver (PlayerPrefs as the storage backend)
+Saver saver = new PlayerPrefsSaver();
+
+// Basic type access
+saver.SaveString("name", "michael");
+string name = saver.GetString("name", "");
+
+saver.SaveInt("language", 2);
+int language = saver.GetInt("language", 0);
+
+saver.SaveFloat("bgmVolume", 0.8f);
+float bgmVolume = saver.GetFloat("bgmVolume", 0f);
+
+// Key management
+if (saver.HasKey("language")) saver.DeleteKey("language");
+saver.DeleteAll();
+```
+
+### Text-Content Data Storage
+
+```csharp
+// Store multiple key value entries inside ONE contentKey text
+saver.SaveData("appPrefs", "lastLogin", "2026-07-29");
+saver.SaveData("appPrefs", "resolution", "1920x1080");
+
+// Get a specific entry from the text (parse-cached)
+string lastLogin = saver.GetData("appPrefs", "lastLogin", null);
+
+// Delete a specific entry from the text
+saver.DeleteData("appPrefs", "lastLogin");
+
+// Delete the whole text content (including the parse cache)
+saver.DeleteContext("appPrefs");
+```
+
+### Centralized Management (Recommended)
+
+Centralize keys behind a **settings facade** and **reuse one Saver instance** (the parse cache is per instance):
+
+```csharp
+using OxGKit.SaverSystem;
+
+public static class GameSettings
+{
+    private static readonly Saver _saver = new PlayerPrefsSaver();
+    private const string KEY_LANGUAGE = "language";
+
+    public static int Language
+    {
+        get => _saver.GetInt(KEY_LANGUAGE, 0);
+        set => _saver.SaveInt(KEY_LANGUAGE, value);
+    }
+}
+```
+
+### Custom Saver (Extension)
+
+Inherit `Saver` and override the abstract methods to persist data anywhere (file, encrypted storage, cloud, etc.); the text-content data feature comes from the base class for free (see [Saver](/docs/saversystem/API/Runtime/Saver#custom-saver)):
+
+```csharp
+using OxGKit.SaverSystem;
+
+public class FileSaver : Saver
+{
+    public override void SaveString(string key, string value) { /* write file */ }
+
+    // ... override the remaining abstract methods
+}
+```
+
+*[Reference Example]*
+
+---
+
+## Installation
+
+| Install via git URL |
+|:--- |
+| Add https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/SaverSystem/Scripts to Package Manager |
+
+**No third-party dependencies**
+
+**Samples (Package Manager -> Samples)**
+
+- **AI Agent Skills** (see [AI Agent Skills](/docs/agent-skills))
+
+---
+
+## Module API
+
+- Runtime
+  - [Saver](/docs/saversystem/API/Runtime/Saver) (using OxGKit.SaverSystem)
+  - [PlayerPrefsSaver](/docs/saversystem/API/Runtime/PlayerPrefsSaver) (using OxGKit.SaverSystem)
+  - [EditorPrefsSaver](/docs/saversystem/API/Runtime/EditorPrefsSaver) (using OxGKit.SaverSystem.Editor)

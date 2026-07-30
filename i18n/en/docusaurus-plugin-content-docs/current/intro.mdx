@@ -1,0 +1,91 @@
+---
+sidebar_position: 0
+---
+
+# Toolkit Intro
+
+export const Highlight = ({children, color}) => (
+  <span
+    style={{
+      backgroundColor: color,
+      borderRadius: '5px',
+      color: '#fff',
+      padding: '2.5px'
+    }}>
+    {children}
+  </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+## Basic Instructions
+
+OxGKit is a Unity-based toolkit of systems commonly used in game development (**all standalone tools**) — install only what you need. Each system module can be installed and used separately via UPM, with no forced coupling between them.
+
+<Highlight color="#00d679">Reminder</Highlight> Some modules depend on [LoggingSystem](/docs/loggingsystem/intro) because, when necessary, they need integrated log output (each module's log switches and levels are centrally managed through LoggingLauncher).
+
+**Currently includes the following**
+
+- [Logging System (LoggingSystem)](/docs/loggingsystem/intro)
+- [Infinite ScrollView (InfiniteScrollView)](/docs/infinitescrollview/intro)
+- [Action Sequence System (ActionSystem)](/docs/actionsystem/intro)
+- [Notice System (NoticeSystem)](/docs/noticesystem/intro)
+- [Input Control System (InputSystem)](/docs/inputsystem/intro)
+- [Tween Animation System (TweenSystem)](/docs/tweensystem/intro)
+- [Button System (ButtonSystem)](/docs/buttonsystem/intro)
+- [Time System (TimeSystem)](/docs/timesystem/intro)
+- [Cursor System (CursorSystem)](/docs/cursorsystem/intro)
+- [Object Pool System (PoolSystem)](/docs/poolsystem/intro)
+- [Singleton System (SingletonSystem)](/docs/singletonsystem/intro)
+- [Saver System (SaverSystem)](/docs/saversystem/intro)
+- [Localization System (LocalizationSystem)](/docs/localizationsystem/intro)
+- [Virtual Joystick System (VirtualJoystick)](/docs/virtualjoystick/intro)
+- [Essential Utility Components (Utilities)](/docs/utilities/intro)
+
+*[The toolkit will keep expanding]*
+
+![](/img/intro/img_1.png)
+
+---
+
+## Toolkit Features
+
+- **Standalone Modules**
+
+  Every system is an independent tool — install and upgrade each one separately via UPM, take only what you need without dragging in unused modules. Works great alongside the [OxGFrame](https://github.com/michael811125/OxGFrame) framework as well.
+
+- **Lightweight Dependencies**
+
+  Each module has minimal dependencies (some modules depend on [UniTask](https://github.com/Cysharp/UniTask), [LWMyBox](https://github.com/michael811125/LWMyBox), and OxGKit.LoggingSystem), so the install list stays clear and simple.
+
+- **Complete Examples**
+
+  Every module ships with Examples (import via Package Manager -> Samples) so you can get started quickly by referencing them.
+
+- **AI-Assisted Development (AI Agent Skills)**
+
+  Every system module ships with built-in **AI Agent Skills** (SKILL.md) that teach AI coding agents (Claude Code, OpenAI Codex CLI, Cursor, Copilot, etc.) how to use each module's API correctly. See [AI Agent Skills](/docs/agent-skills) for details.
+
+- **Template Creation Menus**
+
+  Some modules provide Right-Click Create/OxGKit/... script template menus (e.g., ActionSystem, NoticeSystem, InputSystem, InfiniteScrollView) for quickly creating implementation scripts.
+
+---
+
+## Platform Tests
+- Windows (Passed)
+- MacOSX (Passed)
+- Android (Passed)
+- iOS (Passed)
+- WebGL (Passed)
+
+---
+
+## Compatible Unity Versions
+
+- **Unity 6000.3.20f1 (LTS) or higher** is recommended - [Unity Download](https://unity3d.com/get-unity/download/archive).
+- All packages support **Unity 2021.3+** (Unity 2021 LTS, 2022 LTS, and Unity 6 are all compatible).

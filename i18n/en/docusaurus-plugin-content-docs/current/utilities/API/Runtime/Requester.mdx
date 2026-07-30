@@ -1,0 +1,338 @@
+---
+sidebar_position: 2
+description: Requester is a UniTask + UnityWebRequest based resource requester supporting AudioClip, Texture2D, Sprite, Bytes, and Text requests with ARC/LRU caching.
+---
+
+# Requester
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`Requester` is a resource requester based on **UniTask + UnityWebRequest**, supporting web/file requests for **AudioClip, Texture2D, Sprite, byte[], and string**, with optional **ARC or LRU caching** (keyed by **URL**), plus **timeout (180 seconds by default)** and **cancellation (CancellationTokenSource)** mechanisms. On failure, an [ErrorInfo](#errorinfo) is delivered through `errorAction`.
+
+|  |  |
+| :--- | :--- |
+| **Namespace** | `OxGKit.Utilities.Requester` |
+| **Type** | `public class Requester`, `public struct ErrorInfo` |
+| **Source** | [Requester.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/Utilities/Scripts/Runtime/Requester/Requester.cs) |
+
+```csharp
+using Cysharp.Threading.Tasks;
+using OxGKit.Utilities.Requester;
+```
+
+<Highlight color="#0373fc">Attention</Highlight> The **static** methods listed on this page operate through an **internal lazy singleton**; every method also has a **Self**-prefixed **instance counterpart** (e.g. `SelfRequestTexture2D`), so you can `new Requester()` to create an instance with an **isolated cache scope**.
+
+## Quick Start {#quick-start}
+
+```csharp
+using Cysharp.Threading.Tasks;
+using OxGKit.Utilities.Requester;
+using System.Threading;
+using UnityEngine;
+
+// Initialize the cache capacity per resource type at boot (choose ARC or LRU)
+Requester.InitARCCacheCapacityForAudio(20);
+Requester.InitARCCacheCapacityForTexture2d(60);
+Requester.InitARCCacheCapacityForText(100);
+
+// Request a Texture2D (cached with the URL as key when cached = true)
+Texture2D t2d = await Requester.RequestTexture2D
+(
+    url,
+    (texture) => Debug.Log($"Loaded: {texture.width}x{texture.height}"),
+    (error) => Debug.Log($"Error: {error.message}")
+);
+
+// Request an AudioClip (specify the correct AudioType)
+AudioClip clip = await Requester.RequestAudio(url, AudioType.OGGVORBIS);
+
+// Bind the request lifetime with a CancellationTokenSource
+var cts = new CancellationTokenSource();
+string text = await Requester.RequestText(url, null, null, cts);
+// Cancel the request when the owner is destroyed
+cts.Cancel();
+```
+
+## General Rules {#general-rules}
+
+### Caching {#cache-mechanism}
+
+- Caches are keyed by **URL**; on a hit, the value is **returned immediately and `successAction` is invoked** (no request is sent).
+- Each resource type (**Audio / Texture2d / Text**) allows **only one cache strategy**: initializing **ARC** clears and disables **LRU** for that type, and vice versa.
+- If no cache has been initialized, the `cached` parameter has no effect (**nothing is cached**).
+- **RequestBytes has no caching** (every call sends a new request).
+
+<Highlight color="#00d679">Reminder</Highlight> **RequestSprite** caches the underlying **Texture2D** only; **the Sprite itself is recreated with `Sprite.Create` on every call**. Hold on to the created Sprite yourself when using it frequently.
+
+<Highlight color="#0373fc">Attention</Highlight> Calling an **Init method** again **clears and recreates** the cache for that type (cached entries go through eviction handling). Initialize once at boot.
+
+### Timeout and Cancellation {#timeout-cancellation}
+
+- **Without `cts`**: an internal `CancellationTokenSource` is created and `timeoutSeconds` is applied (defaults to **180 seconds** when unspecified) as a timeout guard.
+- **With a custom `cts`**: **`timeoutSeconds` has no effect**; cancellation timing is fully controlled by the caller.
+
+<Highlight color="#ff2f00">Important</Highlight> When the object holding the request result is destroyed, remember to call `cts.Cancel()` to cancel in-flight requests; otherwise callbacks may fire into released objects.
+
+### Error Handling {#error-handling}
+
+- When the URL is **null or empty**, the request fails (**ConnectionError / ProtocolError / DataProcessingError**), or an exception occurs, `errorAction` receives an [ErrorInfo](#errorinfo) and the **return value is `null` (default)**.
+- Errors are also logged through **OxGKit.LoggingSystem** (logger name `OxGKit.Utilities.Logger`).
+
+---
+
+## ErrorInfo {#errorinfo}
+
+```csharp
+public struct ErrorInfo
+{
+    public string url;
+    public string message;
+    public Exception exception;
+}
+```
+
+The error information delivered through `errorAction` when a request fails.
+
+| Member | Description |
+| :--- | :--- |
+| `url` | The requested URL (`null` when the URL is missing). |
+| `message` | The error message (`UnityWebRequest.error`). |
+| `exception` | The exception (`null` for non-exception errors). |
+
+---
+
+## Request Methods {#request-methods}
+
+### Method Overview {#request-overview}
+
+| Method | Description |
+| :--- | :--- |
+| [RequestAudio](#requestaudio) | Requests an AudioClip (cacheable). |
+| [RequestTexture2D](#requesttexture2d) | Requests a Texture2D (cacheable). |
+| [RequestSprite](#requestsprite) | Requests and creates a Sprite (caches the underlying Texture2D). |
+| [RequestBytes](#requestbytes) | Requests file bytes (no caching). |
+| [RequestText](#requesttext) | Requests text content (cacheable). |
+
+---
+
+### RequestAudio {#requestaudio}
+
+```csharp
+public static async UniTask<AudioClip> RequestAudio(string url, AudioType audioType = AudioType.MPEG, Action<AudioClip> successAction = null, Action<ErrorInfo> errorAction = null, CancellationTokenSource cts = null, bool cached = true, int? timeoutSeconds = null)
+```
+
+Requests an **AudioClip** (streamed download). Specify the `audioType` matching the audio file format (defaults to `AudioType.MPEG`).
+
+```csharp
+AudioClip clip = await Requester.RequestAudio
+(
+    "https://example.com/audio.ogg",
+    AudioType.OGGVORBIS,
+    (audioClip) => audioSource.PlayOneShot(audioClip),
+    (error) => Debug.Log($"Error: {error.message}")
+);
+```
+
+<Highlight color="#0373fc">Attention</Highlight> A mismatched `audioType` causes decoding failures; **WebGL** has platform limits on streaming audio, so verify the supported formats there.
+
+### RequestTexture2D {#requesttexture2d}
+
+```csharp
+public static async UniTask<Texture2D> RequestTexture2D(string url, Action<Texture2D> successAction = null, Action<ErrorInfo> errorAction = null, CancellationTokenSource cts = null, bool cached = true, int? timeoutSeconds = null)
+```
+
+Requests a **Texture2D**. With `cached = true` and an initialized cache, a second request for the same URL returns the cached value directly.
+
+```csharp
+Texture2D t2d = await Requester.RequestTexture2D
+(
+    "https://example.com/image.png",
+    (texture) => rawImage.texture = texture
+);
+```
+
+### RequestSprite {#requestsprite}
+
+```csharp
+public static async UniTask<Sprite> RequestSprite(string url, Action<Sprite> successAction = null, Action<ErrorInfo> errorAction = null, Vector2 position = default, Vector2 pivot = default, float pixelPerUnit = 100, uint extrude = 0, SpriteMeshType meshType = SpriteMeshType.FullRect, CancellationTokenSource cts = null, bool cached = true, int? timeoutSeconds = null)
+```
+
+Requests a **Texture2D** and returns a **Sprite** created via `Sprite.Create`; when `pivot` is unspecified (`Vector2.zero`), the center `(0.5f, 0.5f)` is applied automatically.
+
+```csharp
+Sprite sprite = await Requester.RequestSprite
+(
+    "https://example.com/icon.png",
+    (sp) => image.sprite = sp
+);
+```
+
+### RequestBytes {#requestbytes}
+
+```csharp
+public static async UniTask<byte[]> RequestBytes(string url, Action<byte[]> successAction = null, Action<ErrorInfo> errorAction = null, CancellationTokenSource cts = null, int? timeoutSeconds = null)
+```
+
+Requests the **byte[]** content of a file. **No caching** (there is no `cached` parameter).
+
+```csharp
+byte[] bytes = await Requester.RequestBytes("https://example.com/file.bin");
+```
+
+### RequestText {#requesttext}
+
+```csharp
+public static async UniTask<string> RequestText(string url, Action<string> successAction = null, Action<ErrorInfo> errorAction = null, CancellationTokenSource cts = null, bool cached = true, int? timeoutSeconds = null)
+```
+
+Requests **text content** (`string`). With `cached = true` and an initialized cache, the result is cached with the URL as key.
+
+```csharp
+string json = await Requester.RequestText("https://example.com/config.json");
+```
+
+---
+
+## Cache Management {#cache-management}
+
+### Method Overview {#cache-overview}
+
+| Method | Description |
+| :--- | :--- |
+| [InitARCCacheCapacityFor...](#init-arc) | Initializes the **ARC cache** capacity for a resource type (disables that type's LRU cache). |
+| [InitLRUCacheCapacityFor...](#init-lru) | Initializes the **LRU cache** capacity for a resource type (disables that type's ARC cache). |
+| [RemoveFromARCCacheFor...](#remove-arc) | Removes a URL from a resource type's ARC cache. |
+| [RemoveFromLRUCacheFor...](#remove-lru) | Removes a URL from a resource type's LRU cache. |
+| [ClearARCCacheCapacityFor...](#clear-arc) | Clears a resource type's ARC cache. |
+| [ClearLRUCacheCapacityFor...](#clear-lru) | Clears a resource type's LRU cache. |
+| [AutoRemoveFromCaches](#autoremovefromcaches) | Searches all caches and removes the given URL. |
+| [ClearAllCaches](#clearallcaches) | Clears all caches. |
+| [Release](#release) | Clears and releases all cache containers. |
+
+---
+
+### InitARCCacheCapacityFor... {#init-arc}
+
+```csharp
+public static void InitARCCacheCapacityForAudio(int capacity = 20)
+
+public static void InitARCCacheCapacityForTexture2d(int capacity = 60)
+
+public static void InitARCCacheCapacityForText(int capacity = 100)
+```
+
+Initializes the **ARC cache** capacity for the given resource type; since each type allows **only one cache strategy**, this **clears and disables** that type's LRU cache.
+
+```csharp
+Requester.InitARCCacheCapacityForTexture2d(60);
+```
+
+### InitLRUCacheCapacityFor... {#init-lru}
+
+```csharp
+public static void InitLRUCacheCapacityForAudio(int capacity = 20)
+
+public static void InitLRUCacheCapacityForTexture2d(int capacity = 60)
+
+public static void InitLRUCacheCapacityForText(int capacity = 80)
+```
+
+Initializes the **LRU cache** capacity for the given resource type; this **clears and disables** that type's ARC cache.
+
+```csharp
+Requester.InitLRUCacheCapacityForTexture2d(60);
+```
+
+### RemoveFromARCCacheFor... {#remove-arc}
+
+```csharp
+public static bool RemoveFromARCCacheForAudio(string url)
+
+public static bool RemoveFromARCCacheForTexture2d(string url)
+
+public static bool RemoveFromARCCacheForText(string url)
+```
+
+Removes a URL entry from the given resource type's **ARC cache**; returns `true` on success.
+
+### RemoveFromLRUCacheFor... {#remove-lru}
+
+```csharp
+public static bool RemoveFromLRUCacheForAudio(string url)
+
+public static bool RemoveFromLRUCacheForTexture2d(string url)
+
+public static bool RemoveFromLRUCacheForText(string url)
+```
+
+Removes a URL entry from the given resource type's **LRU cache**; returns `true` on success.
+
+### ClearARCCacheCapacityFor... {#clear-arc}
+
+```csharp
+public static void ClearARCCacheCapacityForAudio()
+
+public static void ClearARCCacheCapacityForTexture2d()
+
+public static void ClearARCCacheCapacityForText()
+```
+
+Clears the given resource type's **ARC cache** (invoking eviction handling per entry).
+
+### ClearLRUCacheCapacityFor... {#clear-lru}
+
+```csharp
+public static void ClearLRUCacheCapacityForAudio()
+
+public static void ClearLRUCacheCapacityForTexture2d()
+
+public static void ClearLRUCacheCapacityForText()
+```
+
+Clears the given resource type's **LRU cache** (invoking eviction handling per entry).
+
+### AutoRemoveFromCaches {#autoremovefromcaches}
+
+```csharp
+public static bool AutoRemoveFromCaches(string url)
+```
+
+**Searches all caches** (ARC and LRU for Audio / Texture2d / Text), removes the given URL when found, and returns `true`.
+
+```csharp
+Requester.AutoRemoveFromCaches(url);
+```
+
+### ClearAllCaches {#clearallcaches}
+
+```csharp
+public static void ClearAllCaches()
+```
+
+Clears **all initialized caches** (ARC and LRU for Audio / Texture2d / Text).
+
+### Release {#release}
+
+```csharp
+public static void Release()
+```
+
+Clears all caches and **releases the cache containers** (sets them to `null`); call an Init method again to restore caching.
+
+<Highlight color="#00d679">Reminder</Highlight> Cached Unity objects (AudioClip / Texture2D) are **automatically destroyed on eviction or removal** (see [Cacher](./Cacher.mdx#remove-handler)); objects requested with `cached = false` must be **destroyed by the caller** when no longer needed.

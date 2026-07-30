@@ -1,0 +1,294 @@
+---
+sidebar_position: 1
+description: ButtonPlus is a button component extended from Unity UGUI's Button, supporting the Once, Continuous, and PressedAndReleased long-click modes plus a Scale press-transition.
+---
+
+# ButtonPlus
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`ButtonPlus` is a button component extended from Unity UGUI's **`Button`** (by inheritance) that **fully keeps Button's original features** (onClick, interactable, Transition, Navigation, etc.) and adds various **Long Click** behavior modes (**Once, Continuous, PressedAndReleased**) plus a **Scale** press-transition effect; create it directly from the **GameObject -> UI** menu, or attach it via **Add Component** (menu path **OxGKit -> ButtonSystem -> Button -> ButtonPlus**).
+
+|  |  |
+| :--- | :--- |
+| **Namespace** | `OxGKit.ButtonSystem` |
+| **Type** | `public class ButtonPlus : UnityEngine.UI.Button` |
+| **Source** | [ButtonPlus.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/ButtonSystem/Scripts/Runtime/Core/Button/ButtonPlus.cs) |
+
+```csharp
+using OxGKit.ButtonSystem;
+```
+
+## Quick Start {#quick-start}
+
+```csharp
+using OxGKit.ButtonSystem;
+using UnityEngine;
+
+public class ControlPanel : MonoBehaviour
+{
+    public ButtonPlus button;
+
+    private void Awake()
+    {
+        // Normal click (inherited from Button)
+        this.button.onClick.AddListener(() => Debug.Log("Click"));
+
+        // Switch the long-click mode and subscribe to the long-click events
+        this.button.extdLongClick = ButtonPlus.ExtdLongClick.PressedAndReleased;
+        this.button.triggerTime = 1f;
+        this.button.onLongClickPressed.AddListener(() => Debug.Log("Long Click Pressed"));
+        this.button.onLongClickReleased.AddListener(() => Debug.Log("Long Click Released"));
+    }
+}
+```
+
+## General Rules {#general-rules}
+
+### Creation {#creation}
+
+1. **Hierarchy menu**: **GameObject -> UI -> Button Plus - TextMeshPro** or **GameObject -> UI -> Legacy -> Button Plus** (scaffolds an Image and the matching text label automatically).
+2. **Add Component**: menu path **OxGKit -> ButtonSystem -> Button -> ButtonPlus**; to replace an existing Button, remove the Button component, attach ButtonPlus instead, and re-wire the events.
+3. **Attaching from code**: `gameObject.AddComponent<ButtonPlus>()`; you can also import the **ButtonPlus Demo** Sample for a complete example (see [Module Intro](../../intro.mdx#demo)).
+
+<Highlight color="#0373fc">Attention</Highlight> The overridden `Awake` of `ButtonPlus` only records the original scale size and does **not call `base.Awake()`**; when attaching from code and relying on UGUI Transition visuals, assign `targetGraphic` yourself.
+
+### Long Click Modes {#long-click-modes}
+
+| Mode | Behavior |
+| :--- | :--- |
+| `None` | No long-click behavior (identical to a normal Button). |
+| `Once` | After holding for [triggerTime](#triggertime), fires [onLongClickPressed](#onlongclickpressed) once. |
+| `Continuous` | Fires [onLongClickPressed](#onlongclickpressed) for the first time after holding for [triggerTime](#triggertime), then keeps firing every [intervalTime](#intervaltime) while held. |
+| `PressedAndReleased` | Fires [onLongClickPressed](#onlongclickpressed) after holding for [triggerTime](#triggertime); fires [onLongClickReleased](#onlongclickreleased) on release (Pointer Up) or when the pointer leaves the button (Pointer Exit). |
+
+<Highlight color="#0373fc">Attention</Highlight> **Long click and click are mutually exclusive**: in any long-click mode, once a long click has triggered, that release will **not** fire `onClick` (the component temporarily swaps the `onClick` event out to avoid an accidental invoke) — a single press is either a click or a long click.
+
+<Highlight color="#0373fc">Attention</Highlight> `PressedAndReleased` also fires [onLongClickReleased](#onlongclickreleased) when the **pointer leaves the button**, so handlers must tolerate a release without the pointer returning onto the button.
+
+### Timing Rules {#timing-rules}
+
+- [ignoreTimeScale](#ignoretimescale) (default `true`) decides whether the **Continuous repeat timer** accumulates with `Time.unscaledDeltaTime` or `Time.deltaTime`.
+- The [triggerTime](#triggertime) delay is scheduled via `MonoBehaviour.Invoke`, which **is affected by `Time.timeScale`** (regardless of [ignoreTimeScale](#ignoretimescale)).
+
+<Highlight color="#ff2f00">Important</Highlight> While the game is paused (`Time.timeScale = 0`), the **initial long-click trigger (triggerTime)** does not happen; `ignoreTimeScale` only guarantees that the **Continuous repeat interval after triggering** is unaffected by time scaling.
+
+### Inspector Layout {#inspector}
+
+The custom Inspector, from top to bottom:
+
+1. **Extd Long Click**: long-click mode dropdown; per mode it shows the **Ignore Time Scale, Trigger Time, Interval Time (Continuous only)** fields.
+2. **Extd Transition**: extended transition dropdown; selecting **Scale** shows the **Size** field.
+3. **Native UGUI Button block**: Interactable, Transition, Navigation, **On Click ()**.
+4. **Long-click event slots** (shown when the mode is not None): **On Long Click Pressed ()**; the **PressedAndReleased** mode additionally shows **On Long Click Released ()**.
+
+<Highlight color="#00d679">Reminder</Highlight> The **Scale transition** composes with the native UGUI **Transition** (Color Tint, etc.); avoid overwriting designer-authored transition settings from runtime code.
+
+---
+
+## Extended Settings {#extended-settings}
+
+### Members Overview {#settings-overview}
+
+| Member | Description |
+| :--- | :--- |
+| [extdTransition](#extdtransition) | Extended transition mode (None / Scale). |
+| [transScale](#transscale) | Scale transition settings (scale factor). |
+| [extdLongClick](#extdlongclick) | Long-click mode (None / Once / Continuous / PressedAndReleased). |
+| [ignoreTimeScale](#ignoretimescale) | Whether the Continuous repeat timer ignores Time.timeScale. |
+| [triggerTime](#triggertime) | Long-click trigger time (seconds). |
+| [intervalTime](#intervaltime) | Continuous repeat interval time (seconds). |
+
+---
+
+### extdTransition {#extdtransition}
+
+```csharp
+public ExtdTransition extdTransition = ExtdTransition.None
+```
+
+Extended transition mode (Inspector: **Extd Transition**), see [ExtdTransition](#extdtransition-enum):
+
+- `None`: no extended transition.
+- `Scale`: scales the button uniformly by the `size` of [transScale](#transscale) while pressed, and restores the original size when the click completes or the pointer exits (also reset on component disable/destroy).
+
+### transScale {#transscale}
+
+```csharp
+public TransScale transScale = new TransScale()
+```
+
+Scale transition settings ([TransScale](#transscale-class)); `size` is the pressed scale factor (default **0.95**, Inspector: **Size**).
+
+```csharp
+button.extdTransition = ButtonPlus.ExtdTransition.Scale;
+button.transScale.size = 0.9f; // Shrink to 90% while pressed
+```
+
+<Highlight color="#0373fc">Attention</Highlight> The original size is recorded in `Awake` from `transform.localScale.x`, and scaling/restoring is applied **uniformly (same value on XYZ)** — buttons with a non-uniform scale are not suitable.
+
+### extdLongClick {#extdlongclick}
+
+```csharp
+public ExtdLongClick extdLongClick = ExtdLongClick.None
+```
+
+Long-click mode (Inspector: **Extd Long Click**), see [Long Click Modes](#long-click-modes) and [ExtdLongClick](#extdlongclick-enum).
+
+### ignoreTimeScale {#ignoretimescale}
+
+```csharp
+public bool ignoreTimeScale = true
+```
+
+Whether the **Continuous repeat timer** ignores `Time.timeScale` (default `true`, accumulating with `Time.unscaledDeltaTime`); when set to `false` it uses `Time.deltaTime` instead, so the repeat interval scales with game time — see [Timing Rules](#timing-rules).
+
+### triggerTime {#triggertime}
+
+```csharp
+public float triggerTime = 1f
+```
+
+Long-click trigger time (seconds, default **1**, Inspector: **Trigger Time**); holding past this time triggers the long click (applies to Once / Continuous / PressedAndReleased).
+
+### intervalTime {#intervaltime}
+
+```csharp
+public float intervalTime = 0.1f
+```
+
+Repeat interval time for the **Continuous** mode (seconds, default **0.1**, Inspector: **Interval Time**); after the long click triggers, [onLongClickPressed](#onlongclickpressed) fires once per interval while held.
+
+---
+
+## Long Click Events {#long-click-events}
+
+### Events Overview {#events-overview}
+
+| Event | Description |
+| :--- | :--- |
+| [onLongClickPressed](#onlongclickpressed) | Long-click pressed event (Once / Continuous / PressedAndReleased). |
+| [onLongClickReleased](#onlongclickreleased) | Long-click released event (PressedAndReleased only). |
+
+Both events are of the **`ButtonClickedEvent`** type inherited from `Button` (a `UnityEvent`) — same as `onClick`, they can be assigned in the Inspector event slots or managed with `AddListener` / `RemoveListener` / `RemoveAllListeners`.
+
+---
+
+### onLongClickPressed {#onlongclickpressed}
+
+```csharp
+public ButtonClickedEvent onLongClickPressed { get; set; }
+```
+
+Long-click pressed event (Inspector: **On Long Click Pressed ()**):
+
+- `Once`: fires **once** after holding for [triggerTime](#triggertime).
+- `Continuous`: after the first fire, keeps firing every [intervalTime](#intervaltime) **while held**.
+- `PressedAndReleased`: fires **once** after holding for [triggerTime](#triggertime).
+
+```csharp
+// Hold-to-repeat (e.g. +1 every 0.1s while held)
+button.extdLongClick = ButtonPlus.ExtdLongClick.Continuous;
+button.triggerTime = 0.5f;
+button.intervalTime = 0.1f;
+button.onLongClickPressed.AddListener(this.OnIncrease);
+```
+
+### onLongClickReleased {#onlongclickreleased}
+
+```csharp
+public ButtonClickedEvent onLongClickReleased { get; set; }
+```
+
+Long-click released event (Inspector: **On Long Click Released ()**), used by the **PressedAndReleased** mode only; after the long click has triggered, it fires on **release (Pointer Up)** or when the **pointer leaves the button (Pointer Exit)**.
+
+```csharp
+// Hold-to-preview (show while held, hide on release)
+button.extdLongClick = ButtonPlus.ExtdLongClick.PressedAndReleased;
+button.onLongClickPressed.AddListener(this.OnShowPreview);
+button.onLongClickReleased.AddListener(this.OnHidePreview);
+```
+
+<Highlight color="#00d679">Reminder</Highlight> Register listeners **once during the bind phase** (`ButtonClickedEvent` accumulates duplicate registrations); for pooled or persistent UI, remember to clean up with `RemoveAllListeners` on release/destroy.
+
+---
+
+## Type Definitions {#type-definitions}
+
+### ExtdTransition {#extdtransition-enum}
+
+```csharp
+public enum ExtdTransition
+{
+    None,
+    Scale
+}
+```
+
+Extended transition mode enum.
+
+### ExtdLongClick {#extdlongclick-enum}
+
+```csharp
+public enum ExtdLongClick
+{
+    None,
+    Once,
+    Continuous,
+    PressedAndReleased
+}
+```
+
+Long-click mode enum, see [Long Click Modes](#long-click-modes).
+
+### TransScale {#transscale-class}
+
+```csharp
+[Serializable]
+public class TransScale
+{
+    [HideInInspector]
+    public float originSize;
+    public float size = 0.95f;
+}
+```
+
+Scale transition settings:
+
+| Member | Description |
+| :--- | :--- |
+| `originSize` | Original size (recorded automatically in `Awake` from `transform.localScale.x`; hidden in the Inspector). |
+| `size` | Pressed scale factor (default **0.95**, Inspector: **Size**). |
+
+---
+
+## Pointer Event Overrides {#pointer-overrides}
+
+`ButtonPlus` overrides the following UGUI pointer events to implement the extended behaviors (called automatically by the EventSystem — normally there is **no need to call them yourself**; the extended behaviors are skipped while `interactable` is `false`):
+
+| Method | Extended Behavior |
+| :--- | :--- |
+| `public override void OnPointerDown(PointerEventData eventData)` | Applies the Scale transition; schedules the long-click trigger by [triggerTime](#triggertime). |
+| `public override void OnPointerUp(PointerEventData eventData)` | PressedAndReleased: fires [onLongClickReleased](#onlongclickreleased) if the long click has triggered. |
+| `public override void OnPointerClick(PointerEventData eventData)` | Suppresses `onClick` if the long click has triggered; then resets the long-click state and the transition. |
+| `public override void OnPointerExit(PointerEventData eventData)` | Pointer leaves while held: PressedAndReleased fires [onLongClickReleased](#onlongclickreleased); then resets the long-click state and the transition. |
+
+There are also `protected` helpers available for subclassing: `ResetExtdLongClick()` (cancels the long-click scheduling and timer), `ResetExtdTransition()` (restores the original size), and `OnLongClick()` (the long-click trigger entry); the component automatically resets the long-click state and the transition in `OnDisable` / `OnDestroy`.
+
+<Highlight color="#0373fc">Attention</Highlight> When subclassing `ButtonPlus` and overriding the pointer events above, remember to call the `base` versions — otherwise the long-click and transition behaviors will stop working.

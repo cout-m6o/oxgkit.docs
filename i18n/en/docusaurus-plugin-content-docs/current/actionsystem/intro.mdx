@@ -1,0 +1,192 @@
+---
+sidebar_position: 1
+---
+
+import ReactPlayer from 'react-player'
+
+# Module Intro
+
+export const Highlight = ({ children, color }) => (
+  <span
+    style={{
+      backgroundColor: color,
+      borderRadius: '5px',
+      color: '#fff',
+      padding: '2.5px'
+    }}>
+    {children}
+  </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+## Basic Instructions
+
+An action-sequence system that lets you define your own Actions and freely compose them into run groups. The default Actions are **SequenceAction, ParallelAction, ParallelDelayAction, DelayAction, DelegateAction**. It can also be used to stitch together timed animation flows.
+
+- Version: **v1.0.3** (`com.michaelo.oxgkit.actionsystem`)
+- Namespace: `OxGKit.ActionSystem`
+
+<Highlight color="#0373fc">Attention</Highlight> This module depends on **UniTask** and **OxGKit.LoggingSystem** (install them yourself, see [Installation](#installation)). Done and removed action reports are printed through the LoggingSystem logger **OxGKit.ActionSystem.Logger**.
+
+---
+
+## Application Description
+
+### Core Concepts
+
+- **[ActionRunner](/docs/actionsystem/API/Runtime/ActionRunner)**: The action runner. Start actions with `RunAction` or enqueue them with `QueueAction`, and have the owner (a MonoBehaviour `Update`, etc.) call `DriveUpdate(dt)` to pump updates.
+- **[ActionBase](/docs/actionsystem/API/Runtime/ActionBase)**: The abstract base class of all actions. Override `OnStart` / `OnUpdate` / `OnDone` to implement custom actions, and control completion with `SetDuration` and `MarkAsDone`.
+- **[Default Actions](/docs/actionsystem/API/Runtime/DefaultActions)**: The built-in actions - SequenceAction (sequence), ParallelAction (parallel), ParallelDelayAction (staggered parallel), DelayAction (delay), DelegateAction (delegate callback) - all of which can be nested and composed with each other.
+
+### Run Flow
+
+1. Create an `ActionRunner` (name it for log identification).
+2. Compose actions (default actions or custom actions).
+3. Start with `RunAction` (or append with `QueueAction`).
+4. Have the owner call `DriveUpdate(Time.deltaTime)` in `Update` to drive the run.
+5. Call `Release()` when the owner exits.
+
+<Highlight color="#ff2f00">Important</Highlight> A runner must be driven by a **single owner** through `DriveUpdate`; without a driver, actions do not advance.
+
+<Highlight color="#0373fc">Attention</Highlight> `RunAction` **resets the runner** before starting the action (replace behavior); use `QueueAction` to **append** actions instead.
+
+### Script Template
+
+- Implement a custom Action via Right-Click **Create/OxGKit/Action System/Template Action.cs**.
+
+<Highlight color="#00d679">Reminder</Highlight> If a custom action uses `SetDuration(-1)` (end by condition), it must call `MarkAsDone()` itself to finish.
+
+---
+
+## Simple Usage
+
+### Driving an ActionRunner
+
+```csharp
+using OxGKit.ActionSystem;
+using UnityEngine;
+
+public class ActionDemo : MonoBehaviour
+{
+    private ActionRunner _actionRunner;
+
+    private void Awake()
+    {
+        this._actionRunner = new ActionRunner("ActionRunner");
+    }
+
+    private void Update()
+    {
+        // Call by Main MonoBehaviour (Main Program)
+        this._actionRunner?.DriveUpdate(Time.deltaTime);
+    }
+
+    private void OnDestroy()
+    {
+        // Release the runner on exit
+        this._actionRunner?.Release();
+    }
+}
+```
+
+### Composing a Sequence (SequenceAction)
+
+```csharp
+var seqAction = new SequenceAction("Colorful Sequence Callback Actions");
+
+// Add actions in order (delayTime greater than 0 delays before invoking the callback)
+seqAction.AddAction(DelegateAction.CreateDelegateAction(() => Debug.Log("[Seq] Hello Red"), 0f));
+seqAction.AddAction(DelegateAction.CreateDelegateAction(() => Debug.Log("[Seq] Hello Yellow"), 1f));
+seqAction.AddAction(DelegateAction.CreateDelegateAction(() => Debug.Log("[Seq] Hello Green"), 2f));
+
+// Use ActionRunner to start sequence actions
+this._actionRunner.RunAction(seqAction);
+```
+
+### Composing a Parallel Group (ParallelAction)
+
+```csharp
+var parAction = new ParallelAction("Colorful Parallel Callback Actions");
+
+// Add actions (run simultaneously)
+parAction.AddAction(DelegateAction.CreateDelegateAction(() => Debug.Log("[Par] Hello Red")));
+parAction.AddAction(DelegateAction.CreateDelegateAction(() => Debug.Log("[Par] Hello Yellow")));
+parAction.AddAction(DelegateAction.CreateDelegateAction(() => Debug.Log("[Par] Hello Green")));
+
+// Use ActionRunner to start parallel actions
+this._actionRunner.RunAction(parAction);
+```
+
+### Implementing a Custom Action
+
+```csharp
+using OxGKit.ActionSystem;
+
+public class NewTplAction : ActionBase
+{
+    #region Default Constructor
+    public NewTplAction()
+    {
+        this.name = nameof(NewTplAction);
+    }
+
+    public NewTplAction(int uid) : this()
+    {
+        this.uid = uid;
+    }
+    #endregion
+
+    protected override void OnStart()
+    {
+        // Set -1 is end by condition or duration time (-1 = have to MarkAsDone manually)
+        this.SetDuration(-1);
+
+        // Do somethings...
+
+        // And then if SetDuration(-1), the end must invoke MarkAsDone
+        this.MarkAsDone();
+    }
+}
+```
+
+*[See Example]*
+
+---
+
+## Installation
+
+| Install via git URL |
+|:--- |
+| Add https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/ActionSystem/Scripts to Package Manager |
+
+**Third-party libraries (install yourself)**
+
+- Use [UniTask v2.5.0 or higher](https://github.com/Cysharp/UniTask), Add https://github.com/Cysharp/UniTask.git?path=src/UniTask/Assets/Plugins/UniTask to Package Manager
+- Use OxGKit.LoggingSystem, Add https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/LoggingSystem/Scripts to Package Manager
+
+**Samples (Package Manager -> Samples)**
+
+- **AI Agent Skills** (see [AI Agent Skills](/docs/agent-skills))
+- **ActionSystem Demo**
+
+---
+
+## Module API
+
+- Runtime
+  - [ActionRunner](/docs/actionsystem/API/Runtime/ActionRunner) (using OxGKit.ActionSystem)
+  - [ActionBase](/docs/actionsystem/API/Runtime/ActionBase) (using OxGKit.ActionSystem)
+  - [Default Actions](/docs/actionsystem/API/Runtime/DefaultActions) (using OxGKit.ActionSystem)
+
+---
+
+## Demo
+
+**ActionSystem Demo**
+
+<ReactPlayer controls url='/video/actionsystem_demo.mp4' />

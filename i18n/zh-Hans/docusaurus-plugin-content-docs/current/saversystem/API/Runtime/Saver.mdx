@@ -1,0 +1,327 @@
+---
+sidebar_position: 1
+description: Saver 是 SaverSystem 的抽象存储器基类，实现 ISaver 的基本键值存取定义，并提供以文本形式存储的 Data Map 功能与解析缓存，可继承扩展自定义存储后端。
+---
+
+# Saver
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`Saver` 是 **SaverSystem** 的**抽象存储器基类** (实现 `ISaver`、`IDisposable`)，定义**字符串/整数/浮点数的基本键值存取**抽象方法 (由子类决定存储后端)，并提供**以文本形式存储的 Data Map 功能** (多条 `key value` 数据打包于单一字符串键中，具解析缓存)；内置实现有 [PlayerPrefsSaver](./PlayerPrefsSaver.mdx) 与 [EditorPrefsSaver](./EditorPrefsSaver.mdx)，也可继承[自行扩展](#custom-saver)。
+
+|  |  |
+| :--- | :--- |
+| **命名空间** | `OxGKit.SaverSystem` |
+| **类型** | `public abstract class Saver : ISaver, IDisposable` |
+| **源码** | [Saver.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/SaverSystem/Scripts/Runtime/Core/Saver/Saver.cs)、[ISaver.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/SaverSystem/Scripts/Runtime/Core/Saver/Interfaces/ISaver.cs) |
+
+```csharp
+using OxGKit.SaverSystem;
+```
+
+## 快速上手 {#quick-start}
+
+```csharp
+using OxGKit.SaverSystem;
+
+// 创建存储器 (以内置 PlayerPrefsSaver 为例)
+Saver saver = new PlayerPrefsSaver();
+
+// 基本存取
+saver.SaveInt("language", 2);
+int language = saver.GetInt("language", 0);
+
+// 文本形式存储 (单一 contentKey 中存储多条 key value 数据)
+saver.SaveData("appPrefs", "lastLogin", "2026-07-29");
+string lastLogin = saver.GetData("appPrefs", "lastLogin", null);
+```
+
+## 通用规则 {#general-rules}
+
+### ISaver 接口 {#isaver}
+
+```csharp
+public interface ISaver
+{
+    void SaveString(string key, string value);
+
+    string GetString(string key, string defaultValue = "");
+
+    void SaveInt(string key, int value);
+
+    int GetInt(string key, int defaultValue = 0);
+
+    void SaveFloat(string key, float value);
+
+    float GetFloat(string key, float defaultValue = 0f);
+
+    bool HasKey(string key);
+
+    void DeleteKey(string key);
+
+    void DeleteAll();
+}
+```
+
+`Saver` 的基本存取方法皆为 **abstract** (对应 `ISaver` 接口)，由子类重写决定存储后端；文本数据功能 (`SaveData` / `GetData` / `DeleteData` / `DeleteContext`) 则由基类实现，**任何子类皆可直接使用**。
+
+### 文本数据格式 {#text-content-format}
+
+`SaveData` 会将多条数据以**每行一条 `key value`** 的格式，存储于单一字符串键 (contentKey) 的文本内容中：
+
+```
+# 以 '#' 开头的行视为注释
+lastLogin 2026-07-29
+resolution 1920x1080
+```
+
+<Highlight color="#ff2f00">重要</Highlight> 每行以**第一个空格**分隔 key 与 value：**key 不可包含空格**；value 可包含空格，但**不可包含换行** (逐行解析)。
+
+<Highlight color="#00d679">提醒</Highlight> 建议**重复使用同一个 Saver 实例**，`GetData` 的解析缓存以实例为单位，每次重新创建实例会失去缓存效果。
+
+### 存储定位 {#scope}
+
+<Highlight color="#0373fc">注意</Highlight> 本系统定位为**设置值与小型数据**的键值存储 (模块概览详见[模块介绍](../../intro.mdx))；无 bool 与对象 API，bool 可以 int (0/1) 存储，对象可自行序列化为 JSON 字符串后通过 [SaveString](#savestring) 存储。
+
+---
+
+## 基本存取 {#storage}
+
+### 方法总览 {#storage-overview}
+
+| 方法 | 说明 |
+| :--- | :--- |
+| [SaveString](#savestring) | 存储字符串。 |
+| [GetString](#getstring) | 获取字符串。 |
+| [SaveInt](#saveint) | 存储整数。 |
+| [GetInt](#getint) | 获取整数。 |
+| [SaveFloat](#savefloat) | 存储浮点数。 |
+| [GetFloat](#getfloat) | 获取浮点数。 |
+| [HasKey](#haskey) | 检查指定键是否存在。 |
+| [DeleteKey](#deletekey) | 删除指定键。 |
+| [DeleteAll](#deleteall) | 删除所有键。 |
+
+---
+
+### SaveString {#savestring}
+
+```csharp
+public abstract void SaveString(string key, string value)
+```
+
+存储字符串 (由子类实现存储后端)。
+
+```csharp
+saver.SaveString("name", "michael");
+```
+
+### GetString {#getstring}
+
+```csharp
+public abstract string GetString(string key, string defaultValue = "")
+```
+
+获取字符串，键不存在时返回 `defaultValue`。
+
+### SaveInt {#saveint}
+
+```csharp
+public abstract void SaveInt(string key, int value)
+```
+
+存储整数。
+
+```csharp
+saver.SaveInt("language", 2);
+```
+
+### GetInt {#getint}
+
+```csharp
+public abstract int GetInt(string key, int defaultValue = 0)
+```
+
+获取整数，键不存在时返回 `defaultValue`。
+
+### SaveFloat {#savefloat}
+
+```csharp
+public abstract void SaveFloat(string key, float value)
+```
+
+存储浮点数。
+
+```csharp
+saver.SaveFloat("bgmVolume", 0.8f);
+```
+
+### GetFloat {#getfloat}
+
+```csharp
+public abstract float GetFloat(string key, float defaultValue = 0)
+```
+
+获取浮点数，键不存在时返回 `defaultValue`。
+
+### HasKey {#haskey}
+
+```csharp
+public abstract bool HasKey(string key)
+```
+
+检查指定键是否存在。
+
+### DeleteKey {#deletekey}
+
+```csharp
+public abstract void DeleteKey(string key)
+```
+
+删除指定键。
+
+### DeleteAll {#deleteall}
+
+```csharp
+public abstract void DeleteAll()
+```
+
+删除**所有**键 (影响范围依存储后端而定，详见各实现页面)。
+
+---
+
+## 文本数据 (Data Map) {#data-map}
+
+### 方法总览 {#data-map-overview}
+
+| 方法 | 说明 |
+| :--- | :--- |
+| [SaveData](#savedata) | 通过文本形式存储数据 (新增或更新单条 key value)。 |
+| [GetData](#getdata) | 获取文本中的特定数据 (具解析缓存)。 |
+| [DeleteData](#deletedata) | 删除文本中的特定数据。 |
+| [DeleteContext](#deletecontext) | 删除全文本数据 (含解析缓存)。 |
+| [ParsingDataMap](#parsingdatamap) | (静态) 解析文本数据为字典。 |
+| [Dispose](#dispose) | 释放解析缓存。 |
+
+---
+
+### SaveData {#savedata}
+
+```csharp
+public void SaveData(string contentKey, string key, string value)
+```
+
+在 `contentKey` 的文本内容中**新增或更新**一条 `key value` 数据 (内部通过 [GetString](#getstring) / [SaveString](#savestring) 读写整份文本)，并标记 Dirty 供 [GetData](#getdata) 重新解析。
+
+```csharp
+saver.SaveData("appPrefs", "lastLogin", "2026-07-29");
+saver.SaveData("appPrefs", "resolution", "1920x1080");
+```
+
+### GetData {#getdata}
+
+```csharp
+public string GetData(string contentKey, string key, string defaultValue = null)
+```
+
+获取 `contentKey` 文本中指定 `key` 的数据；文本不存在或该条数据为空时返回 `defaultValue`。解析结果会以 `contentKey` 为单位**缓存** (Dirty Flag 机制)，仅在 [SaveData](#savedata) / [DeleteData](#deletedata) 之后才会重新解析文本。
+
+```csharp
+string lastLogin = saver.GetData("appPrefs", "lastLogin", null);
+```
+
+### DeleteData {#deletedata}
+
+```csharp
+public void DeleteData(string contentKey, string key)
+```
+
+删除 `contentKey` 文本中指定 `key` 的数据行，并标记 Dirty。
+
+```csharp
+saver.DeleteData("appPrefs", "lastLogin");
+```
+
+### DeleteContext {#deletecontext}
+
+```csharp
+public void DeleteContext(string contextKey)
+```
+
+删除**整份文本数据** (内部调用 [DeleteKey](#deletekey) 删除存储键)，并一并清除对应的解析缓存与 Dirty 标记。
+
+```csharp
+saver.DeleteContext("appPrefs");
+```
+
+### ParsingDataMap {#parsingdatamap}
+
+```csharp
+public static Dictionary<string, string> ParsingDataMap(string content)
+```
+
+(静态方法) 将文本内容解析为 `Dictionary<string, string>`：依换行逐行分割，跳过 `#` 开头的注释行，每行以**第一个空格**分隔 key 与 value；**重复的 key 只取第一条**。
+
+```csharp
+// 也可单独作为 "key value" 行格式的配置文件解析器
+string content = saver.GetString("appPrefs");
+Dictionary<string, string> dataMap = Saver.ParsingDataMap(content);
+```
+
+<Highlight color="#00d679">提醒</Highlight> 由于支持 `#` 注释行，该格式也适合作为**可手动编辑的配置文件格式** (例如 [OxGFrame](https://github.com/michael811125/OxGFrame) 的媒体 URL 配置文件即使用 `Saver.ParsingDataMap` 解析)。
+
+### Dispose {#dispose}
+
+```csharp
+public virtual void Dispose()
+```
+
+释放解析缓存 (Data Map 缓存与 Dirty 标记)。
+
+<Highlight color="#0373fc">注意</Highlight> `Dispose` 后缓存字典会被置空，**不可再使用该实例的文本数据功能**，需重新创建 Saver 实例。
+
+---
+
+## 自定义 Saver {#custom-saver}
+
+继承 `Saver` 并重写抽象方法，即可将数据存储至任意后端 (文件、加密存储、云端等)；**文本数据功能 (Data Map) 由基类提供，无需另行实现**。
+
+```csharp
+using OxGKit.SaverSystem;
+
+public class FileSaver : Saver
+{
+    public override void SaveString(string key, string value) { /* 写入文件 */ }
+
+    public override string GetString(string key, string defaultValue = "") { /* 读取文件 */ return defaultValue; }
+
+    public override void SaveInt(string key, int value) => this.SaveString(key, value.ToString());
+
+    public override int GetInt(string key, int defaultValue = 0) => int.TryParse(this.GetString(key), out var value) ? value : defaultValue;
+
+    public override void SaveFloat(string key, float value) => this.SaveString(key, value.ToString());
+
+    public override float GetFloat(string key, float defaultValue = 0f) => float.TryParse(this.GetString(key), out var value) ? value : defaultValue;
+
+    public override bool HasKey(string key) { /* ... */ return false; }
+
+    public override void DeleteKey(string key) { /* ... */ }
+
+    public override void DeleteAll() { /* ... */ }
+}
+```

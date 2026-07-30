@@ -1,0 +1,391 @@
+---
+sidebar_position: 2
+description: ActionBase 是 ActionSystem 所有動作的抽象基類，透過覆寫 OnStart、OnUpdate、OnDone 實作自定義動作，並以 SetDuration 與 MarkAsDone 控制完成時機。
+---
+
+# ActionBase
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`ActionBase` 是 **ActionSystem** 所有動作的**抽象基類**，自定義動作需繼承此類，並透過覆寫 `OnStart` / `OnUpdate` / `OnDone` 生命週期方法實作行為，以 `SetDuration` 控制持續時間 (設置 **-1** 表示依條件結束，需手動 `MarkAsDone`)；另外內建**子動作 (Sub Action)** 機制，可在動作內組合子動作。
+
+|  |  |
+| :--- | :--- |
+| **命名空間** | `OxGKit.ActionSystem` |
+| **類型** | `public abstract class ActionBase` |
+| **原始碼** | [ActionBase.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/ActionSystem/Scripts/Runtime/Core/ActionBase.cs) |
+
+```csharp
+using OxGKit.ActionSystem;
+```
+
+<Highlight color="#00d679">提醒</Highlight> 可透過 Right-Click **Create/OxGKit/Action System/Template Action.cs** 快速建立自定義 Action 腳本模板。
+
+## 快速上手 {#quick-start}
+
+**計時型動作**：於 `OnStart` 設置持續時間，時間到會自動標記完成 (觸發 `OnDone`)，可搭配 [GetTimeElapsedRatio](#gettimeelapsedratio) 製作進度漸變效果。
+
+```csharp
+using OxGKit.ActionSystem;
+using UnityEngine;
+
+public class FadeOutAction : ActionBase
+{
+    #region Default Constructor
+    public FadeOutAction()
+    {
+        this.name = nameof(FadeOutAction);
+    }
+
+    public FadeOutAction(int uid) : this()
+    {
+        this.uid = uid;
+    }
+    #endregion
+
+    public CanvasGroup canvasGroup;
+    public float duration;
+
+    /// <summary>
+    /// [Factory Mode] 透過靜態方法建立動作實例
+    /// </summary>
+    public static FadeOutAction CreateFadeOutAction(CanvasGroup canvasGroup, float duration)
+    {
+        var action = new FadeOutAction();
+        action.canvasGroup = canvasGroup;
+        action.duration = duration;
+        return action;
+    }
+
+    protected override void OnStart()
+    {
+        // 設置持續時間 (時間到自動 MarkAsDone)
+        this.SetDuration(this.duration);
+    }
+
+    protected override void OnUpdate(float dt)
+    {
+        // 依經過時間比例 (0 到 1) 進行漸變
+        this.canvasGroup.alpha = 1f - this.GetTimeElapsedRatio();
+    }
+
+    protected override void OnDone()
+    {
+        this.canvasGroup.alpha = 0f;
+    }
+}
+```
+
+**條件型動作**：`SetDuration(-1)` 表示依條件結束，必須自行呼叫 [MarkAsDone](#markasdone)。
+
+```csharp
+using OxGKit.ActionSystem;
+
+public class WaitForServerAction : ActionBase
+{
+    public WaitForServerAction()
+    {
+        this.name = nameof(WaitForServerAction);
+    }
+
+    protected override void OnStart()
+    {
+        // -1 = 依條件結束，必須手動呼叫 MarkAsDone
+        this.SetDuration(-1);
+
+        // 條件達成時結束動作
+        Server.Request(ok => this.MarkAsDone());
+    }
+}
+```
+
+## 通用規則 {#general-rules}
+
+### 生命週期 {#lifecycle}
+
+1. **RunStart**：先 `Reset()` 重置狀態 (旗標、經過時間、子動作)，標記為已啟動後觸發 [OnStart](#onstart) (於此設置 `SetDuration` 與初始邏輯)。
+2. **RunUpdate(dt)**：由運行器每幀驅動，累計經過時間；未完成時，持續時間到會自動 [MarkAsDone](#markasdone)，否則觸發 [OnUpdate](#onupdate)，並同時更新子動作。
+3. **MarkAsDone**：觸發 [OnDone](#ondone) (僅一次) 並標記完成；當**動作本身完成且子動作全部完成**時，才會標記全部完成 (`IsAllDone`)，運行器以此判斷移除時機。
+
+### 完成規則 {#completion-rules}
+
+<Highlight color="#ff2f00">重要</Highlight> `SetDuration(-1)` 的動作**永遠不會自動結束**，必須保證 `MarkAsDone()` / `MarkAllDone()` 的呼叫路徑一定會觸發 (包含錯誤路徑)。
+
+<Highlight color="#0373fc">注意</Highlight> 動作為**有狀態的一次性物件**：重新運行 (`RunStart`) 會重置內部狀態，但**請勿讓兩個運行器同時共用同一個動作實例**。
+
+---
+
+## 成員 {#members}
+
+| 成員 | 說明 |
+| :--- | :--- |
+| `public int uid` | 動作唯一識別碼，可供 `RemoveAction(uid)` 依 UID 移除。 |
+| `public string name` | 動作名稱 (預設類名)，用於日誌輸出識別。 |
+
+**保護欄位 (供衍生類使用)**
+
+| 成員 | 說明 |
+| :--- | :--- |
+| `protected bool _isStarted` | 是否已啟動旗標。 |
+| `protected bool _isDone` | 動作本身完成旗標。 |
+| `protected bool _isAllDone` | 全部完成旗標 (含子動作)。 |
+| `protected float _duration` | 持續時間 (透過 [SetDuration](#setduration) 設置)。 |
+| `protected float _timeElapsed` | 已累計的經過時間。 |
+| `protected QueueSet<ActionBase> _queueSubActions` | 子動作佇列 (`QueueSet` 為先進先出且不重複的佇列集合)。 |
+
+---
+
+## 生命週期覆寫 {#lifecycle-overrides}
+
+### 方法總覽 {#lifecycle-overview}
+
+| 方法 | 說明 |
+| :--- | :--- |
+| [OnStart](#onstart) | 動作啟動時觸發 (設置持續時間與初始邏輯)。 |
+| [OnUpdate](#onupdate) | 動作每幀更新時觸發 (完成後不再呼叫)。 |
+| [OnDone](#ondone) | 呼叫 MarkAsDone 時觸發 (僅一次)。 |
+
+---
+
+### OnStart {#onstart}
+
+```csharp
+protected virtual void OnStart() { }
+```
+
+動作啟動時觸發 (由 [RunStart](#runstart) 呼叫)，通常於此設置 [SetDuration](#setduration) 並執行初始邏輯。
+
+### OnUpdate {#onupdate}
+
+```csharp
+protected virtual void OnUpdate(float dt) { }
+```
+
+動作每幀更新時觸發 (由 [RunUpdate](#runupdate) 驅動)；動作完成後不會再被呼叫。
+
+### OnDone {#ondone}
+
+```csharp
+protected virtual void OnDone() { }
+```
+
+當呼叫 [MarkAsDone](#markasdone) 時觸發 (僅觸發一次)，可用於結尾處理 (回調、狀態清理)。
+
+---
+
+## 運行控制 {#run-control}
+
+### 方法總覽 {#run-control-overview}
+
+| 方法 | 說明 |
+| :--- | :--- |
+| [RunStart](#runstart) | 啟動動作 (重置狀態並觸發 OnStart)。 |
+| [RunUpdate](#runupdate) | 更新動作 (含時間累計與子動作更新)。 |
+| [Reset](#reset) | 重置動作狀態 (含清空子動作)。 |
+
+---
+
+### RunStart {#runstart}
+
+```csharp
+public void RunStart()
+```
+
+啟動動作：先 [Reset](#reset) 重置狀態、標記為已啟動，再觸發 [OnStart](#onstart)。
+
+<Highlight color="#00d679">提醒</Highlight> 通常由 [ActionRunner](./ActionRunner.mdx) 或組合動作 ([SequenceAction](./DefaultActions.mdx#sequenceaction) 等) 呼叫，一般不需要自行呼叫。
+
+### RunUpdate {#runupdate}
+
+```csharp
+public void RunUpdate(float dt)
+```
+
+更新動作 (由運行器每幀驅動)：累計經過時間，持續時間到會自動 [MarkAsDone](#markasdone)，否則觸發 [OnUpdate](#onupdate)；並同時更新子動作，當動作本身與子動作皆完成時標記全部完成。
+
+### Reset {#reset}
+
+```csharp
+public void Reset()
+```
+
+重置動作狀態 (啟動/完成旗標、經過時間) 並清空子動作。
+
+---
+
+## 狀態查詢 {#status}
+
+### 方法總覽 {#status-overview}
+
+| 方法 | 說明 |
+| :--- | :--- |
+| [IsStarted](#isstarted) | 是否已啟動。 |
+| [IsDone](#isdone) | 動作本身是否完成。 |
+| [IsAllDone](#isalldone) | 是否全部完成 (含子動作)。 |
+| [GetTimeElapsed](#gettimeelapsed) | 取得經過時間 (秒)。 |
+| [GetTimeElapsedRatio](#gettimeelapsedratio) | 取得經過時間比例 (0 到 1)。 |
+
+---
+
+### IsStarted {#isstarted}
+
+```csharp
+public bool IsStarted()
+```
+
+動作是否已啟動 (`RunStart` 後為 `true`)。
+
+### IsDone {#isdone}
+
+```csharp
+public bool IsDone()
+```
+
+動作**本身**是否完成 (不含子動作)。
+
+### IsAllDone {#isalldone}
+
+```csharp
+public bool IsAllDone()
+```
+
+動作是否**全部完成 (含子動作)**；運行器以此判斷動作是否可移除。
+
+### GetTimeElapsed {#gettimeelapsed}
+
+```csharp
+public float GetTimeElapsed()
+```
+
+取得動作啟動後累計的經過時間 (秒)。
+
+### GetTimeElapsedRatio {#gettimeelapsedratio}
+
+```csharp
+public float GetTimeElapsedRatio()
+```
+
+取得經過時間比例 (**0 到 1**，依 [SetDuration](#setduration) 設置的持續時間計算；`duration` 小於等於 0 時回傳 0)，適合用於漸變 (Lerp) 等進度效果。
+
+---
+
+## 完成控制 {#completion}
+
+### 方法總覽 {#completion-overview}
+
+| 方法 | 說明 |
+| :--- | :--- |
+| [SetDuration](#setduration) | 設置持續時間 (-1 = 依條件手動結束)。 |
+| [MarkAsDone](#markasdone) | 標記動作完成 (觸發 OnDone)。 |
+| [MarkAllDone](#markalldone) | 標記全部完成 (含子動作)。 |
+| [CheckAndReduceTime](#checkandreducetime) | 檢查持續時間是否已到 (protected)。 |
+
+---
+
+### SetDuration {#setduration}
+
+```csharp
+public void SetDuration(float duration)
+```
+
+設置動作持續時間 (秒)，時間到會自動 [MarkAsDone](#markasdone)；設置 **-1** 表示依條件結束。
+
+<Highlight color="#ff2f00">重要</Highlight> `SetDuration(-1)` 的動作**永遠不會自動結束**，必須自行呼叫 [MarkAsDone](#markasdone) (請保證回調路徑一定會觸發，包含錯誤路徑)。
+
+### MarkAsDone {#markasdone}
+
+```csharp
+public void MarkAsDone()
+```
+
+標記動作完成：觸發 [OnDone](#ondone) (僅一次)；若子動作也全部完成，會一併標記全部完成 (`IsAllDone`)。
+
+### MarkAllDone {#markalldone}
+
+```csharp
+public void MarkAllDone()
+```
+
+標記動作**全部完成 (含所有子動作)**；運行器移除動作 (`RemoveAction`) 時也會呼叫此方法。
+
+### CheckAndReduceTime {#checkandreducetime}
+
+```csharp
+protected bool CheckAndReduceTime()
+```
+
+檢查持續時間是否已到 (`duration` 為 **-1** 時恆回傳 `false`)，由 [RunUpdate](#runupdate) 自動呼叫，一般不需要自行呼叫。
+
+---
+
+## 子動作 (Sub Action) {#sub-actions}
+
+供衍生類於動作內組合子動作的保護方法，子動作由基類的 [RunUpdate](#runupdate) 自動更新；當**動作本身完成且子動作全部完成**時，才會標記全部完成。
+
+### 方法總覽 {#sub-actions-overview}
+
+| 方法 | 說明 |
+| :--- | :--- |
+| [AddSubAction](#addsubaction) | 加入並啟動子動作。 |
+| [IsSubActionAllDone](#issubactionalldone) | 檢查子動作是否全部完成。 |
+| [UpdateSubActions](#updatesubactions) | 更新所有子動作。 |
+| [MarkSubAllDone](#marksuballdone) | 標記所有子動作完成。 |
+| [ClearSubActions](#clearsubactions) | 清空子動作。 |
+
+---
+
+### AddSubAction {#addsubaction}
+
+```csharp
+protected ActionBase AddSubAction(ActionBase action)
+```
+
+加入子動作 (同一實例不會重複加入，加入時會直接觸發其 `OnStart`)，回傳動作本身。
+
+### IsSubActionAllDone {#issubactionalldone}
+
+```csharp
+protected bool IsSubActionAllDone()
+```
+
+檢查所有子動作是否全部完成 (無子動作時回傳 `true`)。
+
+### UpdateSubActions {#updatesubactions}
+
+```csharp
+protected void UpdateSubActions(float dt)
+```
+
+更新所有子動作 (由 [RunUpdate](#runupdate) 自動呼叫)。
+
+### MarkSubAllDone {#marksuballdone}
+
+```csharp
+protected void MarkSubAllDone()
+```
+
+標記所有子動作為全部完成 (由 [MarkAllDone](#markalldone) 自動呼叫)。
+
+### ClearSubActions {#clearsubactions}
+
+```csharp
+protected void ClearSubActions()
+```
+
+清空子動作佇列。

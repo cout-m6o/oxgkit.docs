@@ -1,0 +1,262 @@
+---
+sidebar_position: 1
+description: Cursors is the static facade of CursorSystem that wraps all CursorManager singleton operations, providing cursor visibility/lock control, state switching, and render-reset APIs.
+---
+
+# Cursors
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`Cursors` is the **static facade** of **CursorSystem** that wraps all operations of the [CursorManager](./CursorManager.mdx) singleton (the first call automatically finds or creates the `[CursorManager]` instance), providing **cursor visibility/lock control**, **state switching**, and **render-reset** APIs. Route all cursor operations through `Cursors` to keep state consistent.
+
+|  |  |
+| :--- | :--- |
+| **Namespace** | `OxGKit.CursorSystem` |
+| **Type** | `public static class Cursors` |
+| **Source** | [Cursors.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/CursorSystem/Scripts/Runtime/Cursors.cs) |
+
+```csharp
+using OxGKit.CursorSystem;
+```
+
+## Quick Start {#quick-start}
+
+```csharp
+using OxGKit.CursorSystem;
+using UnityEngine;
+
+// Initialize the CursorManager instance (auto-finds the CursorManager Prefab placed in the scene)
+Cursors.InitInstance();
+
+// Switch the cursor state by name
+Cursors.SetCursorState("Attack");
+
+// Reset back to the default state (first element in the list)
+Cursors.ResetCursorState();
+
+// Visibility and lock control
+Cursors.SetCursorVisible(true);
+Cursors.SetCursorLockState(CursorLockMode.Confined);
+```
+
+## General Rules {#general-rules}
+
+### Singleton and Default State {#singleton-default-state}
+
+1. The first call to any `Cursors` API automatically finds the [CursorManager](./CursorManager.mdx) in the scene; if none exists, a `[CursorManager]` node is created automatically (parented under the `OxGKit` container node with DontDestroyOnLoad).
+2. **The first entry in the Cursor States list is the default state**; [ResetCursorState](#resetcursorstate) resets back to the first state.
+
+<Highlight color="#0373fc">Attention</Highlight> State names are **data** (defined by the Cursor States list in the Inspector), not constants; [SetCursorState](#setcursorstate) returns `false` for undefined names — check the return value during development.
+
+---
+
+## Initialization {#initialization}
+
+### Methods Overview {#init-overview}
+
+| Method | Description |
+| :--- | :--- |
+| [InitInstance](#initinstance) | Initializes the CursorManager instance. |
+
+---
+
+### InitInstance {#initinstance}
+
+```csharp
+public static void InitInstance()
+```
+
+Initializes the [CursorManager](./CursorManager.mdx) instance (finds the instance in the scene, or creates one automatically). Recommended to call at game startup.
+
+---
+
+## Visibility and Lock {#visibility-lock}
+
+### Methods Overview {#visibility-overview}
+
+| Method | Description |
+| :--- | :--- |
+| [IsCursorVisible](#iscursorvisible) | Checks whether the cursor is visible. |
+| [SetCursorVisible](#setcursorvisible) | Sets the cursor visibility. |
+| [GetCurrentCursorLockState](#getcurrentcursorlockstate) | Gets the current cursor lock mode. |
+| [SetCursorLockState](#setcursorlockstate) | Sets the cursor lock mode. |
+
+---
+
+### IsCursorVisible {#iscursorvisible}
+
+```csharp
+public static bool IsCursorVisible()
+```
+
+Checks whether the cursor is currently visible (i.e., `Cursor.visible`).
+
+### SetCursorVisible {#setcursorvisible}
+
+```csharp
+public static void SetCursorVisible(bool visible)
+```
+
+Sets the cursor visibility (i.e., `Cursor.visible`).
+
+### GetCurrentCursorLockState {#getcurrentcursorlockstate}
+
+```csharp
+public static CursorLockMode GetCurrentCursorLockState()
+```
+
+Gets the current cursor lock mode (i.e., `Cursor.lockState`).
+
+### SetCursorLockState {#setcursorlockstate}
+
+```csharp
+public static void SetCursorLockState(CursorLockMode cursorLockMode)
+```
+
+Sets the cursor lock mode (`None`, `Locked`, `Confined`).
+
+```csharp
+// FPS-style capture (hide and lock to the screen center)
+Cursors.SetCursorVisible(false);
+Cursors.SetCursorLockState(CursorLockMode.Locked);
+
+// Release when opening a menu
+Cursors.SetCursorLockState(CursorLockMode.None);
+Cursors.SetCursorVisible(true);
+```
+
+<Highlight color="#0373fc">Attention</Highlight> On **WebGL**, browser restrictions require a **user gesture** (e.g., a click) before the lock (`Locked`) takes effect.
+
+---
+
+## State Management {#state-management}
+
+### Methods Overview {#state-overview}
+
+| Method | Description |
+| :--- | :--- |
+| [GetAllCursorStates](#getallcursorstates) | Gets all cursor states. |
+| [GetCursorState](#getcursorstate) | Gets the cursor state with the given name. |
+| [GetCurrentCursorState](#getcurrentcursorstate) | Gets the current cursor state. |
+| [SetCursorState](#setcursorstate) | Switches the cursor state by name. |
+| [ResetCursorState](#resetcursorstate) | Resets back to the default state (first element). |
+
+---
+
+### GetAllCursorStates {#getallcursorstates}
+
+```csharp
+public static CursorManager.CursorState[] GetAllCursorStates()
+```
+
+Gets all configured cursor states ([CursorState](./CursorManager.mdx#cursorstate)).
+
+### GetCursorState {#getcursorstate}
+
+```csharp
+public static CursorManager.CursorState GetCursorState(string stateName)
+```
+
+Gets the cursor state with the given name; returns `null` if not found. Useful for adjusting state parameters at runtime (textures, hotspot, frame rate, etc.).
+
+```csharp
+var cursorState = Cursors.GetCursorState("Default");
+cursorState?.SetFrameRate(12);
+```
+
+### GetCurrentCursorState {#getcurrentcursorstate}
+
+```csharp
+public static CursorManager.CursorState GetCurrentCursorState()
+```
+
+Gets the current cursor state.
+
+### SetCursorState {#setcursorstate}
+
+```csharp
+public static bool SetCursorState(string stateName)
+```
+
+Switches the cursor state by name and resets the rendering; returns `true` on success, or `false` if the name is not found.
+
+```csharp
+// e.g., switch to the attack cursor when hovering an enemy
+if (!Cursors.SetCursorState("Attack"))
+    Debug.LogWarning("Cursor state not found!");
+```
+
+### ResetCursorState {#resetcursorstate}
+
+```csharp
+public static void ResetCursorState()
+```
+
+Resets the cursor state to the **default state (first element in the list)** and resets the rendering; also used to restore the cursor rendering after [RemoveCursorRender](#removecursorrender).
+
+---
+
+## Render Control {#render-control}
+
+### Methods Overview {#render-overview}
+
+| Method | Description |
+| :--- | :--- |
+| [SetIgnoreScale](#setignorescale) | Sets whether dynamic cursor animation ignores Time.timeScale. |
+| [SetScaleToAllCursors](#setscaletoallcursors) | Sets the scale for all cursor states and resets the rendering. |
+| [ResetRender](#resetrender) | Resets the rendering of the current cursor state. |
+| [RemoveCursorRender](#removecursorrender) | Removes the cursor rendering (restores the system cursor). |
+
+---
+
+### SetIgnoreScale {#setignorescale}
+
+```csharp
+public static void SetIgnoreScale(bool ignore)
+```
+
+Sets whether the dynamic cursor animation update ignores `Time.timeScale` (default `true`, driven by `Time.unscaledDeltaTime`). Keep it `true` if the cursor animation must continue while the game is paused (`Time.timeScale = 0`).
+
+### SetScaleToAllCursors {#setscaletoallcursors}
+
+```csharp
+public static void SetScaleToAllCursors(Vector2 scale)
+```
+
+Sets the scale for **all** cursor states and resets the rendering.
+
+<Highlight color="#0373fc">Attention</Highlight> Scaling only takes effect when the state has **scalingEnabled** on and **cursorMode is ForceSoftware**.
+
+### ResetRender {#resetrender}
+
+```csharp
+public static void ResetRender()
+```
+
+Resets the rendering of the **current** cursor state (a static cursor re-applies its texture; a dynamic cursor resets its animation parameters and replays).
+
+### RemoveCursorRender {#removecursorrender}
+
+```csharp
+public static void RemoveCursorRender()
+```
+
+Removes the cursor rendering (clears the current state and restores the **system default cursor**).
+
+<Highlight color="#00d679">Reminder</Highlight> To restore the custom cursor rendering, call [ResetCursorState](#resetcursorstate) to re-initialize and reset the rendering (not just [SetCursorVisible](#setcursorvisible)).

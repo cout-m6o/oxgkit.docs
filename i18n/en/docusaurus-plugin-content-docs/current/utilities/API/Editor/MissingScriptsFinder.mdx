@@ -1,0 +1,102 @@
+---
+sidebar_position: 2
+description: MissingScriptsFinder searches scenes and prefabs for Missing Scripts, quickly locating objects with lost script references.
+---
+
+# MissingScriptsFinder
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`MissingScriptsFinder` searches **scenes and prefabs for Missing Scripts** (lost script references). The results are printed as **clickable logs** (click in the Console to ping the corresponding object/asset). Supported search scopes: loaded scenes, Build Settings scenes, all project scenes, and all prefabs (modified from [Mr-sB/MissingScriptsFinder](https://github.com/Mr-sB/MissingScriptsFinder)).
+
+|  |  |
+| :--- | :--- |
+| **Namespace** | `OxGKit.Utilities.MissingFinder.Editor` |
+| **Type** | `public static class MissingScriptsFinder` |
+| **Source** | [MissingScriptsFinder.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/Utilities/Scripts/Editor/MissingScriptsFinder/MissingScriptsFinder.cs) |
+
+## Menu Items {#menu-items}
+
+The features live under **`MissingScriptsFinder` in the main menu bar**:
+
+| Menu | Description |
+| :--- | :--- |
+| `MissingScriptsFinder/Search in loaded scenes` | Searches **currently loaded scenes** for Missing Scripts. |
+| `MissingScriptsFinder/Search in build settings scenes` | Searches **enabled scenes in Build Settings** for Missing Scripts. |
+| `MissingScriptsFinder/Search in build settings scenes (include disable)` | Searches **all scenes in Build Settings** (including disabled ones) for Missing Scripts. |
+| `MissingScriptsFinder/Search in project all scenes` | Searches **all scenes in the project** for Missing Scripts. |
+| `MissingScriptsFinder/Search in all prefabs` | Searches **all prefabs in the project** for Missing Scripts. |
+
+<Highlight color="#00d679">Reminder</Highlight> The search **recursively checks all children**; unloaded scenes are **opened additively** for the check and closed automatically afterwards, leaving the current scene state untouched.
+
+---
+
+## Method Overview {#method-overview}
+
+The following methods match the menu items above and can also be called directly from custom tooling:
+
+| Method | Description |
+| :--- | :--- |
+| [FindMissingScriptsInLoadedScenes](#findmissingscriptsinloadedscenes) | Searches loaded scenes. |
+| [FindMissingScriptsInBuildSettingsScenes](#findmissingscriptsinbuildsettingsscenes) | Searches enabled Build Settings scenes. |
+| [FindMissingScriptsInBuildSettingsScenesIncludeDisable](#findmissingscriptsinbuildsettingsscenesincludedisable) | Searches all Build Settings scenes (including disabled). |
+| [FindMissingScriptsInProjectAllScenes](#findmissingscriptsinprojectallscenes) | Searches all project scenes. |
+| [FindMissingScriptsInAllPrefabs](#findmissingscriptsinallprefabs) | Searches all project prefabs. |
+
+---
+
+### FindMissingScriptsInLoadedScenes {#findmissingscriptsinloadedscenes}
+
+```csharp
+public static void FindMissingScriptsInLoadedScenes()
+```
+
+Searches all objects (including children) in the **currently loaded scenes** for Missing Scripts.
+
+### FindMissingScriptsInBuildSettingsScenes {#findmissingscriptsinbuildsettingsscenes}
+
+```csharp
+public static void FindMissingScriptsInBuildSettingsScenes()
+```
+
+Searches the **enabled scenes in Build Settings** for Missing Scripts.
+
+### FindMissingScriptsInBuildSettingsScenesIncludeDisable {#findmissingscriptsinbuildsettingsscenesincludedisable}
+
+```csharp
+public static void FindMissingScriptsInBuildSettingsScenesIncludeDisable()
+```
+
+Searches **all scenes in Build Settings** (including disabled scenes) for Missing Scripts.
+
+### FindMissingScriptsInProjectAllScenes {#findmissingscriptsinprojectallscenes}
+
+```csharp
+public static void FindMissingScriptsInProjectAllScenes()
+```
+
+Searches **every scene asset in the project** for Missing Scripts.
+
+### FindMissingScriptsInAllPrefabs {#findmissingscriptsinallprefabs}
+
+```csharp
+public static void FindMissingScriptsInAllPrefabs()
+```
+
+Scans the script references of **all prefabs in the project** (matching script GUIDs), checks each suspicious prefab, and prints the **Missing Scripts count with locating logs**.

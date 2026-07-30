@@ -1,0 +1,156 @@
+---
+sidebar_position: 1
+description: NoticeManager is the static notice manager of the NoticeSystem. It handles notice condition registration and condition ID lookup, and refreshes the red-dot display of condition-holding NoticeItems via Notify when data changes.
+---
+
+# NoticeManager
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`NoticeManager` is the static notice manager (the core of the red dot system) of the **NoticeSystem**. It handles **registration of notice conditions ([NoticeCondition](./NoticeCondition.mdx)) and condition ID lookup**, and when data changes it uses **Notify** to look up the [NoticeItem](./NoticeItem.mdx)s holding a condition by its ID and refresh their display.
+
+|  |  |
+| :--- | :--- |
+| **Namespace** | `OxGKit.NoticeSystem` |
+| **Type** | `public static class NoticeManager` |
+| **Source** | [NoticeManager.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/NoticeSystem/Scripts/Runtime/Core/NoticeManager.cs) |
+
+```csharp
+using OxGKit.NoticeSystem;
+```
+
+## Quick Start {#quick-start}
+
+```csharp
+using OxGKit.NoticeSystem;
+
+// 1. Register the notice condition (once at startup)
+NoticeManager.RegisterCondition<NewMailCond>();
+
+// 2. Register the condition and data on a NoticeItem (condition ID + data)
+this.mailNoticeItem.RegisterNotice(new NoticeInfo(NewMailCond.id, this._mailBox));
+
+// 3. When data changes, notify the condition ID to refresh the red-dot display
+this._mailBox.unreadCount++;
+NoticeManager.Notify(NewMailCond.id);
+```
+
+## General Rules {#general-rules}
+
+### Condition ID {#condition-id}
+
+- Condition IDs are **auto-assigned** when registering via [RegisterCondition](#registercondition) (the condition type is the unique key).
+- By convention, define a static `id` property in the condition class and get the ID via [GetConditionId](#getconditionid):
+
+```csharp
+public class NewMailCond : NoticeCondition
+{
+    public static int id { get { return NoticeManager.GetConditionId<NewMailCond>(); } }
+
+    public override bool ShowCondition(object data) { /* ... */ }
+}
+```
+
+<Highlight color="#ff2f00">Important</Highlight> A condition must be registered with [RegisterCondition](#registercondition) **before** its ID can be resolved by [GetConditionId](#getconditionid) (returns `0` when unregistered).
+
+### Notify & Refresh Flow {#notify-flow}
+
+1. Data state changes.
+2. Call [Notify](#notify) with the condition IDs.
+3. NoticeManager looks up all NoticeItems holding those conditions by ID.
+4. Each NoticeItem re-runs its condition checks (`ShowCondition`) — shown when any condition matches, hidden when none do.
+
+<Highlight color="#00d679">Reminder</Highlight> During Notify, registrations of already destroyed NoticeItems are removed automatically — no need to worry about stale references.
+
+---
+
+## Method Overview {#overview}
+
+| Method | Description |
+| :--- | :--- |
+| [RegisterCondition](#registercondition) | Registers a notice condition (auto-assigns the condition ID). |
+| [GetConditionId](#getconditionid) | Gets a notice condition ID. |
+| [Notify](#notify) | Notifies by condition IDs or NoticeItems to refresh the display when data changes. |
+
+---
+
+### RegisterCondition {#registercondition}
+
+```csharp
+public static void RegisterCondition<TNoticeCondition>() where TNoticeCondition : NoticeCondition, new()
+```
+
+Registers a notice condition (creates the condition instance and auto-assigns its condition ID). Conditions can be added dynamically at runtime.
+
+```csharp
+NoticeManager.RegisterCondition<NewMailCond>();
+NoticeManager.RegisterCondition<CoinInWalletCond>();
+```
+
+<Highlight color="#0373fc">Attention</Highlight> **Registering the same condition twice** is ignored and logs a warning.
+
+### GetConditionId {#getconditionid}
+
+```csharp
+public static int GetConditionId<TNoticeCondition>() where TNoticeCondition : NoticeCondition
+```
+
+Gets the condition ID of a notice condition.
+
+```csharp
+int conditionId = NoticeManager.GetConditionId<NewMailCond>();
+```
+
+<Highlight color="#0373fc">Attention</Highlight> Returns `0` when the condition is **not yet registered** — register it first via [RegisterCondition](#registercondition).
+
+### Notify {#notify}
+
+```csharp
+// Single condition ID (non-alloc)
+public static void Notify(int conditionId)
+
+// Multiple condition IDs
+public static void Notify(params int[] conditionIds)
+
+// Notify by NoticeItems (collects their held condition IDs and removes duplicates)
+public static void Notify(params NoticeItem[] noticeItems)
+```
+
+Notifies on data changes — looks up all NoticeItems holding the conditions by ID, then performs the **condition checks and refreshes the display**.
+
+- **Notify by condition IDs**: pass the condition IDs directly (the single-ID overload is non-alloc, best efficiency).
+- **Notify by NoticeItems**: automatically collects the condition IDs held by the given NoticeItems, **removes duplicates**, then notifies them in one pass (avoids refreshing the same condition repeatedly).
+
+```csharp
+// Data changes
+this._wallet.IncreaseCoin();
+
+// Single condition ID (non-alloc)
+NoticeManager.Notify(CoinInWalletCond.id);
+
+// Multiple condition IDs
+NoticeManager.Notify(CoinInWalletCond.id, CoinIsEvenCond.id);
+
+// Notify by NoticeItems
+NoticeManager.Notify(this.walletNoticeItem, this.coinNoticeItem);
+```
+
+<Highlight color="#ff2f00">Important</Highlight> After data changes you **must Notify the related condition IDs**, otherwise the red-dot display will not refresh; for **value-type** data, update the data snapshot first via [NoticeItem.RenewNotice](./NoticeItem.mdx#renewnotice), then Notify.
+
+<Highlight color="#0373fc">Attention</Highlight> Notifying an **unregistered** condition ID logs an error (`Error Notice Condition Cannot find`).

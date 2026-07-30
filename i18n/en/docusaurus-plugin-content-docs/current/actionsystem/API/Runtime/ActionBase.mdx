@@ -1,0 +1,391 @@
+---
+sidebar_position: 2
+description: ActionBase is the abstract base class of all ActionSystem actions. Override OnStart, OnUpdate, and OnDone to implement custom actions, and control completion with SetDuration and MarkAsDone.
+---
+
+# ActionBase
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`ActionBase` is the **abstract base class** of all **ActionSystem** actions. Custom actions inherit from it and override the `OnStart` / `OnUpdate` / `OnDone` lifecycle methods, controlling the duration with `SetDuration` (set **-1** to end by condition, which requires calling `MarkAsDone` manually). It also has a built-in **sub action** mechanism for composing child actions inside an action.
+
+|  |  |
+| :--- | :--- |
+| **Namespace** | `OxGKit.ActionSystem` |
+| **Type** | `public abstract class ActionBase` |
+| **Source** | [ActionBase.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/ActionSystem/Scripts/Runtime/Core/ActionBase.cs) |
+
+```csharp
+using OxGKit.ActionSystem;
+```
+
+<Highlight color="#00d679">Reminder</Highlight> Create a custom Action skeleton quickly via Right-Click **Create/OxGKit/Action System/Template Action.cs**.
+
+## Quick Start {#quick-start}
+
+**Timed action**: set the duration in `OnStart`; the base class automatically marks the action done (firing `OnDone`) when the time elapses. Combine with [GetTimeElapsedRatio](#gettimeelapsedratio) for progress-driven effects.
+
+```csharp
+using OxGKit.ActionSystem;
+using UnityEngine;
+
+public class FadeOutAction : ActionBase
+{
+    #region Default Constructor
+    public FadeOutAction()
+    {
+        this.name = nameof(FadeOutAction);
+    }
+
+    public FadeOutAction(int uid) : this()
+    {
+        this.uid = uid;
+    }
+    #endregion
+
+    public CanvasGroup canvasGroup;
+    public float duration;
+
+    /// <summary>
+    /// [Factory Mode] Create an action instance through a static method
+    /// </summary>
+    public static FadeOutAction CreateFadeOutAction(CanvasGroup canvasGroup, float duration)
+    {
+        var action = new FadeOutAction();
+        action.canvasGroup = canvasGroup;
+        action.duration = duration;
+        return action;
+    }
+
+    protected override void OnStart()
+    {
+        // Set the duration (auto MarkAsDone when elapsed)
+        this.SetDuration(this.duration);
+    }
+
+    protected override void OnUpdate(float dt)
+    {
+        // Fade by elapsed-time ratio (0 to 1)
+        this.canvasGroup.alpha = 1f - this.GetTimeElapsedRatio();
+    }
+
+    protected override void OnDone()
+    {
+        this.canvasGroup.alpha = 0f;
+    }
+}
+```
+
+**Condition-based action**: `SetDuration(-1)` means end by condition; you must call [MarkAsDone](#markasdone) yourself.
+
+```csharp
+using OxGKit.ActionSystem;
+
+public class WaitForServerAction : ActionBase
+{
+    public WaitForServerAction()
+    {
+        this.name = nameof(WaitForServerAction);
+    }
+
+    protected override void OnStart()
+    {
+        // -1 = end by condition, MarkAsDone must be called manually
+        this.SetDuration(-1);
+
+        // Finish when the condition is met
+        Server.Request(ok => this.MarkAsDone());
+    }
+}
+```
+
+## General Rules {#general-rules}
+
+### Lifecycle {#lifecycle}
+
+1. **RunStart**: `Reset()` clears state first (flags, elapsed time, sub actions), the action is marked started, then [OnStart](#onstart) fires (set `SetDuration` and initialize there).
+2. **RunUpdate(dt)**: driven per frame by the runner; accumulates elapsed time. While unfinished, the action is automatically marked done ([MarkAsDone](#markasdone)) when the duration elapses, otherwise [OnUpdate](#onupdate) fires; sub actions are updated as well.
+3. **MarkAsDone**: fires [OnDone](#ondone) (once) and marks the action done; only when **both the action itself and all sub actions are done** is it marked all done (`IsAllDone`), which the runner uses to decide removal.
+
+### Completion Rules {#completion-rules}
+
+<Highlight color="#ff2f00">Important</Highlight> An action with `SetDuration(-1)` **never finishes on its own** - guarantee that the `MarkAsDone()` / `MarkAllDone()` call path always fires (including error paths).
+
+<Highlight color="#0373fc">Attention</Highlight> Actions are **stateful one-shots**: re-running (`RunStart`) resets internal state, but **never share one action instance across two runners simultaneously**.
+
+---
+
+## Members {#members}
+
+| Member | Description |
+| :--- | :--- |
+| `public int uid` | Unique action id, usable with `RemoveAction(uid)`. |
+| `public string name` | Action name (defaults to the class name), used for log identification. |
+
+**Protected fields (for derived classes)**
+
+| Member | Description |
+| :--- | :--- |
+| `protected bool _isStarted` | Started flag. |
+| `protected bool _isDone` | Done flag of the action itself. |
+| `protected bool _isAllDone` | All-done flag (including sub actions). |
+| `protected float _duration` | Duration (set via [SetDuration](#setduration)). |
+| `protected float _timeElapsed` | Accumulated elapsed time. |
+| `protected QueueSet<ActionBase> _queueSubActions` | Sub action queue (`QueueSet` is a FIFO queue with unique items). |
+
+---
+
+## Lifecycle Overrides {#lifecycle-overrides}
+
+### Method Overview {#lifecycle-overview}
+
+| Method | Description |
+| :--- | :--- |
+| [OnStart](#onstart) | Fired when the action starts (set duration and initialize). |
+| [OnUpdate](#onupdate) | Fired every frame while running (not called once done). |
+| [OnDone](#ondone) | Fired when MarkAsDone is called (once). |
+
+---
+
+### OnStart {#onstart}
+
+```csharp
+protected virtual void OnStart() { }
+```
+
+Fired when the action starts (called by [RunStart](#runstart)); typically sets [SetDuration](#setduration) and runs initialization logic.
+
+### OnUpdate {#onupdate}
+
+```csharp
+protected virtual void OnUpdate(float dt) { }
+```
+
+Fired every frame (driven by [RunUpdate](#runupdate)); no longer called once the action is done.
+
+### OnDone {#ondone}
+
+```csharp
+protected virtual void OnDone() { }
+```
+
+Fired when [MarkAsDone](#markasdone) is called (fires only once); useful for wrap-up work (callbacks, state cleanup).
+
+---
+
+## Run Control {#run-control}
+
+### Method Overview {#run-control-overview}
+
+| Method | Description |
+| :--- | :--- |
+| [RunStart](#runstart) | Starts the action (resets state and fires OnStart). |
+| [RunUpdate](#runupdate) | Updates the action (time accumulation and sub action updates). |
+| [Reset](#reset) | Resets action state (and clears sub actions). |
+
+---
+
+### RunStart {#runstart}
+
+```csharp
+public void RunStart()
+```
+
+Starts the action: [Reset](#reset) clears state, the action is marked started, then [OnStart](#onstart) fires.
+
+<Highlight color="#00d679">Reminder</Highlight> Normally called by the [ActionRunner](./ActionRunner.mdx) or by composite actions ([SequenceAction](./DefaultActions.mdx#sequenceaction), etc.) - you usually do not call it yourself.
+
+### RunUpdate {#runupdate}
+
+```csharp
+public void RunUpdate(float dt)
+```
+
+Updates the action (driven per frame by the runner): accumulates elapsed time, automatically marks the action done ([MarkAsDone](#markasdone)) when the duration elapses, otherwise fires [OnUpdate](#onupdate); also updates sub actions and marks all done once the action itself and all sub actions are finished.
+
+### Reset {#reset}
+
+```csharp
+public void Reset()
+```
+
+Resets action state (started/done flags, elapsed time) and clears sub actions.
+
+---
+
+## Status Queries {#status}
+
+### Method Overview {#status-overview}
+
+| Method | Description |
+| :--- | :--- |
+| [IsStarted](#isstarted) | Whether the action has started. |
+| [IsDone](#isdone) | Whether the action itself is done. |
+| [IsAllDone](#isalldone) | Whether everything is done (including sub actions). |
+| [GetTimeElapsed](#gettimeelapsed) | Gets the elapsed time in seconds. |
+| [GetTimeElapsedRatio](#gettimeelapsedratio) | Gets the elapsed-time ratio (0 to 1). |
+
+---
+
+### IsStarted {#isstarted}
+
+```csharp
+public bool IsStarted()
+```
+
+Whether the action has started (`true` after `RunStart`).
+
+### IsDone {#isdone}
+
+```csharp
+public bool IsDone()
+```
+
+Whether the action **itself** is done (sub actions not included).
+
+### IsAllDone {#isalldone}
+
+```csharp
+public bool IsAllDone()
+```
+
+Whether the action is **all done (including sub actions)**; the runner uses this to decide when to remove the action.
+
+### GetTimeElapsed {#gettimeelapsed}
+
+```csharp
+public float GetTimeElapsed()
+```
+
+Gets the accumulated elapsed time (seconds) since the action started.
+
+### GetTimeElapsedRatio {#gettimeelapsedratio}
+
+```csharp
+public float GetTimeElapsedRatio()
+```
+
+Gets the elapsed-time ratio (**0 to 1**, based on the duration set via [SetDuration](#setduration); returns 0 when `duration` is less than or equal to 0). Suitable for progress-driven effects such as lerping.
+
+---
+
+## Completion Control {#completion}
+
+### Method Overview {#completion-overview}
+
+| Method | Description |
+| :--- | :--- |
+| [SetDuration](#setduration) | Sets the duration (-1 = end manually by condition). |
+| [MarkAsDone](#markasdone) | Marks the action done (fires OnDone). |
+| [MarkAllDone](#markalldone) | Marks everything done (including sub actions). |
+| [CheckAndReduceTime](#checkandreducetime) | Checks whether the duration has elapsed (protected). |
+
+---
+
+### SetDuration {#setduration}
+
+```csharp
+public void SetDuration(float duration)
+```
+
+Sets the action duration (seconds); the action is automatically marked done ([MarkAsDone](#markasdone)) when the time elapses. Set **-1** to end by condition.
+
+<Highlight color="#ff2f00">Important</Highlight> An action with `SetDuration(-1)` **never finishes on its own** - you must call [MarkAsDone](#markasdone) yourself (guarantee the callback path always fires, including error paths).
+
+### MarkAsDone {#markasdone}
+
+```csharp
+public void MarkAsDone()
+```
+
+Marks the action done: fires [OnDone](#ondone) (once); if all sub actions are also done, the action is marked all done (`IsAllDone`).
+
+### MarkAllDone {#markalldone}
+
+```csharp
+public void MarkAllDone()
+```
+
+Marks the action **all done (including every sub action)**; also called by the runner when removing an action (`RemoveAction`).
+
+### CheckAndReduceTime {#checkandreducetime}
+
+```csharp
+protected bool CheckAndReduceTime()
+```
+
+Checks whether the duration has elapsed (always returns `false` when `duration` is **-1**); called automatically by [RunUpdate](#runupdate), normally not called manually.
+
+---
+
+## Sub Actions {#sub-actions}
+
+Protected methods for derived classes to compose sub actions inside an action. Sub actions are updated automatically by the base [RunUpdate](#runupdate); the action is marked all done only when **the action itself is done and all sub actions are done**.
+
+### Method Overview {#sub-actions-overview}
+
+| Method | Description |
+| :--- | :--- |
+| [AddSubAction](#addsubaction) | Adds and starts a sub action. |
+| [IsSubActionAllDone](#issubactionalldone) | Checks whether all sub actions are done. |
+| [UpdateSubActions](#updatesubactions) | Updates all sub actions. |
+| [MarkSubAllDone](#marksuballdone) | Marks all sub actions done. |
+| [ClearSubActions](#clearsubactions) | Clears sub actions. |
+
+---
+
+### AddSubAction {#addsubaction}
+
+```csharp
+protected ActionBase AddSubAction(ActionBase action)
+```
+
+Adds a sub action (the same instance is never added twice; its `OnStart` fires immediately on add). Returns the action itself.
+
+### IsSubActionAllDone {#issubactionalldone}
+
+```csharp
+protected bool IsSubActionAllDone()
+```
+
+Checks whether all sub actions are done (returns `true` when there are none).
+
+### UpdateSubActions {#updatesubactions}
+
+```csharp
+protected void UpdateSubActions(float dt)
+```
+
+Updates all sub actions (called automatically by [RunUpdate](#runupdate)).
+
+### MarkSubAllDone {#marksuballdone}
+
+```csharp
+protected void MarkSubAllDone()
+```
+
+Marks all sub actions as all done (called automatically by [MarkAllDone](#markalldone)).
+
+### ClearSubActions {#clearsubactions}
+
+```csharp
+protected void ClearSubActions()
+```
+
+Clears the sub action queue.

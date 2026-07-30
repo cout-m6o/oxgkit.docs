@@ -1,0 +1,225 @@
+---
+sidebar_position: 3
+description: LoggersConfig 为 LoggingSystem 的日志器配置数据，包含全局开关/级别/颜色与各日志器设置，并涵盖 LoggerSettings、LogLevel、LogColor、LoggerNameAttribute 与 LoggingSettings 等配置类型。
+---
+
+# LoggersConfig
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`LoggersConfig` 为 **LoggingSystem** 的日志器配置数据 (可序列化)，包含**全局开关/级别/颜色**与**各日志器 ([LoggerSettings](#loggersettings)) 设置清单**；配置可存储为 StreamingAssets 配置文件 (Cipher/Plaintext)，或于运行时通过 [LoggingLauncher.SetLoggersConfig](./LoggingLauncher.mdx#setloggersconfig) 动态应用。
+
+|  |  |
+| :--- | :--- |
+| **命名空间** | `OxGKit.LoggingSystem` |
+| **类型** | `[Serializable] public class LoggersConfig` |
+| **源码** | [LoggersConfig.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/LoggingSystem/Scripts/Runtime/Logging/Config/LoggersConfig.cs) |
+
+```csharp
+using OxGKit.LoggingSystem;
+```
+
+## 快速上手 {#quick-start}
+
+```csharp
+// 创建配置 (可传入多组 LoggerSettings)
+var loggersConfig = new LoggersConfig
+(
+    new LoggerSettings("Game.Logger", true, LogLevel.All),
+    new LoggerSettings("Net.Logger", true, LogLevel.LogError, LogColor.Enabled)
+);
+
+// 应用配置并重载
+LoggingLauncher.SetLoggersConfig(loggersConfig);
+```
+
+## 成员 {#members}
+
+| 成员 | 说明 |
+| :--- | :--- |
+| `public bool logMainActive` | 全局开关 (Inspector: **Master Logging Toggle**)，默认 `true`。 |
+| `public LogLevel logMainLevel` | 全局级别 (Inspector: **Master Logging Level**)，默认 `LogLevel.All`。 |
+| `public LogColor logMainColor` | 全局颜色模式 (Inspector: **Master Logging Color**)，默认 `LogColor.EditorOnly`。 |
+| `public List<LoggerSettings> loggerSettings` | 各日志器配置清单。 |
+
+## 构造函数 {#constructors}
+
+```csharp
+public LoggersConfig()
+public LoggersConfig(params LoggerSettings[] loggerSettings)
+```
+
+## 方法 {#methods}
+
+| 方法 | 说明 |
+| :--- | :--- |
+| [ClearLoggerSettings](#clearloggersettings) | 清除所有日志器配置。 |
+| [AddLoggerSettings](#addloggersettings) | 添加一条日志器配置。 |
+| [RemoveLoggerSettings](#removeloggersettings) | 移除一条日志器配置。 |
+
+### ClearLoggerSettings {#clearloggersettings}
+
+```csharp
+public void ClearLoggerSettings()
+```
+
+### AddLoggerSettings {#addloggersettings}
+
+```csharp
+public void AddLoggerSettings(LoggerSettings loggerSettings)
+```
+
+### RemoveLoggerSettings {#removeloggersettings}
+
+```csharp
+public void RemoveLoggerSettings(LoggerSettings loggerSettings)
+```
+
+---
+
+## LoggerSettings {#loggersettings}
+
+单一日志器配置 (可序列化)。
+
+|  |  |
+| :--- | :--- |
+| **类型** | `[Serializable] public class LoggerSettings` |
+| **源码** | [LoggerSettings.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/LoggingSystem/Scripts/Runtime/Logging/Config/LoggerSettings.cs) |
+
+| 成员 | 说明 |
+| :--- | :--- |
+| `public string loggerName` | 日志器名称 (Inspector 只读)。 |
+| `public bool logActive` | 日志器开关。 |
+| `public LogLevel logLevel` | 日志器级别，默认 `All`。 |
+| `public LogColor logColor` | 日志器颜色模式，默认 `EditorOnly`。 |
+
+```csharp
+public LoggerSettings(string loggerName, bool logActive)
+public LoggerSettings(string loggerName, bool logActive, LogLevel logLevel)
+public LoggerSettings(string loggerName, bool logActive, LogLevel logLevel, LogColor logColor)
+```
+
+---
+
+## LogLevel {#loglevel}
+
+日志级别 (**Flags**，可以 `|` 组合多个级别)。
+
+```csharp
+[Flags]
+public enum LogLevel
+{
+    Off = 0,
+    LogDebug = 1 << 0,
+    LogInfo = 1 << 1,
+    LogWarning = 1 << 2,
+    LogError = 1 << 3,
+    LogException = 1 << 4,
+    All = ~0
+}
+```
+
+```csharp
+// 组合示例：仅输出 Warning + Error
+LoggingLauncher.ConfigureLogger("Game.Logger", true, LogLevel.LogWarning | LogLevel.LogError);
+```
+
+<Highlight color="#0373fc">注意</Highlight> 生效规则为**全局与个别取交集** (G ∩ P)，详见[级别规则表](../../intro.mdx#log-level-级别)。
+
+---
+
+## LogColor {#logcolor}
+
+日志颜色模式。
+
+```csharp
+public enum LogColor
+{
+    Disabled = 0,   // 不启用颜色
+    Enabled = 1,    // 一律启用颜色
+    EditorOnly = 2  // 只在 Editor 启用颜色 (发布时自动剔除)
+}
+```
+
+<Highlight color="#0373fc">注意</Highlight> 生效规则为**全局与个别取较严格者**，详见[颜色规则表](../../intro.mdx#log-color-颜色)。
+
+---
+
+## ConfigFileType {#configfiletype}
+
+配置文件类型。
+
+```csharp
+public enum ConfigFileType
+{
+    Json,   // JSON [Plaintext]
+    Bytes   // BYTES [Cipher]
+}
+```
+
+---
+
+## LoggerNameAttribute {#loggernameattribute}
+
+日志器名称标记，用于**自定义日志器名称**与**覆写同名日志器** (Override)。
+
+|  |  |
+| :--- | :--- |
+| **类型** | `[AttributeUsage(AttributeTargets.Class)] public class LoggerNameAttribute : Attribute` |
+| **源码** | [LoggerNameAttribute.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/LoggingSystem/Scripts/Runtime/Logging/Attribute/LoggerNameAttribute.cs) |
+
+| 成员 | 说明 |
+| :--- | :--- |
+| `public string loggerName` | 日志器名称。 |
+| `public bool isOverride` | 是否覆写同名日志器。 |
+
+```csharp
+public LoggerNameAttribute(string loggerName)
+public LoggerNameAttribute(string loggerName, bool isOverride)
+```
+
+```csharp
+[LoggerName("MyLogger")]
+public class MyLogger1 : Logging { }
+
+// Use same name to override MyLogger1
+[LoggerName("MyLogger", true)]
+public class OverrideMyLogger1 : Logging { }
+```
+
+---
+
+## LoggingSettings {#loggingsettings}
+
+LoggingSystem 的设置文件 (`ScriptableObject`)，可自定义**配置文件名称、扩展名与加密密钥**。
+
+|  |  |
+| :--- | :--- |
+| **类型** | `public class LoggingSettings : ScriptableObject` |
+| **源码** | [LoggingSettings.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/LoggingSystem/Scripts/Runtime/Logging/ScriptableObject/LoggingSettings.cs) |
+
+| 成员 | 说明 |
+| :--- | :--- |
+| `public const short CIPHER_HEADER` | 配置文件头标 (`0x584F`)。 |
+| `public byte cipher` | 配置文件密钥，默认 `0x42`。 |
+| `public string loggerCfgName` | 配置文件名称，默认 `"LoggerConfig"`。 |
+| `public string loggerCfgExtension` | 配置文件扩展名 (**需包含点**，如 `.dat`、`.cfg`、`.json`)，默认 `".dat"`。 |
+| `public static LoggingSettings settings` | 设置文件单例 (自动从 `Resources` 加载，无则使用默认值)。 |
+
+<Highlight color="#00d679">提醒</Highlight> 通过 Right-Click **Create/OxGKit/Create Settings/Create Logging Settings in Resources** 创建设置文件资源，即可定制配置文件名称。

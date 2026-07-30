@@ -1,0 +1,142 @@
+---
+sidebar_position: 3
+description: DTUpdater 是獨立於 MonoBehaviour 的 UniTask 更新迴圈，提供 onUpdate、onFixedUpdate、onLateUpdate 回調，可自訂 targetFrameRate 與 timeScale，並會乘算 Unity Time.timeScale。
+---
+
+# DTUpdater
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`DTUpdater` 是**獨立於 MonoBehaviour 的更新迴圈** (UniTask 驅動)，提供 `onUpdate`、`onFixedUpdate`、`onLateUpdate` 回調，可自訂 **targetFrameRate (更新頻率)** 與 **timeScale (自身時間尺度)**；更新頻率會**乘算 Unity 的 `Time.timeScale`**，當 `Time.timeScale = 0` 時迴圈閒置 (跟隨遊戲暫停)，適合驅動需要跟隨遊戲時間的非 MonoBehaviour 系統。
+
+|  |  |
+| :--- | :--- |
+| **命名空間** | `OxGKit.TimeSystem` |
+| **類型** | `public class DTUpdater` |
+| **原始碼** | [DTUpdater.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/TimeSystem/Scripts/Runtime/Core/Updater/DTUpdater.cs) |
+
+```csharp
+using OxGKit.TimeSystem;
+```
+
+## 快速上手 {#quick-start}
+
+```csharp
+using OxGKit.TimeSystem;
+
+var dtUpdater = new DTUpdater();
+
+// 訂閱更新回調
+dtUpdater.onUpdate += (dt) => { /* 每次更新 (實際經過時間) */ };
+dtUpdater.onFixedUpdate += (fdt) => { /* 固定間隔更新 */ };
+dtUpdater.onLateUpdate += (dt) => { /* 後更新 */ };
+
+// 可自訂更新頻率與時間尺度
+dtUpdater.targetFrameRate = 60f; // 預設 60
+dtUpdater.timeScale = 1f;        // 0 ~ 64，預設 1
+
+// 啟動更新迴圈
+dtUpdater.Start();
+
+// 功能結束時務必停止
+dtUpdater.Stop();
+```
+
+## 通用規則 {#general-rules}
+
+### 更新頻率與時間縮放 {#update-rate}
+
+- 每輪迴圈的更新頻率 = `targetFrameRate` × (`Time.timeScale` × `timeScale`)，並以 `fixedDeltaTime = 1 / 更新頻率` 作為等待間隔。
+- 每輪依序觸發：`onFixedUpdate(fixedDeltaTime)` → `onUpdate(deltaTime)` → `onLateUpdate(deltaTime)`；其中 `deltaTime` 為以系統時鐘計算的**上一輪實際經過時間**，`fixedDeltaTime` 為固定間隔值。
+
+<Highlight color="#0373fc">注意</Highlight> 僅於 **`Time.timeScale` 大於 0 且 `targetFrameRate` 大於 0 且 `timeScale` 大於 0** 時運轉，任一為 0 時迴圈**閒置等待** (不觸發回調)；因此 `DTUpdater` 會**跟隨 Unity 遊戲暫停**。若需要不受 `Time.timeScale` 影響的更新迴圈，請改用 [RTUpdater](./RTUpdater.mdx) (詳見[模組選型](../../intro.mdx#模組選型-依時間基準區分))。
+
+### 生命週期 {#lifecycle}
+
+<Highlight color="#ff2f00">重要</Highlight> 更新迴圈為 **UniTask 迴圈**，擁有者 (功能/場景) 結束時**務必呼叫 [Stop](#stop) 停止**，否則迴圈會持續運轉；迴圈中回調擲出例外時會自動停止並重新擲出。
+
+---
+
+## 委派 {#delegates}
+
+```csharp
+public delegate void DeltaTimeUpdate(float deltaTime);
+public delegate void DeltaTimeFixedUpdate(float fixedDeltaTime);
+public delegate void DeltaTimeLateUpdate(float deltaTime);
+```
+
+## 成員 {#members}
+
+| 成員 | 說明 |
+| :--- | :--- |
+| `public DeltaTimeUpdate onUpdate` | 每輪更新回調 (參數為上一輪實際經過時間 deltaTime)。 |
+| `public DeltaTimeFixedUpdate onFixedUpdate` | 每輪固定間隔回調 (參數為 fixedDeltaTime)。 |
+| `public DeltaTimeLateUpdate onLateUpdate` | 每輪後更新回調 (於 onUpdate 之後觸發)。 |
+| `public float timeSinceStartup { get; }` | 自實例建立以來的經過時間 (秒，系統時鐘計算)。 |
+| `public float timeAtLastFrame { get; }` | 上一輪更新的時間點 (秒)。 |
+| `public float timeScale { get; set; }` | 自身時間尺度，**設值會被限制於 0 ~ 64** (預設 1)。 |
+| `public float targetFrameRate { get; set; }` | 目標更新頻率 (每秒次數)，負值會被歸 0 (預設 60)。 |
+| `public float deltaTime { get; }` | 上一輪的實際經過時間 (秒)。 |
+| `public float fixedDeltaTime { get; }` | 當前的固定間隔時間 (1 / 更新頻率)。 |
+
+## 建構子 {#constructors}
+
+```csharp
+public DTUpdater()
+```
+
+建立更新器並以建立當下的系統時間作為 `timeSinceStartup` 的基準點。
+
+---
+
+## 方法 {#methods}
+
+### 方法總覽 {#methods-overview}
+
+| 方法 | 說明 |
+| :--- | :--- |
+| [Start](#start) | 啟動更新迴圈。 |
+| [Stop](#stop) | 停止更新迴圈。 |
+| [IsRunning](#isrunning) | 是否正在運轉中。 |
+
+---
+
+### Start {#start}
+
+```csharp
+public void Start()
+```
+
+啟動更新迴圈 (UniTask)，已在運轉中時再次呼叫**無作用**。
+
+### Stop {#stop}
+
+```csharp
+public void Stop()
+```
+
+停止更新迴圈並取消內部的 CancellationTokenSource；停止後可再次 [Start](#start) 重新啟動。
+
+### IsRunning {#isrunning}
+
+```csharp
+public bool IsRunning()
+```
+
+返回更新迴圈是否正在運轉中。

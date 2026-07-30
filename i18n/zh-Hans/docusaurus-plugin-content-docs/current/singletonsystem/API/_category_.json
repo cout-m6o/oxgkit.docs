@@ -1,0 +1,8 @@
+{
+  "label": "API",
+  "key": "singletonsystem-api",
+  "position": 99,
+  "link": {
+    "type": "generated-index"
+  }
+}

@@ -1,0 +1,98 @@
+---
+sidebar_position: 5
+description: UISafeAreaAdapter 依據螢幕 Safe Area 自動調整 UI 面板錨點，適配瀏海與異形螢幕。
+---
+
+# UISafeAreaAdapter
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`UISafeAreaAdapter` 為 **UI 安全區域適配組件**，依據 `Screen.safeArea` 自動調整指定面板 (`RectTransform`) 的**錨點 (anchorMin / anchorMax)**，適配**瀏海、打孔與異形螢幕**；解析度變更時會自動重新適配，也可開啟 `refreshAlways` 每幀刷新 (應對螢幕旋轉)。
+
+|  |  |
+| :--- | :--- |
+| **命名空間** | `OxGKit.Utilities.Adapter` |
+| **類型** | `public class UISafeAreaAdapter : MonoBehaviour` |
+| **原始碼** | [UISafeAreaAdapter.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/Utilities/Scripts/Runtime/Adapter/UISafeAreaAdapter.cs) |
+
+```csharp
+using OxGKit.Utilities.Adapter;
+```
+
+<Highlight color="#00d679">提醒</Highlight> 透過 **AddComponentMenu: OxGKit/Utilities/Adapter/UISafeAreaAdapter** 加入組件 (同物件僅允許一個, DisallowMultipleComponent)。
+
+## 快速上手 {#quick-start}
+
+1. 將 `UISafeAreaAdapter` 掛載於需要適配的 **UI 面板**上。
+2. `panel` 未指定時，`Awake` 會自動使用**自身的 `RectTransform`**。
+3. `Start` 時自動執行第一次適配；**解析度變更**時自動重新適配。
+
+```csharp
+using OxGKit.Utilities.Adapter;
+using UnityEngine;
+
+public class SafeAreaDemo : MonoBehaviour
+{
+    public UISafeAreaAdapter adapter;
+
+    private void Start()
+    {
+        // 需要應對螢幕旋轉時, 可開啟每幀刷新
+        this.adapter.refreshAlways = true;
+
+        // 或於特定時機手動刷新
+        this.adapter.RefreshViewSize();
+    }
+}
+```
+
+## 通用規則 {#general-rules}
+
+### 適配時機 {#refresh-timing}
+
+- **Start**：自動執行第一次適配。
+- **LateUpdate**：偵測到**解析度變更**時自動適配；`refreshAlways = true` 時**每幀**適配。
+- **手動**：呼叫 [RefreshViewSize](#refreshviewsize)。
+
+<Highlight color="#00d679">提醒</Highlight> 適配時的 Safe Area 與解析度日誌**僅於數值變更時輸出** (避免每幀產生字串配置)，日誌透過 **OxGKit.LoggingSystem** 輸出。
+
+---
+
+## 成員 {#members}
+
+| 成員 | 說明 |
+| :--- | :--- |
+| `public bool refreshAlways` | 是否每幀刷新適配 (預設 `false`)，應對螢幕旋轉等情境。 |
+| `public RectTransform panel` | 要適配的目標面板，未指定時自動使用自身的 `RectTransform`。 |
+
+---
+
+## 方法 {#methods}
+
+### RefreshViewSize {#refreshviewsize}
+
+```csharp
+public void RefreshViewSize()
+```
+
+依據當前 `Screen.safeArea` 重新計算並套用面板的 `anchorMin` 與 `anchorMax` (以螢幕寬高正規化)。
+
+```csharp
+adapter.RefreshViewSize();
+```

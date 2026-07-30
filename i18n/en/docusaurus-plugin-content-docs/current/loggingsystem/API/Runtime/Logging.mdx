@@ -1,0 +1,196 @@
+---
+sidebar_position: 1
+description: Logging is the abstract logger base class of LoggingSystem. It outputs logs of each level via generic static methods, and can be inherited to implement custom loggers and override output behavior.
+---
+
+# Logging
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`Logging` is the abstract logger base class of **LoggingSystem**. **Inherit this class to implement a custom logger**, and use the generic static methods (the `Print<TLogging>` series) to output logs of each level with the specified logger; output is filtered and colorized according to the [global and per-logger level/color rules](../../intro.mdx#log-level).
+
+|  |  |
+| :--- | :--- |
+| **Namespace** | `OxGKit.LoggingSystem` |
+| **Type** | `public abstract class Logging : ILogging` |
+| **Source** | [Logging.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/LoggingSystem/Scripts/Runtime/Logging/Logging.cs) |
+
+```csharp
+using OxGKit.LoggingSystem;
+```
+
+<Highlight color="#0373fc">Attention</Highlight> Loggers must first be initialized via [LoggingLauncher](./LoggingLauncher.mdx) (`TryInitLoggers` or `CreateLogger` + `TryLoadLoggers`) before the generic output takes effect; when building (Build), the **OXGKIT_LOGGER_ON** symbol must be added.
+
+## Quick Start {#quick-start}
+
+```csharp
+using OxGKit.LoggingSystem;
+
+// 1. Implement a custom logger (use [LoggerName] to customize the name)
+[LoggerName("Game.Logger")]
+public class GameLogger : Logging
+{
+    // If use HybridCLR must create a default constructor
+    public GameLogger() { }
+}
+
+// 2. Output logs via the generic static methods (the logger type specifies the outputter)
+Logging.Print<GameLogger>("Debug message");
+Logging.PrintInfo<GameLogger>("Info message");
+Logging.PrintWarning<GameLogger>("Warning message");
+Logging.PrintError<GameLogger>("Error message");
+Logging.PrintException<GameLogger>(new System.Exception("Exception message"));
+```
+
+## General Rules {#general-rules}
+
+### Logger Name {#logger-name}
+
+A logger is uniquely identified by its **name**, which defaults to the type name (Type Name) and can be customized via [LoggerNameAttribute](./LoggersConfig.mdx#loggernameattribute); the config file ([LoggersConfig](./LoggersConfig.mdx)) uses this name to map each logger's toggle/level/color settings.
+
+### Overriding a Logger {#override-logger}
+
+Mark a new logger class with `[LoggerName("SameName", true)]` (using the same name); during initialization it will **replace** the existing logger with the same name, which is useful for overriding output behavior (e.g., forwarding to files, remote collectors, etc.).
+
+```csharp
+[LoggerName("Game.Logger", true)]
+public class OverrideGameLogger : Logging
+{
+    public OverrideGameLogger() { }
+
+    public override void Log(object message)
+    {
+        UnityEngine.Debug.Log("[Override] " + message);
+    }
+}
+```
+
+### Output Filtering and Colorizing {#filter-colorize}
+
+Each output is checked in order: **global toggle/level (Master) → per-logger toggle/level (Per-Logger)**; a level is output only when both allow it (see the [level rules table](../../intro.mdx#log-level)); the colorize mode takes effect as the stricter of the global and per-logger [LogColor](./LoggersConfig.mdx#logcolor).
+
+---
+
+## Static Print Methods {#static-print}
+
+### Method Overview {#print-overview}
+
+| Method | Description |
+| :--- | :--- |
+| [Print](#print) | Outputs Debug level logs (corresponds to `Log`). |
+| [PrintInfo](#printinfo) | Outputs Info level logs (corresponds to `LogInfo`). |
+| [PrintWarning](#printwarning) | Outputs Warning level logs (corresponds to `LogWarning`). |
+| [PrintError](#printerror) | Outputs Error level logs (corresponds to `LogError`). |
+| [PrintException](#printexception) | Outputs Exception level logs (corresponds to `LogException`). |
+
+<Highlight color="#00d679">Reminder</Highlight> Each method accepts a `UnityEngine.Object context`; clicking the log in the Console highlights that object (same behavior as `Debug.Log(message, context)`).
+
+---
+
+### Print {#print}
+
+```csharp
+public static void Print<TLogging>(object message, UnityEngine.Object context = null) where TLogging : Logging
+```
+
+Outputs a **LogDebug** level log with the logger specified by `TLogging`.
+
+```csharp
+Logging.Print<GameLogger>("Hello OxGKit");
+Logging.Print<GameLogger>("With context", this.gameObject);
+```
+
+### PrintInfo {#printinfo}
+
+```csharp
+public static void PrintInfo<TLogging>(object message, UnityEngine.Object context = null) where TLogging : Logging
+```
+
+Outputs a **LogInfo** level log with the logger specified by `TLogging`.
+
+### PrintWarning {#printwarning}
+
+```csharp
+public static void PrintWarning<TLogging>(object message, UnityEngine.Object context = null) where TLogging : Logging
+```
+
+Outputs a **LogWarning** level log with the logger specified by `TLogging`.
+
+### PrintError {#printerror}
+
+```csharp
+public static void PrintError<TLogging>(object message, UnityEngine.Object context = null) where TLogging : Logging
+```
+
+Outputs a **LogError** level log with the logger specified by `TLogging`.
+
+### PrintException {#printexception}
+
+```csharp
+public static void PrintException<TLogging>(Exception exception, UnityEngine.Object context = null) where TLogging : Logging
+```
+
+Outputs a **LogException** level log with the logger specified by `TLogging`.
+
+---
+
+## Overridable Methods (virtual) {#virtual-methods}
+
+After inheriting `Logging`, the following output behaviors can be overridden; the default implementations are the corresponding `UnityEngine.Debug` methods:
+
+| Method | Default Implementation |
+| :--- | :--- |
+| `public virtual void Log(object message)` | `Debug.Log` |
+| `public virtual void LogInfo(object message)` | `Debug.Log` |
+| `public virtual void LogWarning(object message)` | `Debug.LogWarning` |
+| `public virtual void LogError(object message)` | `Debug.LogError` |
+| `public virtual void LogException(Exception exception)` | `Debug.LogException` |
+| `public virtual void Log(object message, UnityEngine.Object context)` | `Debug.Log` |
+| `public virtual void LogInfo(object message, UnityEngine.Object context)` | `Debug.Log` |
+| `public virtual void LogWarning(object message, UnityEngine.Object context)` | `Debug.LogWarning` |
+| `public virtual void LogError(object message, UnityEngine.Object context)` | `Debug.LogError` |
+| `public virtual void LogException(Exception exception, UnityEngine.Object context)` | `Debug.LogException` |
+
+---
+
+## Helper Methods {#helper-methods}
+
+### CheckLogActive {#checklogactive}
+
+```csharp
+public bool CheckLogActive(LogLevel logLevel)
+```
+
+Checks whether this logger is allowed to output at the specified level (determined by the intersection of the global and per-logger rules).
+
+### ShouldColorize {#shouldcolorize}
+
+```csharp
+public bool ShouldColorize()
+```
+
+Checks whether RichText coloring is currently enabled for this logger (the stricter of the global and per-logger [LogColor](./LoggersConfig.mdx#logcolor) wins; in the Editor, `EditorOnly` counts as enabled).
+
+### ColorizeLogMessage {#colorizelogmessage}
+
+```csharp
+public object ColorizeLogMessage(LogLevel logLevel, object message)
+```
+
+Formats the message with RichText coloring according to the level (returns it unchanged when coloring is not enabled).

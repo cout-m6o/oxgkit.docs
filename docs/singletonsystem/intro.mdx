@@ -1,0 +1,173 @@
+---
+sidebar_position: 1
+---
+
+# 模塊介紹
+
+export const Highlight = ({ children, color }) => (
+  <span
+    style={{
+      backgroundColor: color,
+      borderRadius: '5px',
+      color: '#fff',
+      padding: '2.5px'
+    }}>
+    {children}
+  </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+## 基本說明
+
+單例模式，支持 **MonoSingleton (MonoBehaviour)** 與 **NewSingleton (class)** 兩種單例基類，提供**線程安全的延遲建立**、**場景查找或自動建立實例**、**DontDestroyOnLoad 跨場景常駐控制**與 **OnCreate / OnStart / OnRelease 生命週期掛勾**。
+
+- 版本：**v1.0.2** (`com.michaelo.oxgkit.singletonsystem`)
+- 命名空間：`OxGKit.SingletonSystem`
+
+<Highlight color="#00d679">提醒</Highlight> 本模組**無任何第三方依賴**，可獨立安裝使用。
+
+---
+
+## 應用說明
+
+### 兩種單例基類
+
+| 基類 | 說明 |
+| :--- | :--- |
+| [`MonoSingleton<T>`](/docs/singletonsystem/API/Runtime/MonoSingleton) | `MonoBehaviour` 單例基類，取得實例時會**優先查找場景上的既有實例，否則自動建立 GameObject** 掛載組件，支持 `DontDestroyOnLoad` 常駐控制，並提供 `OnCreate` / `OnStart` / `OnRelease` 生命週期掛勾。 |
+| [`NewSingleton<T>`](/docs/singletonsystem/API/Runtime/NewSingleton) | 純 C# class 單例基類 (非 `MonoBehaviour`)，以 `new T()` 延遲建立實例 (雙重檢查鎖定)。 |
+
+### 生命週期掛勾 (MonoSingleton)
+
+`MonoSingleton<T>` 已將 Unity 的 `Awake()`、`Start()`、`OnDestroy()` 實作為基類**私有方法**，改由以下掛勾實作邏輯：
+
+| 掛勾 | 觸發時機 |
+| :--- | :--- |
+| `OnCreate()` | 由 Unity `Awake` 觸發 |
+| `OnStart()` | 由 Unity `Start` 觸發 |
+| `OnRelease()` | 由 Unity `OnDestroy` 觸發 |
+
+<Highlight color="#ff2f00">重要</Highlight> **不可實作 `Awake()`、`Start()`、`OnDestroy()`** (基類已佔用)，其餘 Unity 方法 (`Update`、`OnEnable` 等) 皆可正常實作。
+
+### DontDestroyOnLoad 控制
+
+- **場景預先放置**：實例於 `Awake` 自動註冊為單例，依 Inspector 上的 `dontDestroyOnLoad` 欄位 (預設 `true`) 決定是否跨場景常駐。
+- **程式動態建立**：由首次 `GetInstance(dontDestroyOnLoad)` / `InitInstance(dontDestroyOnLoad)` 呼叫的參數決定 (預設 `true`)。
+
+<Highlight color="#0373fc">注意</Highlight> `dontDestroyOnLoad` 於**首次建立實例時生效**，請於第一次取得實例的呼叫點決定並保持一致。
+
+### 腳本模板建立
+
+透過 Right-Click **Create/OxGKit/SingletonSystem/Template Mono Singleton.cs** 快速建立 MonoSingleton 模板腳本。
+
+---
+
+## 簡單使用
+
+### 實作 MonoSingleton
+
+```csharp
+using OxGKit.SingletonSystem;
+
+public class GameManager : MonoSingleton<GameManager>
+{
+    // |-------------------------------------------------------------------------------------|
+    // | Note: Except Awake(), Start() and OnDestroy(), other Unity methods can be override. |
+    // |-------------------------------------------------------------------------------------|
+
+    protected override void OnCreate()
+    {
+        /**
+         * Do Somethings OnCreate In Here (Call by Unity.Awake)
+         */
+    }
+
+    protected override void OnStart()
+    {
+        /**
+         * Do Somethings OnStart In Here (Call by Unity.Start)
+         */
+    }
+
+    protected override void OnRelease()
+    {
+        /**
+         * Do Somethings OnRelease In Here (Call by Unity.OnDestroy)
+         */
+    }
+}
+```
+
+```csharp
+// 取得實例 (場景查找或自動建立，預設 DontDestroyOnLoad)
+GameManager.GetInstance();
+
+// 場景限定單例 (隨場景卸載銷毀，首次取得時設定一次即可)
+GameManager.GetInstance(dontDestroyOnLoad: false);
+
+// 開機明確初始實例 (warm-up)
+GameManager.InitInstance();
+
+// 檢查實例是否存在
+if (GameManager.CheckInstanceExists()) { /* ... */ }
+
+// 銷毀實例 (連同 GameObject)
+GameManager.DestroyInstance();
+```
+
+### 實作 NewSingleton
+
+```csharp
+using OxGKit.SingletonSystem;
+
+public class ScoreManager : NewSingleton<ScoreManager>
+{
+    public int score = 0;
+
+    public static void AddScore()
+    {
+        GetInstance().score++;
+    }
+}
+```
+
+```csharp
+// 取得實例 (延遲 new T() 建立)
+var scoreManager = ScoreManager.GetInstance();
+ScoreManager.AddScore();
+
+// 銷毀實例 (僅清空靜態引用)
+ScoreManager.DestroyInstance();
+```
+
+*[參考 Example]*
+
+---
+
+## Installation
+
+| Install via git URL |
+|:--- |
+| Add https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/SingletonSystem/Scripts to Package Manager |
+
+**第三方庫**
+
+- 無 (本模組無任何第三方依賴)。
+
+**Samples (Package Manager -> Samples)**
+
+- **AI Agent Skills** (參考 [AI Agent Skills](/docs/agent-skills))
+- **MonoSingleton Demo**
+
+---
+
+## 模塊 API
+
+- Runtime
+  - [MonoSingleton](/docs/singletonsystem/API/Runtime/MonoSingleton) (using OxGKit.SingletonSystem)
+  - [NewSingleton](/docs/singletonsystem/API/Runtime/NewSingleton) (using OxGKit.SingletonSystem)

@@ -1,0 +1,192 @@
+---
+sidebar_position: 1
+description: ActionRunner is the action runner of the ActionSystem, responsible for starting, queuing, removing, and releasing actions, driven by the owner through DriveUpdate.
+---
+
+# ActionRunner
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`ActionRunner` is the action runner of the **ActionSystem** (a plain C# class, not a MonoBehaviour). It is responsible for **starting (RunAction), queuing (QueueAction), removing (RemoveAction), and releasing (Release) actions**. It has no update loop of its own - an owner (a MonoBehaviour `Update`, an updater, etc.) must call `DriveUpdate(dt)` to pump it.
+
+|  |  |
+| :--- | :--- |
+| **Namespace** | `OxGKit.ActionSystem` |
+| **Type** | `public class ActionRunner` |
+| **Source** | [ActionRunner.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/ActionSystem/Scripts/Runtime/Core/ActionRunner.cs) |
+
+```csharp
+using OxGKit.ActionSystem;
+```
+
+<Highlight color="#00d679">Reminder</Highlight> Since **v1.0.3** the public update entry point is `DriveUpdate(dt)` (consistent with the Drive naming across OxGKit systems); `OnUpdate(dt)` is now `protected` and driven by `DriveUpdate`.
+
+## Quick Start {#quick-start}
+
+```csharp
+using OxGKit.ActionSystem;
+using UnityEngine;
+
+public class FeatureController : MonoBehaviour
+{
+    private ActionRunner _runner;
+
+    private void Awake()
+    {
+        // Create the runner (name it for log identification)
+        this._runner = new ActionRunner("FeatureRunner");
+    }
+
+    private void Start()
+    {
+        // Compose a sequence
+        var seqAction = new SequenceAction("OpenFlow");
+        seqAction
+            .AddAction(DelegateAction.CreateDelegateAction(() => Debug.Log("Step 1")))
+            .AddAction(DelayAction.CreateDelayAction(1f))
+            .AddAction(DelegateAction.CreateDelegateAction(() => Debug.Log("Step 2")));
+
+        // Start the action (resets the runner)
+        this._runner.RunAction(seqAction);
+    }
+
+    private void Update()
+    {
+        // Pumped by the owner
+        this._runner.DriveUpdate(Time.deltaTime);
+    }
+
+    private void OnDestroy()
+    {
+        // Release on exit so pending callbacks cannot hit released objects
+        this._runner.Release();
+    }
+}
+```
+
+## General Rules {#general-rules}
+
+### Driving Rules {#drive-rules}
+
+<Highlight color="#ff2f00">Important</Highlight> A runner must be pumped by a **single owner** through `DriveUpdate`: without a driver, actions do not advance; pumped twice in the same frame, they run at **double speed**.
+
+<Highlight color="#ff2f00">Important</Highlight> When the owner (scene/UI/feature) exits, call [Release](#release) to clear the actions, so pending callbacks cannot hit released objects.
+
+### Done Reports {#done-log}
+
+<Highlight color="#00d679">Reminder</Highlight> Done and removed actions are reported through the **LoggingSystem** logger **OxGKit.ActionSystem.Logger**; enable it in the [LoggingSystem](/docs/loggingsystem/intro) configuration to trace runs.
+
+---
+
+## Members {#members}
+
+| Member | Description |
+| :--- | :--- |
+| `public string name` | Runner name (defaults to `ActionRunner`), used for log identification. |
+
+### Constructors {#constructors}
+
+```csharp
+public ActionRunner()
+
+public ActionRunner(string name)
+```
+
+Creates a runner; `name` can be specified for log identification.
+
+---
+
+## Action Management {#action-management}
+
+### Method Overview {#action-management-overview}
+
+| Method | Description |
+| :--- | :--- |
+| [DriveUpdate](#driveupdate) | Called by the owner to pump the runner. |
+| [RunAction](#runaction) | Resets the runner and starts the action immediately. |
+| [QueueAction](#queueaction) | Queues an action (started on the next update). |
+| [RemoveAction](#removeaction) | Removes an action by UID. |
+| [Release](#release) | Clears all actions. |
+
+---
+
+### DriveUpdate {#driveupdate}
+
+```csharp
+public void DriveUpdate(float dt)
+```
+
+Called by the owner (a MonoBehaviour `Update`, etc.) to pump the runner: updates all running actions, removes finished (`IsAllDone`) actions and prints their done reports, then starts any queued actions.
+
+```csharp
+private void Update()
+{
+    this._runner.DriveUpdate(Time.deltaTime);
+}
+```
+
+### RunAction {#runaction}
+
+```csharp
+public void RunAction(ActionBase action)
+```
+
+**Resets the runner** (clears running/queued actions), then starts the given action immediately.
+
+<Highlight color="#0373fc">Attention</Highlight> `RunAction` **resets the runner** before starting (replace behavior); to **append** an action without clearing existing ones, use [QueueAction](#queueaction) instead.
+
+### QueueAction {#queueaction}
+
+```csharp
+public ActionRunner QueueAction(ActionBase action)
+```
+
+Enqueues an action (the same action instance is never enqueued twice); queued actions start and become running on the **next `DriveUpdate`**. Returns the runner itself, so calls are **chainable**.
+
+```csharp
+this._runner
+    .QueueAction(actionA)
+    .QueueAction(actionB);
+```
+
+### RemoveAction {#removeaction}
+
+```csharp
+public void RemoveAction(int uid)
+```
+
+Removes an action by `uid` from the **running** and **queued** caches; the removed action is marked all done (`MarkAllDone`) and a removal report is printed.
+
+```csharp
+var action = new SequenceAction("Flow", 1001);
+this._runner.QueueAction(action);
+
+// Remove by UID
+this._runner.RemoveAction(1001);
+```
+
+### Release {#release}
+
+```csharp
+public void Release()
+```
+
+Clears all actions (running/queued/done caches).
+
+<Highlight color="#ff2f00">Important</Highlight> The owner must call `Release()` on exit (OnDestroy, etc.).

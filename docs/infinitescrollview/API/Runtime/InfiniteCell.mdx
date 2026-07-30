@@ -1,0 +1,217 @@
+---
+sidebar_position: 3
+description: InfiniteCell 為掛載於 Cell Prefab 的基底類，透過 OnCreate、OnRefresh、OnRecycle、OnSnap、OnClick 生命週期實作顯示邏輯，並涵蓋數據載體 InfiniteCellData。
+---
+
+# InfiniteCell
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`InfiniteCell` 為 **Cell 的基底類** (`MonoBehaviour`)，掛載於 Cell Prefab 的根節點；Cell 由物件池**循環利用**，透過覆寫**生命週期方法**實作顯示邏輯，渲染所需的數據由 [InfiniteCellData](#infinitecelldata) 承載。
+
+|  |  |
+| :--- | :--- |
+| **命名空間** | `OxGKit.InfiniteScrollView` |
+| **類型** | `public class InfiniteCell : MonoBehaviour` |
+| **原始碼** | [InfiniteCell.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/InfiniteScrollView/Scripts/Runtime/Core/CellObject/InfiniteCell.cs) |
+
+```csharp
+using OxGKit.InfiniteScrollView;
+```
+
+<Highlight color="#00d679">提醒</Highlight> 透過 Right-Click **Create/OxGKit/Infinite ScrollView/Template Infinite Cell.cs (Script)** 與 **Template Infinite Cell (RectTransform Prefab)** 可快速建立 Cell 的腳本與 Prefab 模板。
+
+## 快速上手 {#quick-start}
+
+```csharp
+using Cysharp.Threading.Tasks;
+using OxGKit.InfiniteScrollView;
+using UnityEngine.UI;
+
+public class ItemCell : InfiniteCell
+{
+    public Text titleTxt;
+    public Button button;
+
+    public override async UniTask OnCreate(object args)
+    {
+        // 建立時初始一次 (args 由 InitializePool(args) 轉傳)
+        this.button.onClick.AddListener(this.OnClick);
+    }
+
+    public override void OnRefresh()
+    {
+        // Cell 為物件池循環利用，顯示必須完全由 cellData 驅動
+        string text = (string)this.cellData.data;
+        this.titleTxt.text = $"[{this.cellData.index}] {text}";
+    }
+
+    public override void OnRecycle()
+    {
+        // 回收回物件池時的清理
+    }
+
+    public override void OnSnap()
+    {
+        // 成為 Snap 目標時的表現 (如高亮)
+    }
+
+    public override void OnClick()
+    {
+        // 觸發列表的 onCellSelected 事件
+        base.OnClick();
+    }
+}
+```
+
+## 通用規則 {#general-rules}
+
+### 生命週期 {#lifecycle}
+
+| 方法 | 觸發時機 |
+| :--- | :--- |
+| [OnCreate](#oncreate) | [InitializePool](./InfiniteScrollView.mdx#initializepool) 實例化 Cell 時 (一次性，`await`)。 |
+| [OnRefresh](#onrefresh) | `cellData` 被指派時 (Cell 進入可視範圍配置顯示、數據刷新)。 |
+| [OnRecycle](#onrecycle) | Cell 被回收回物件池時 (GameObject 已停用)。 |
+| [OnSnap](#onsnap) | [Snap](./InfiniteScrollView.mdx#snap) 完成且該 Cell 為目標時。 |
+| [OnClick](#onclick) | 點擊時 (需自行將 Button 事件綁定至此方法)。 |
+
+<Highlight color="#ff2f00">重要</Highlight> Cell 為**物件池循環利用** — 同一個 Cell 實例會輪流顯示不同筆數據，[OnRefresh](#onrefresh) 必須**完全由 `cellData` 驅動重繪**，勿將單筆項目的狀態存於 Cell 身上 (應存於數據物件)。
+
+<Highlight color="#0373fc">注意</Highlight> `Insert` / `Remove` 會位移數據索引，Cell 內請即時讀取 `this.cellData.index`，勿快取索引值。
+
+---
+
+## 成員 {#members}
+
+| 成員 | 說明 |
+| :--- | :--- |
+| `public RectTransform rectTransform` | Cell 的 `RectTransform` (自動快取)。 |
+| `public InfiniteCellData cellData` | 當前綁定的數據；**被指派 (set) 時會自動觸發 [OnRefresh](#onrefresh)**。 |
+
+---
+
+## 方法 {#methods}
+
+### 方法總覽 {#methods-overview}
+
+| 方法 | 說明 |
+| :--- | :--- |
+| [OnCreate](#oncreate) | 建立時初始 (一次性)。 |
+| [OnRefresh](#onrefresh) | 依數據重繪顯示。 |
+| [OnRecycle](#onrecycle) | 回收時清理。 |
+| [OnSnap](#onsnap) | 成為 Snap 目標時。 |
+| [OnClick](#onclick) | 點擊事件 (觸發選中)。 |
+| [InvokeSelected](#invokeselected) | (protected) 主動觸發選中事件。 |
+
+---
+
+### OnCreate {#oncreate}
+
+```csharp
+public virtual async UniTask OnCreate(object args)
+```
+
+於 [InitializePool](./InfiniteScrollView.mdx#initializepool) 實例化 Cell 時被 `await` 呼叫**一次**；`args` 為 `InitializePool(args)` 轉傳的自定義參數，適合進行組件初始等一次性設置。
+
+### OnRefresh {#onrefresh}
+
+```csharp
+public virtual void OnRefresh()
+```
+
+`cellData` 被指派時自動呼叫 — 於 Cell 被配置顯示 (進入可視範圍) 時觸發，請在此依 `cellData` 重繪顯示內容。
+
+### OnRecycle {#onrecycle}
+
+```csharp
+public virtual void OnRecycle()
+```
+
+Cell 被回收回物件池時呼叫 (此時 GameObject 已被停用)，可在此進行清理 (如停止動畫、釋放暫存)。
+
+### OnSnap {#onsnap}
+
+```csharp
+public virtual void OnSnap()
+```
+
+[Snap](./InfiniteScrollView.mdx#snap) 完成且該 Cell 為目標索引時呼叫 (適用頁籤切換、選中表現等)。
+
+### OnClick {#onclick}
+
+```csharp
+public virtual void OnClick()
+```
+
+點擊事件入口 — 預設實作會呼叫 [InvokeSelected](#invokeselected) 觸發列表的 [onCellSelected](./InfiniteScrollView.mdx#events) 事件；請自行將 Cell 上的 `Button` 事件綁定至此方法 (覆寫時記得呼叫 `base.OnClick()`)。
+
+### InvokeSelected {#invokeselected}
+
+```csharp
+protected void InvokeSelected()
+```
+
+主動觸發選中事件 (通知列表的 [onCellSelected](./InfiniteScrollView.mdx#events))；自定義點擊流程 (不經由 [OnClick](#onclick)) 時可直接呼叫。
+
+---
+
+## InfiniteCellData {#infinitecelldata}
+
+Cell 的**數據載體**，決定 Cell 的尺寸與渲染數據；與 Cell (顯示) 分離，由列表持有並於配置顯示時綁定給 Cell。
+
+|  |  |
+| :--- | :--- |
+| **類型** | `public class InfiniteCellData : IDisposable` |
+| **原始碼** | [InfiniteCellData.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/InfiniteScrollView/Scripts/Runtime/Core/CellData/InfiniteCellData.cs) |
+
+| 成員 | 說明 |
+| :--- | :--- |
+| `public int index { get; internal set; }` | 數據索引 (由列表自動維護，`Insert` / `Remove` 後自動更新)。 |
+| `public Vector2 cellSize` | Cell 尺寸 (x = 寬、y = 高)：垂直列表取 `y`、水平列表取 `x`、Grid 兩者皆用。 |
+| `public object data` | 渲染 Cell 所需的自定義數據。 |
+
+**建構子**
+
+```csharp
+public InfiniteCellData()
+public InfiniteCellData(Vector2 cellSize)
+public InfiniteCellData(Vector2 cellSize, object data)
+```
+
+**方法**
+
+```csharp
+public void Dispose()
+```
+
+釋放數據引用 (`data = null`)；由列表的 `Remove` / `Clear` 自動呼叫。
+
+**動態尺寸範例 (聊天室)**
+
+```csharp
+// 先以量測用 Text 計算文字高度，再依內容建立動態高度的數據
+this.heightInstrument.text = message;
+float height = this.heightInstrument.preferredHeight;
+this.chatScrollView.Add(new InfiniteCellData(new Vector2(0f, height), new ChatData(user, message)));
+this.chatScrollView.Refresh();
+this.chatScrollView.SnapLast(0.1f);
+```
+
+<Highlight color="#0373fc">注意</Highlight> `cellSize` 需於**加入列表前**決定；之後變更尺寸需更新該筆數據的 `cellSize` 並執行完整 [Refresh](./InfiniteScrollView.mdx#refresh)。

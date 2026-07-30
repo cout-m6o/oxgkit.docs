@@ -1,0 +1,151 @@
+---
+sidebar_position: 7
+description: UMT 是 Unity 主线程调度器，可将任意线程的工作排入主线程执行，并支持协程管理。
+---
+
+# UMT
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`UMT` (**U**nity **M**ain **T**hread) 是 **Unity 主线程调度器** (`MonoBehaviour` 懒汉式单例)，可将**任意线程**的工作 (`Action`) 排入队列，于 Unity **主线程的 `Update`** 中依次执行 (排入操作具线程锁)，并支持**协程的启动与停止**管理。
+
+|  |  |
+| :--- | :--- |
+| **命名空间** | `OxGKit.Utilities.UnityMainThread` |
+| **类型** | `public class UMT : MonoBehaviour` |
+| **源码** | [UMT.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/Utilities/Scripts/Runtime/UnityMainThread/UMT.cs) |
+
+```csharp
+using OxGKit.Utilities.UnityMainThread;
+```
+
+<Highlight color="#0373fc">注意</Highlight> 首次访问 `UMT.worker` 时，会**自动创建名为 `[UMT]` 的常驻对象** (挂入 `OxGKit` 容器并 `DontDestroyOnLoad`)；请避免于应用程序**关闭/销毁流程**中首次触发，以免产生多余对象。
+
+## 快速上手 {#quick-start}
+
+```csharp
+using OxGKit.Utilities.UnityMainThread;
+using System.Threading.Tasks;
+using UnityEngine;
+
+public class UMTDemo : MonoBehaviour
+{
+    private void Start()
+    {
+        Task.Run(() =>
+        {
+            // 于后台线程完成运算后...
+            var result = 1 + 1;
+
+            // 将需要操作 Unity API 的工作排回主线程
+            UMT.worker.AddJob(() =>
+            {
+                Debug.Log($"Result: {result} (main thread)");
+                this.transform.position = Vector3.zero;
+            });
+        });
+    }
+}
+```
+
+## 通用规则 {#general-rules}
+
+### 执行时机 {#execution-timing}
+
+- 通过 [AddJob](#addjob) 排入的工作，会于 UMT 的 **`Update` 中依次全部执行** (FIFO)。
+- `AddJob` 具**线程锁**，可于**任意线程**安全调用；协程相关方法仍需于主线程使用。
+
+---
+
+## 成员 {#members}
+
+| 成员 | 说明 |
+| :--- | :--- |
+| `public static UMT worker` | 获取 UMT 单例 (首次访问自动创建常驻对象)。 |
+
+---
+
+## 方法总览 {#method-overview}
+
+| 方法 | 说明 |
+| :--- | :--- |
+| [AddJob](#addjob) | 将工作排入队列，于主线程的 Update 中执行。 |
+| [RunCoroutine](#runcoroutine) | 启动协程 (IEnumerator 或方法名称)。 |
+| [CancelCoroutine](#cancelcoroutine) | 停止协程 (IEnumerator 或方法名称)。 |
+| [CancelAllCoroutines](#cancelallcoroutines) | 停止所有由 UMT 启动的协程。 |
+| [Clear](#clear) | 清空尚未执行的工作队列。 |
+
+---
+
+### AddJob {#addjob}
+
+```csharp
+public void AddJob(Action newJob)
+```
+
+将工作排入队列，于**主线程的 `Update`** 中依次执行；可于**任意线程**调用 (具线程锁)。
+
+```csharp
+UMT.worker.AddJob(() =>
+{
+    // Do main thread job
+});
+```
+
+### RunCoroutine {#runcoroutine}
+
+```csharp
+public void RunCoroutine(IEnumerator routine)
+
+public void RunCoroutine(string methodName)
+```
+
+以 UMT 作为宿主**启动协程**；适合让非 MonoBehaviour 的类执行协程。
+
+```csharp
+UMT.worker.RunCoroutine(this.MyRoutine());
+```
+
+<Highlight color="#00d679">提醒</Highlight> **字符串版本**依 Unity `StartCoroutine(string)` 语义，仅能启动**定义于 UMT 自身**的方法，一般情况请使用 **IEnumerator 版本**。
+
+### CancelCoroutine {#cancelcoroutine}
+
+```csharp
+public void CancelCoroutine(IEnumerator routine)
+
+public void CancelCoroutine(string methodName)
+```
+
+停止指定的协程 (需传入**与启动时相同**的 IEnumerator 实例或方法名称)。
+
+### CancelAllCoroutines {#cancelallcoroutines}
+
+```csharp
+public void CancelAllCoroutines()
+```
+
+停止**所有**由 UMT 启动的协程。
+
+### Clear {#clear}
+
+```csharp
+public void Clear()
+```
+
+清空**尚未执行**的工作队列 (已执行的工作不受影响)。

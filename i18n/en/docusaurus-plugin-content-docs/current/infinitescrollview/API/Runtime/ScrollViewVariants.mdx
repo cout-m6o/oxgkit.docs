@@ -1,0 +1,180 @@
+---
+sidebar_position: 2
+description: The four built-in implementations of InfiniteScrollView, covering the members and overridden behaviors of VerticalInfiniteScrollView (vertical), HorizontalInfiniteScrollView (horizontal), VerticalGridInfiniteScrollView (vertical grid), and HorizontalGridInfiniteScrollView (horizontal grid).
+---
+
+# ScrollView Variants
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+**InfiniteScrollView** ships with **4 implementations** (all inheriting [InfiniteScrollView](./InfiniteScrollView.mdx)) — attach the matching component to the `ScrollRect` object and assign `cellPrefab` to use it; see the [base class page](./InfiniteScrollView.mdx) for the **shared APIs** (initialization, data operations, refreshing, scrolling, and snapping).
+
+|  |  |
+| :--- | :--- |
+| **Namespace** | `OxGKit.InfiniteScrollView` |
+| **Type** | `VerticalInfiniteScrollView`, `HorizontalInfiniteScrollView`, `VerticalGridInfiniteScrollView`, `HorizontalGridInfiniteScrollView` (all inherit `InfiniteScrollView`) |
+| **Source** | [VerticalInfiniteScrollView.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/InfiniteScrollView/Scripts/Runtime/Core/ScrollView/VerticalInfiniteScrollView.cs), [HorizontalInfiniteScrollView.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/InfiniteScrollView/Scripts/Runtime/Core/ScrollView/HorizontalInfiniteScrollView.cs), [VerticalGridInfiniteScrollView.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/InfiniteScrollView/Scripts/Runtime/Core/ScrollView/VerticalGridInfiniteScrollView.cs), [HorizontalGridInfiniteScrollView.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/InfiniteScrollView/Scripts/Runtime/Core/ScrollView/HorizontalGridInfiniteScrollView.cs) |
+
+```csharp
+using OxGKit.InfiniteScrollView;
+```
+
+## Quick Start {#quick-start}
+
+### Variants Overview {#variants-overview}
+
+| Implementation | Layout | Specific Members |
+| :--- | :--- | :--- |
+| [VerticalInfiniteScrollView](#verticalinfinitescrollview) | Vertical list (scrolls up and down) | `spacing` (`float`) |
+| [HorizontalInfiniteScrollView](#horizontalinfinitescrollview) | Horizontal list (scrolls left and right) | `spacing` (`float`) |
+| [VerticalGridInfiniteScrollView](#verticalgridinfinitescrollview) | Vertical grid (scrolls up and down) | `spacing` (`Vector2`), `columnCount` |
+| [HorizontalGridInfiniteScrollView](#horizontalgridinfinitescrollview) | Horizontal grid (scrolls left and right) | `spacing` (`Vector2`), `rowCount` |
+
+```csharp
+using Cysharp.Threading.Tasks;
+using OxGKit.InfiniteScrollView;
+using UnityEngine;
+
+public class GridLauncher : MonoBehaviour
+{
+    public VerticalGridInfiniteScrollView gridScrollView;
+
+    private async void Start()
+    {
+        // Grid setup (also configurable on the Inspector)
+        this.gridScrollView.columnCount = 4;
+        this.gridScrollView.spacing = new Vector2(10f, 10f);
+
+        await this.gridScrollView.InitializePool();
+
+        for (int i = 0; i < 500; i++)
+            this.gridScrollView.Add(new InfiniteCellData(new Vector2(100f, 100f), i));
+        this.gridScrollView.Refresh();
+    }
+}
+```
+
+## General Rules {#general-rules}
+
+- The 4 implementations only differ in **layout calculation and their specific members**; data operations, refreshing, and snapping all share the [base class behaviors](./InfiniteScrollView.mdx).
+- The list does **not** configure the `ScrollRect` scroll axis automatically — set the `ScrollRect`'s **Vertical / Horizontal** checkboxes to match the implementation you use.
+
+<Highlight color="#0373fc">Attention</Highlight> The grid implementations advance the layout and content-size calculation using the **`cellSize` of the first data entry of each row/column strip**, so a **uniform cellSize** is recommended for grids (dynamic sizes are suited to the Vertical / Horizontal lists).
+
+---
+
+## VerticalInfiniteScrollView {#verticalinfinitescrollview}
+
+Vertical infinite list (scrolls up and down); suited to leaderboards, chat rooms, and other vertical lists.
+
+|  |  |
+| :--- | :--- |
+| **Type** | `public class VerticalInfiniteScrollView : InfiniteScrollView` |
+| **Source** | [VerticalInfiniteScrollView.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/InfiniteScrollView/Scripts/Runtime/Core/ScrollView/VerticalInfiniteScrollView.cs) |
+
+| Member | Description |
+| :--- | :--- |
+| `public float spacing` | Vertical spacing between cells. |
+
+**Overridden Behaviors**
+
+```csharp
+public override void Snap(int index, float duration)
+public override bool Remove(int index, bool refresh = true)
+```
+
+- `Snap`: calculates the **vertical** target position by accumulating `cellSize.y + spacing` according to `snapAlign` (no-op when the content height is smaller than the viewport and cannot scroll).
+- `Remove`: after removal, the content position is **shifted back by one cell** (`cellSize.y + spacing`) to avoid a visual jump.
+
+---
+
+## HorizontalInfiniteScrollView {#horizontalinfinitescrollview}
+
+Horizontal infinite list (scrolls left and right); suited to card rows, horizontal menus, and other horizontal lists.
+
+|  |  |
+| :--- | :--- |
+| **Type** | `public class HorizontalInfiniteScrollView : InfiniteScrollView` |
+| **Source** | [HorizontalInfiniteScrollView.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/InfiniteScrollView/Scripts/Runtime/Core/ScrollView/HorizontalInfiniteScrollView.cs) |
+
+| Member | Description |
+| :--- | :--- |
+| `public float spacing` | Horizontal spacing between cells. |
+
+**Overridden Behaviors**
+
+```csharp
+public override void Snap(int index, float duration)
+public override bool Remove(int index, bool refresh = true)
+```
+
+- `Snap`: calculates the **horizontal** target position by accumulating `cellSize.x + spacing` according to `snapAlign` (no-op when the content width is smaller than the viewport and cannot scroll).
+- `Remove`: after removal, the content position is shifted back by one cell (`cellSize.x + spacing`).
+
+<Highlight color="#00d679">Reminder</Highlight> Tab-page (TabPage) usage can combine a horizontal list with [Snap](./InfiniteScrollView.mdx#snap) to switch pages (see the **Infinite TabPage Demo** in Samples, listed in the [Module Intro](../../intro.mdx#installation)).
+
+---
+
+## VerticalGridInfiniteScrollView {#verticalgridinfinitescrollview}
+
+Vertical grid infinite list (scrolls up and down) with `columnCount` cells side by side per row; suited to inventories, shops, and other grid lists.
+
+|  |  |
+| :--- | :--- |
+| **Type** | `public class VerticalGridInfiniteScrollView : InfiniteScrollView` |
+| **Source** | [VerticalGridInfiniteScrollView.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/InfiniteScrollView/Scripts/Runtime/Core/ScrollView/VerticalGridInfiniteScrollView.cs) |
+
+| Member | Description |
+| :--- | :--- |
+| `public Vector2 spacing` | Cell spacing (x = horizontal, y = vertical). |
+| `public int columnCount` | Column count (cells side by side per row), default `1` (values less than or equal to 0 are treated as 1). |
+
+**Overridden Behaviors**
+
+```csharp
+public override void Snap(int index, float duration)
+```
+
+- `Snap`: calculates the **vertical** target position from the row the target index belongs to (`index / columnCount`).
+
+<Highlight color="#0373fc">Attention</Highlight> `columnCount` was renamed from `columeCount` (typo fix) in **v1.7.1**; it is marked with `FormerlySerializedAs`, so serialized data of old scenes / prefabs migrates automatically.
+
+---
+
+## HorizontalGridInfiniteScrollView {#horizontalgridinfinitescrollview}
+
+Horizontal grid infinite list (scrolls left and right) with `rowCount` cells stacked per column.
+
+|  |  |
+| :--- | :--- |
+| **Type** | `public class HorizontalGridInfiniteScrollView : InfiniteScrollView` |
+| **Source** | [HorizontalGridInfiniteScrollView.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/InfiniteScrollView/Scripts/Runtime/Core/ScrollView/HorizontalGridInfiniteScrollView.cs) |
+
+| Member | Description |
+| :--- | :--- |
+| `public Vector2 spacing` | Cell spacing (x = horizontal, y = vertical). |
+| `public int rowCount` | Row count (cells stacked per column), default `1` (values less than or equal to 0 are treated as 1). |
+
+**Overridden Behaviors**
+
+```csharp
+public override void Snap(int index, float duration)
+```
+
+- `Snap`: calculates the **horizontal** target position from the column the target index belongs to (`index / rowCount`).

@@ -1,0 +1,216 @@
+---
+sidebar_position: 1
+description: DoTweenAnim is the tween animation component of TweenSystem, configuring Position, Rotation, Scale, Size, Alpha, and Color tween tracks in the Inspector with Normal, Reverse, PingPong, Sequence play modes and editor preview.
+---
+
+# DoTweenAnim
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`DoTweenAnim` is the **tween animation component** of **TweenSystem** (based on **DoTween Pro**). Enable and configure **tween tracks** (Position, Rotation, Scale, Size, Alpha, Color) in the Inspector; each track supports **Normal, Reverse, PingPong, Sequence** play modes. Choose the **DriveMode** to play either **automatically on activation (Active)** or **event-driven (Event)**, with **editor Preview Mode** support. Add it via **Add Component/OxGKit/TweenSystem/DoTweenAnim** (only one per GameObject).
+
+|  |  |
+| :--- | :--- |
+| **Namespace** | `OxGKit.TweenSystem` |
+| **Type** | `public class DoTweenAnim : MonoBehaviour` |
+| **Source** | [DoTweenAnim.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/TweenSystem/Scripts/Runtime/DoTweenAnim.cs) |
+
+```csharp
+using OxGKit.TweenSystem;
+```
+
+<Highlight color="#0373fc">Attention</Highlight> The end callback type is DoTween's `TweenCallback` (`DG.Tweening`); add `using DG.Tweening;` when using callbacks.
+
+## Quick Start {#quick-start}
+
+```csharp
+using DG.Tweening;
+using OxGKit.TweenSystem;
+
+// 1. Add Component/OxGKit/TweenSystem/DoTweenAnim
+// 2. Enable tween tracks in the Inspector (tPositionOn, tScaleOn...)
+//    and configure from/to values, duration, easeMode, playMode
+
+// DriveMode.Active: plays automatically when the GameObject becomes active
+doTweenAnim.gameObject.SetActive(true);
+
+// DriveMode.Event: driven by code (or DoTweenAnimEvent)
+doTweenAnim.PlayTween(true);                                   // Play forward
+doTweenAnim.PlayTween(false, () => Debug.Log("Play ended"));   // Play backward + end callback
+```
+
+## General Rules {#general-rules}
+
+### Tween Tracks {#tween-tracks}
+
+After enabling a track toggle, the Inspector shows the corresponding track configuration (TweenValues); tracks that require a component **auto-find the component on the same GameObject** during initialization, and the track does not play if the component is not found:
+
+| Toggle | Track (Type) | Tween Target (DoTween) | Required Component (auto find) |
+| :--- | :--- | :--- | :--- |
+| `tPositionOn` | `tPosition` (`TweenPosition`) | Position (`DOLocalMove`) | Transform |
+| `tRotationOn` | `tRotation` (`TweenRotation`) | Rotation (`DOLocalRotate` / `DOLocalRotateQuaternion`) | Transform |
+| `tScaleOn` | `tScale` (`TweenScale`) | Scale (`DOScale`) | Transform |
+| `tSizeOn` | `tSize` (`TweenSize`) | Size (`DOSizeDelta`) | RectTransform |
+| `tAlphaOn` | `tAlpha` (`TweenAlpha`) | Alpha (`DOFade`) | CanvasGroup |
+| `tImgColorOn` | `tImgColor` (`TweenImgColor`) | Color (`DOColor`) | Image |
+| `tSprColorOn` | `tSprColor` (`TweenSprColor`) | Color (`DOColor`) | SpriteRenderer |
+
+### PlayMode {#playmode}
+
+```csharp
+public enum PlayMode
+{
+    Normal,     // Plays forward (from -> to)
+    Reverse,    // Plays backward (to -> from)
+    PingPong,   // Plays back and forth (from -> to -> from)
+    Sequence    // Plays along the waypoint list in order
+}
+```
+
+<Highlight color="#0373fc">Attention</Highlight> In **Sequence** mode, from / to (begin / end) values are ignored; use the track's **waypoint list** instead (`posSeq`, `angleSeq`, `scaleSeq`, `sizeSeq`, `alphaSeq`, `colorSeq`).
+
+### DriveMode {#drivemode}
+
+```csharp
+public enum DriveMode
+{
+    Active,    // Plays automatically on activation (SetActive-driven)
+    Event      // Event-driven playback (DoTweenAnimEvent or code)
+}
+```
+
+- **Active**: **automatically resets and plays** on `OnEnable`, and resets back to the origin values on `OnDisable`; loop settings (loopTimes / loopType) and interval replay (isInterval / intervalTime) take effect in this mode.
+- **Event**: waits for an external call to [PlayTween](#playtween) (usually driven by [DoTweenAnimEvent](./DoTweenAnimEvent.mdx) as a group); the **trigger** decides forward/backward and it plays a **single pass** (loop settings are not applied). When the Inspector's **Auto Active** option is on, `Awake` automatically hides the GameObject with `SetActive(false)`, and the GameObject is also deactivated automatically after a backward play (trigger = false) finishes.
+
+<Highlight color="#ff2f00">Important</Highlight> Pick only one drive style per DoTweenAnim: **Active** mode replays automatically on every activation, so **do not** also drive the same component through a DoTweenAnimEvent.
+
+### Ignore Time Scale {#ignore-time-scale}
+
+The Inspector's **Ignore Time Scale** option (default **true**) is applied to all tracks: tweens are **not affected by `Time.timeScale`** (they keep playing in pause menus); interval replay timing also uses `unscaledDeltaTime` or `deltaTime` according to this option.
+
+### Editor Preview (Preview Mode) {#preview-mode}
+
+- The **Editor block** at the bottom of the Inspector provides **preview playback**: **Active** mode shows a **Play** button and a **Progress** slider; **Event** mode shows an alternating **Play Trigger (true / false)** button; the **Stop** button stops the preview and restores the origin values.
+- When the **Is Sync Begin Value** option is on, editing the track configuration **automatically syncs the begin values** onto the GameObject (`OnValidate`).
+- During preview (`isPreviewMode`) the tween settings are locked, and loop times are forced to 0 (single pass).
+- Editing in the scene is not allowed during Play Mode; only editing in **Prefab Isolation** mode is supported.
+- See the preview illustration in the [Module Intro](../../intro.mdx#preview-mode).
+
+---
+
+## Members {#members}
+
+| Member | Description |
+| :--- | :--- |
+| `public DriveMode driveMode` | Drive mode (default `Active`), Inspector: **Drive Mode** (see [DriveMode](#drivemode)). |
+| `public bool tPositionOn` ... `public bool tSprColorOn` | The seven track toggles (all default `false`), see [Tween Tracks](#tween-tracks). |
+| `public TweenPosition tPosition` ... `public TweenSprColor tSprColor` | **Read-only accessors** for the seven track configurations (read `seq`, `duration`, etc. at runtime). |
+| `public static bool isPreviewMode` | **(UNITY_EDITOR)** Whether the editor preview mode is currently active. |
+
+### Common Track Configuration (TweenBase) {#tweenbase}
+
+All tracks inherit the common configuration from `TweenBase`:
+
+```csharp
+[Serializable]
+public class TweenBase
+{
+    public bool isInterval;        // Interval replay toggle (only effective in DriveMode.Active)
+    public float intervalTime;     // Interval time (shown when isInterval = true)
+    public int loopTimes;          // Loop times, -1 = infinitely (shown when isInterval = false)
+    public LoopType loopType;      // Loop type (default Restart)
+    public PlayMode playMode;      // Play mode (default Normal)
+    public Ease easeMode;          // Ease mode (default Linear)
+    public float duration;         // Duration time (default 0.1f)
+}
+```
+
+Track-specific configuration:
+
+| Track | Specific Configuration |
+| :--- | :--- |
+| `TweenPosition` | `relative` (tween relative to its own position), `from` / `to` (`Vector3`), `posSeq` (`List<Vector3>`) |
+| `TweenRotation` | `rotateMode` (default `FastBeyond360`), `beginAngle` / `endAngle` (`Vector3`), `angleSeq` (`List<Vector3>`) |
+| `TweenScale` | `beginScale` / `endScale` (`Vector3`), `scaleSeq` (`List<Vector3>`) |
+| `TweenSize` | `beginSize` / `endSize` (`Vector2`), `sizeSeq` (`List<Vector2>`) |
+| `TweenAlpha` | `beginAlpha` / `endAlpha` (`float`, 0 ~ 1), `alphaSeq` (`List<float>`) |
+| `TweenImgColor` | `beginColor` / `endColor` (`Color`), `colorSeq` (`List<Color>`) |
+| `TweenSprColor` | `beginColor` / `endColor` (`Color`), `colorSeq` (`List<Color>`) |
+
+---
+
+## Methods {#methods}
+
+### Overview {#methods-overview}
+
+| Method | Description |
+| :--- | :--- |
+| [PlayTween](#playtween) | (Event-driven) Plays all enabled tracks; trigger controls the direction. |
+| [InitTweens](#inittweens) | Initializes all enabled tracks (binds components and records origin values). |
+| [ResetTweens](#resettweens) | Kills all tweens and resets back to the origin values. |
+| [GetMaxDurationTween](#getmaxdurationtween) | Gets the track with the longest duration. |
+
+---
+
+### PlayTween {#playtween}
+
+```csharp
+public void PlayTween(bool trigger, TweenCallback endCallback = null)
+```
+
+(Event-driven) Plays all enabled tracks: automatically activates the GameObject with `SetActive(true)` → resets the tracks → attaches `endCallback` (and Auto Active) to the **track with the longest duration** → plays each track according to its playMode.
+
+- **trigger**: `true` plays forward; `false` plays backward (inverse).
+- **endCallback**: fires when the track with the longest duration finishes playing.
+
+```csharp
+// Play forward
+doTweenAnim.PlayTween(true);
+
+// Play backward + end callback
+doTweenAnim.PlayTween(false, () => Debug.Log("Tween ended"));
+```
+
+<Highlight color="#00d679">Reminder</Highlight> In most cases it is recommended to use [DoTweenAnimEvent](./DoTweenAnimEvent.mdx) for group playback and callback management instead of calling this method directly.
+
+### InitTweens {#inittweens}
+
+```csharp
+public void InitTweens()
+```
+
+Initializes all enabled tracks: **binds the components on the same GameObject** (Transform / RectTransform / CanvasGroup / Image / SpriteRenderer) and **records the origin values** according to the playMode (`Awake` calls this automatically; call it manually after changing track configurations dynamically at runtime).
+
+### ResetTweens {#resettweens}
+
+```csharp
+public void ResetTweens()
+```
+
+**Kills** all track tween sequences and **resets the values back to the origin values** (`OnDisable` (Active mode) and `OnDestroy` call this automatically).
+
+### GetMaxDurationTween {#getmaxdurationtween}
+
+```csharp
+public TweenBase GetMaxDurationTween()
+```
+
+Gets the track (`TweenBase`) with the **longest duration** among the enabled tracks; returns `null` when no track is enabled.
+
+<Highlight color="#0373fc">Attention</Highlight> [DoTweenAnimEvent](./DoTweenAnimEvent.mdx) calls this method to compute the group wait time when playing, so every DoTweenAnim in its list **must have at least one tween track enabled**, otherwise a `NullReferenceException` occurs.

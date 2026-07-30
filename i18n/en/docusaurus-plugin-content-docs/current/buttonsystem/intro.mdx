@@ -1,0 +1,143 @@
+---
+sidebar_position: 1
+---
+
+import ReactPlayer from 'react-player'
+
+# Module Intro
+
+export const Highlight = ({ children, color }) => (
+  <span
+    style={{
+      backgroundColor: color,
+      borderRadius: '5px',
+      color: '#fff',
+      padding: '2.5px'
+    }}>
+    {children}
+  </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+## Basic Instructions
+
+ButtonPlus is extended from Unity UGUI's **Button** (by inheritance), with feature extensions supporting various **Long Click** behaviors (**Once, Continuous, PressedAndReleased** long-click modes, plus a **Scale** press-transition effect); the module also ships an **InputFieldPlaceholderRemover** helper that automatically hides an input field's Placeholder while the field is focused.
+
+- Version: **v1.0.2** (`com.michaelo.oxgkit.buttonsystem`)
+- Namespace: `OxGKit.ButtonSystem`
+
+---
+
+## Application Description
+
+### Creating a ButtonPlus
+
+- Create directly via the Hierarchy context menu **GameObject -> UI -> Button Plus - TextMeshPro** or **GameObject -> UI -> Legacy -> Button Plus** (scaffolds an Image and the matching text label automatically).
+- Or attach via **Add Component -> OxGKit -> ButtonSystem -> Button -> ButtonPlus** onto a UI object; to replace an existing Button in the scene, remove the Button component, attach ButtonPlus instead, and re-wire the events.
+
+<Highlight color="#00d679">Reminder</Highlight> ButtonPlus **fully keeps Button's original features** (onClick, interactable, Transition, Navigation, etc.), so it can be used exactly like a normal Button.
+
+### Long Click Modes (Extd Long Click)
+
+Switch the long-click mode with the **Extd Long Click** dropdown in the Inspector:
+
+| Mode | Behavior |
+| :--- | :--- |
+| **None** | No long-click behavior (identical to a normal Button). |
+| **Once** | After holding for **Trigger Time**, fires **On Long Click Pressed** once. |
+| **Continuous** | Fires **On Long Click Pressed** for the first time after holding for **Trigger Time**, then keeps firing every **Interval Time** while held. |
+| **PressedAndReleased** | Fires **On Long Click Pressed** after holding for **Trigger Time**; fires **On Long Click Released** on release or when the pointer leaves the button. |
+
+Depending on the selected mode, the Inspector shows the **Ignore Time Scale, Trigger Time, Interval Time (Continuous only)** fields, plus the matching long-click event slots (**On Long Click Pressed / On Long Click Released**).
+
+<Highlight color="#0373fc">Attention</Highlight> **Long click and click are mutually exclusive** — once a long click has triggered, that release will **not** fire onClick (a single press is either a click or a long click).
+
+### Press Transition (Extd Transition)
+
+Switch with the **Extd Transition** dropdown in the Inspector:
+
+- **None**: no extended transition.
+- **Scale**: scales the button uniformly by **Size (default 0.95)** while pressed and restores the original size on release.
+
+<Highlight color="#00d679">Reminder</Highlight> The Scale transition composes with the native UGUI **Transition (Color Tint, etc.)** — they can be used together without conflict.
+
+### InputFieldPlaceholderRemover
+
+Attach [InputFieldPlaceholderRemover](/docs/buttonsystem/API/Runtime/InputFieldPlaceholderRemover) onto the same GameObject as an **InputField (Legacy)** or **TMP_InputField**; the Placeholder is **hidden automatically while the input field is focused** and restored after it loses focus (pure component behavior — no API calls needed).
+
+---
+
+## Simple Usage
+
+### Inspector Setup
+
+1. Create a ButtonPlus via **GameObject -> UI -> Button Plus - TextMeshPro**.
+2. Pick an **Extd Long Click** mode in the Inspector and tune **Trigger Time / Interval Time**.
+3. Assign your callbacks to the **On Click ()** and **On Long Click Pressed () / On Long Click Released ()** event slots.
+
+### Subscribing to Long Click Events in Code
+
+```csharp
+using OxGKit.ButtonSystem;
+using UnityEngine;
+
+public class ShopUI : MonoBehaviour
+{
+    public ButtonPlus buyButton;
+
+    private void Awake()
+    {
+        // Normal click (inherited from Button)
+        this.buyButton.onClick.AddListener(this.OnBuyOne);
+
+        // Hold-to-repeat (after holding 0.5s, fires every 0.1s)
+        this.buyButton.extdLongClick = ButtonPlus.ExtdLongClick.Continuous;
+        this.buyButton.triggerTime = 0.5f;
+        this.buyButton.intervalTime = 0.1f;
+        this.buyButton.onLongClickPressed.AddListener(this.OnBuyOne);
+    }
+
+    private void OnBuyOne()
+    {
+        Debug.Log("Buy x1");
+    }
+}
+```
+
+*[Refer to Example]*
+
+---
+
+## Installation
+
+| Install via git URL |
+|:--- |
+| Add https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/ButtonSystem/Scripts to Package Manager |
+
+**No third-party dependencies** (uses Unity's built-in UGUI)
+
+**Samples (Package Manager -> Samples)**
+
+- **AI Agent Skills** (refer to [AI Agent Skills](/docs/agent-skills))
+- **ButtonPlus Demo**
+
+---
+
+## Module API
+
+- Runtime
+  - [ButtonPlus](/docs/buttonsystem/API/Runtime/ButtonPlus) (using OxGKit.ButtonSystem)
+  - [InputFieldPlaceholderRemover](/docs/buttonsystem/API/Runtime/InputFieldPlaceholderRemover) (using OxGKit.ButtonSystem)
+
+---
+
+## Demo
+
+**ButtonSystem Demo**
+
+<ReactPlayer controls url='/video/buttonsystem_demo.mp4' />

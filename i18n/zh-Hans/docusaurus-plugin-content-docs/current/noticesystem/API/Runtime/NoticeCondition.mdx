@@ -1,0 +1,151 @@
+---
+sidebar_position: 3
+description: NoticeCondition 为 NoticeSystem 的通知条件基类，自定义条件需继承并实现 ShowCondition 判断是否显示红点，并涵盖 NoticeInfo (条件 ID 与数据) 通知信息结构。
+---
+
+# NoticeCondition
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`NoticeCondition` 为 **NoticeSystem** 的**通知条件基类 (抽象类)**，自定义条件需继承并实现 `ShowCondition` 判断是否显示红点，经由 [NoticeManager.RegisterCondition](./NoticeManager.mdx#registercondition) 注册后自动分配条件 ID；可通过 Right-Click **Create/OxGKit/Notice System/Template Notice Condition.cs** 创建条件模板 (参考 [模块介绍](../../intro.mdx))。
+
+|  |  |
+| :--- | :--- |
+| **命名空间** | `OxGKit.NoticeSystem` |
+| **类型** | `public abstract class NoticeCondition` |
+| **源码** | [NoticeCondition.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/NoticeSystem/Scripts/Runtime/Core/NoticeCondition.cs) |
+
+```csharp
+using OxGKit.NoticeSystem;
+```
+
+## 快速上手 {#quick-start}
+
+```csharp
+using OxGKit.NoticeSystem;
+using UnityEngine;
+
+public class NewMailCond : NoticeCondition
+{
+    #region Default
+    // 惯例：定义静态属性获取自动分配的条件 ID
+    public static int id { get { return NoticeManager.GetConditionId<NewMailCond>(); } }
+
+    // 于场景加载前自动注册条件 (对应 BeforeSceneLoad 模板)
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+    static void Register()
+    {
+        NoticeManager.RegisterCondition<NewMailCond>();
+    }
+    #endregion
+
+    public override bool ShowCondition(object data)
+    {
+        if (data != null)
+        {
+            MailBox mailBox = data as MailBox;
+
+            // 有未读邮件则显示红点
+            if (mailBox.unreadCount > 0) return true;
+        }
+
+        return false;
+    }
+}
+```
+
+## 通用规则 {#general-rules}
+
+- 条件类为**纯逻辑类**，`ShowCondition` 内不要持有 MonoBehaviour 状态或场景引用。
+- `ShowCondition` 的 `data` 可能为 `null` 或不同类型 (多个 UI 共用同一条件时)，需做**防御性检查**。
+- 条件 ID 由 [NoticeManager.RegisterCondition](./NoticeManager.mdx#registercondition) 注册时**自动分配**，惯例上于条件类中定义静态属性 `id`。
+
+<Highlight color="#00d679">提醒</Highlight> 单一 NoticeItem 持有多个条件为 **OR 逻辑** (任一符合即显示)；若需 **AND 逻辑**，将整组判断写在同一个条件类的 `ShowCondition` 中。
+
+---
+
+## 方法总览 {#overview}
+
+| 方法 | 说明 |
+| :--- | :--- |
+| [SetId](#setid) | 设置条件 ID (由 NoticeManager 注册时自动调用)。 |
+| [GetId](#getid) | 获取条件 ID。 |
+| [ShowCondition](#showcondition) | (抽象) 依数据判断条件是否成立 (是否显示红点)。 |
+
+---
+
+### SetId {#setid}
+
+```csharp
+public void SetId(int id)
+```
+
+设置条件 ID。
+
+<Highlight color="#0373fc">注意</Highlight> 由 [NoticeManager.RegisterCondition](./NoticeManager.mdx#registercondition) 于注册时**自动调用**，一般无需自行调用。
+
+### GetId {#getid}
+
+```csharp
+public int GetId()
+```
+
+获取条件 ID (亦可通过 `NoticeManager.GetConditionId<T>()` 以类型查询)。
+
+### ShowCondition {#showcondition}
+
+```csharp
+public abstract bool ShowCondition(object data)
+```
+
+依传入的数据判断条件是否成立，返回 `true` 表示**显示红点**；`data` 为 NoticeItem 注册时通过 [NoticeInfo](#noticeinfo) 传入的数据。
+
+---
+
+## NoticeInfo {#noticeinfo}
+
+通知信息 (结构)，包含**条件 ID 与判断数据**，作为 [NoticeItem.RegisterNotice](./NoticeItem.mdx#registernotice) / [RenewNotice](./NoticeItem.mdx#renewnotice) 的注册单位。
+
+|  |  |
+| :--- | :--- |
+| **类型** | `public struct NoticeInfo` |
+| **源码** | [NoticeInfo.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/NoticeSystem/Scripts/Runtime/Core/NoticeInfo.cs) |
+
+### 成员 {#noticeinfo-members}
+
+| 成员 | 说明 |
+| :--- | :--- |
+| `public int conditionId` | 条件 ID。 |
+| `public object data` | 交给 `ShowCondition` 判断的数据 (可为值类型或引用类型)。 |
+
+### 构造函数 {#noticeinfo-constructors}
+
+```csharp
+public NoticeInfo(int conditionId, object data)
+```
+
+```csharp
+// 引用类型数据 (变更后仅需 Notify)
+new NoticeInfo(NewMailCond.id, this._mailBox);
+
+// 值类型数据 (变更后必须 RenewNotice 更新快照，再 Notify)
+new NoticeInfo(CoinInWalletCond.id, this._coin);
+```
+
+<Highlight color="#ff2f00">重要</Highlight> **值类型 (Value Type)** 数据存储的是**快照**，数据变更后必须通过 [NoticeItem.RenewNotice](./NoticeItem.mdx#renewnotice) 更新数据再 Notify，否则红点不会刷新。

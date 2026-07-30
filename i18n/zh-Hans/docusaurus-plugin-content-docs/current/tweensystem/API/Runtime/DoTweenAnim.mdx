@@ -1,0 +1,216 @@
+---
+sidebar_position: 1
+description: DoTweenAnim 是 TweenSystem 的补间动画组件，于 Inspector 配置 Position、Rotation、Scale、Size、Alpha、Color 补间轨道，支持 Normal、Reverse、PingPong、Sequence 播放模式与编辑器预览。
+---
+
+# DoTweenAnim
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`DoTweenAnim` 是 **TweenSystem** 的**补间动画组件** (基于 **DoTween Pro**)，通过 Inspector 启用并配置**补间轨道** (Position、Rotation、Scale、Size、Alpha、Color)，各轨道支持 **Normal、Reverse、PingPong、Sequence** 播放模式，可依 **DriveMode** 选择**激活自动播放 (Active)** 或**事件驱动播放 (Event)**，并支持**编辑器预览 (Preview Mode)**；通过 **Add Component/OxGKit/TweenSystem/DoTweenAnim** 添加 (同一对象仅能挂载一个)。
+
+|  |  |
+| :--- | :--- |
+| **命名空间** | `OxGKit.TweenSystem` |
+| **类型** | `public class DoTweenAnim : MonoBehaviour` |
+| **源码** | [DoTweenAnim.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/TweenSystem/Scripts/Runtime/DoTweenAnim.cs) |
+
+```csharp
+using OxGKit.TweenSystem;
+```
+
+<Highlight color="#0373fc">注意</Highlight> 结束回调类型为 DoTween 的 `TweenCallback` (`DG.Tweening`)，使用回调时需搭配 `using DG.Tweening;`。
+
+## 快速上手 {#quick-start}
+
+```csharp
+using DG.Tweening;
+using OxGKit.TweenSystem;
+
+// 1. Add Component/OxGKit/TweenSystem/DoTweenAnim
+// 2. 于 Inspector 启用补间轨道 (tPositionOn、tScaleOn...)
+//    并配置起止值、duration、easeMode、playMode
+
+// DriveMode.Active：GameObject 激活时自动播放
+doTweenAnim.gameObject.SetActive(true);
+
+// DriveMode.Event：由代码 (或 DoTweenAnimEvent) 驱动播放
+doTweenAnim.PlayTween(true);                                   // 正向播放
+doTweenAnim.PlayTween(false, () => Debug.Log("Play ended"));   // 反向播放 + 结束回调
+```
+
+## 通用规则 {#general-rules}
+
+### 补间轨道 {#tween-tracks}
+
+启用轨道开关后，Inspector 会显示对应的轨道配置 (TweenValues)；需要组件的轨道会于初始时**自动查找同对象上的组件**，查找不到则该轨道不会播放：
+
+| 开关 | 轨道 (类型) | 补间目标 (DoTween) | 需求组件 (自动查找) |
+| :--- | :--- | :--- | :--- |
+| `tPositionOn` | `tPosition` (`TweenPosition`) | 位置 (`DOLocalMove`) | Transform |
+| `tRotationOn` | `tRotation` (`TweenRotation`) | 旋转 (`DOLocalRotate` / `DOLocalRotateQuaternion`) | Transform |
+| `tScaleOn` | `tScale` (`TweenScale`) | 缩放 (`DOScale`) | Transform |
+| `tSizeOn` | `tSize` (`TweenSize`) | 尺寸 (`DOSizeDelta`) | RectTransform |
+| `tAlphaOn` | `tAlpha` (`TweenAlpha`) | 透明度 (`DOFade`) | CanvasGroup |
+| `tImgColorOn` | `tImgColor` (`TweenImgColor`) | 颜色 (`DOColor`) | Image |
+| `tSprColorOn` | `tSprColor` (`TweenSprColor`) | 颜色 (`DOColor`) | SpriteRenderer |
+
+### 播放模式 (PlayMode) {#playmode}
+
+```csharp
+public enum PlayMode
+{
+    Normal,     // 正向播放 (from -> to)
+    Reverse,    // 反向播放 (to -> from)
+    PingPong,   // 来回播放 (from -> to -> from)
+    Sequence    // 序列播放 (依序列点位列表)
+}
+```
+
+<Highlight color="#0373fc">注意</Highlight> **Sequence** 模式下起止值 (from / to、begin / end) 不生效，改用轨道的**序列点位列表**配置 (`posSeq`、`angleSeq`、`scaleSeq`、`sizeSeq`、`alphaSeq`、`colorSeq`)。
+
+### 驱动模式 (DriveMode) {#drivemode}
+
+```csharp
+public enum DriveMode
+{
+    Active,    // 激活自动播放 (SetActive 驱动)
+    Event      // 事件驱动播放 (DoTweenAnimEvent 或代码)
+}
+```
+
+- **Active**：`OnEnable` 时**自动重置并播放**，`OnDisable` 时重置回原始值；循环 (loopTimes / loopType) 与间隔重播 (isInterval / intervalTime) 于此模式生效。
+- **Event**：等待外部调用 [PlayTween](#playtween) (通常由 [DoTweenAnimEvent](./DoTweenAnimEvent.mdx) 分组驱动)，依 **trigger** 决定正反向且**单次播放** (不套用循环设置)；Inspector 的 **Auto Active** 选项开启时，`Awake` 会自动 `SetActive(false)` 隐藏对象，且反向播放 (trigger = false) 结束后也会自动关闭对象。
+
+<Highlight color="#ff2f00">重要</Highlight> 同一个 DoTweenAnim 请只择一驱动方式：**Active** 模式会于每次激活时自动重播，**请勿再同时**通过 DoTweenAnimEvent 驱动它。
+
+### 时间缩放 (Ignore Time Scale) {#ignore-time-scale}
+
+Inspector 的 **Ignore Time Scale** 选项 (默认 **true**) 会套用至所有轨道：补间**不受 `Time.timeScale` 影响** (暂停菜单中依然播放)；间隔重播的计时亦依此选项采用 `unscaledDeltaTime` 或 `deltaTime`。
+
+### 编辑器预览 (Preview Mode) {#preview-mode}
+
+- Inspector 下方的 **Editor 区块**提供**预览播放**：**Active** 模式为 **Play** 按钮与 **Progress** 进度滑杆；**Event** 模式为 **Play Trigger (true / false)** 交替按钮；**Stop** 按钮停止预览并还原原始值。
+- **Is Sync Begin Value** 选项开启后，修改轨道配置会**自动同步起始值**至对象上 (`OnValidate`)。
+- 预览期间 (`isPreviewMode`) 补间配置会被锁定，且循环次数强制为 0 (单次播放)。
+- Play Mode 期间无法于场景中编辑，仅支持于 **Prefab Isolation** 模式下编辑。
+- 预览示意图参考[模块介绍](../../intro.mdx#preview-mode)。
+
+---
+
+## 成员 {#members}
+
+| 成员 | 说明 |
+| :--- | :--- |
+| `public DriveMode driveMode` | 驱动模式 (默认 `Active`)，Inspector: **Drive Mode** (详见[驱动模式](#drivemode))。 |
+| `public bool tPositionOn` ... `public bool tSprColorOn` | 七个轨道开关 (默认皆为 `false`)，详见[补间轨道](#tween-tracks)。 |
+| `public TweenPosition tPosition` ... `public TweenSprColor tSprColor` | 七个轨道配置的**只读访问器** (可于运行时读取 `seq`、`duration` 等)。 |
+| `public static bool isPreviewMode` | **(UNITY_EDITOR)** 当前是否处于编辑器预览模式。 |
+
+### 轨道通用配置 (TweenBase) {#tweenbase}
+
+所有轨道皆继承 `TweenBase` 的通用配置：
+
+```csharp
+[Serializable]
+public class TweenBase
+{
+    public bool isInterval;        // 间隔重播开关 (仅 DriveMode.Active 生效)
+    public float intervalTime;     // 间隔时间 (isInterval = true 时显示)
+    public int loopTimes;          // 循环次数，-1 = 无限循环 (isInterval = false 时显示)
+    public LoopType loopType;      // 循环类型 (默认 Restart)
+    public PlayMode playMode;      // 播放模式 (默认 Normal)
+    public Ease easeMode;          // 缓动模式 (默认 Linear)
+    public float duration;         // 播放时长 (默认 0.1f)
+}
+```
+
+各轨道特有配置：
+
+| 轨道 | 特有配置 |
+| :--- | :--- |
+| `TweenPosition` | `relative` (基于自身位置做相对位移)、`from` / `to` (`Vector3`)、`posSeq` (`List<Vector3>`) |
+| `TweenRotation` | `rotateMode` (默认 `FastBeyond360`)、`beginAngle` / `endAngle` (`Vector3`)、`angleSeq` (`List<Vector3>`) |
+| `TweenScale` | `beginScale` / `endScale` (`Vector3`)、`scaleSeq` (`List<Vector3>`) |
+| `TweenSize` | `beginSize` / `endSize` (`Vector2`)、`sizeSeq` (`List<Vector2>`) |
+| `TweenAlpha` | `beginAlpha` / `endAlpha` (`float`, 0 ~ 1)、`alphaSeq` (`List<float>`) |
+| `TweenImgColor` | `beginColor` / `endColor` (`Color`)、`colorSeq` (`List<Color>`) |
+| `TweenSprColor` | `beginColor` / `endColor` (`Color`)、`colorSeq` (`List<Color>`) |
+
+---
+
+## 方法 {#methods}
+
+### 方法总览 {#methods-overview}
+
+| 方法 | 说明 |
+| :--- | :--- |
+| [PlayTween](#playtween) | (事件驱动) 播放所有已启用轨道，trigger 控制正反向。 |
+| [InitTweens](#inittweens) | 初始所有已启用轨道 (绑定组件并记录原始值)。 |
+| [ResetTweens](#resettweens) | Kill 所有补间并重置回原始值。 |
+| [GetMaxDurationTween](#getmaxdurationtween) | 获取时长最大的轨道。 |
+
+---
+
+### PlayTween {#playtween}
+
+```csharp
+public void PlayTween(bool trigger, TweenCallback endCallback = null)
+```
+
+(事件驱动) 播放所有已启用轨道：自动 `SetActive(true)` 激活对象 → 重置轨道 → 将 `endCallback` (与 Auto Active) 挂载至**时长最大的轨道** → 依各轨道的 playMode 播放。
+
+- **trigger**：`true` 正向播放；`false` 反向播放 (inverse)。
+- **endCallback**：于时长最大的轨道播放完毕时触发。
+
+```csharp
+// 正向播放
+doTweenAnim.PlayTween(true);
+
+// 反向播放 + 结束回调
+doTweenAnim.PlayTween(false, () => Debug.Log("Tween ended"));
+```
+
+<Highlight color="#00d679">提醒</Highlight> 一般情况建议通过 [DoTweenAnimEvent](./DoTweenAnimEvent.mdx) 进行分组播放与回调管理，而非直接调用本方法。
+
+### InitTweens {#inittweens}
+
+```csharp
+public void InitTweens()
+```
+
+初始所有已启用轨道：**绑定同对象上的组件** (Transform / RectTransform / CanvasGroup / Image / SpriteRenderer) 并依 playMode **记录原始值** (`Awake` 会自动调用；运行时动态修改轨道配置后，可手动调用重新初始)。
+
+### ResetTweens {#resettweens}
+
+```csharp
+public void ResetTweens()
+```
+
+**Kill** 所有轨道的补间序列并将数值**重置回原始值** (`OnDisable` (Active 模式) 与 `OnDestroy` 会自动调用)。
+
+### GetMaxDurationTween {#getmaxdurationtween}
+
+```csharp
+public TweenBase GetMaxDurationTween()
+```
+
+从已启用轨道中获取 **duration 最大**的轨道 (`TweenBase`)；无任何启用轨道时返回 `null`。
+
+<Highlight color="#0373fc">注意</Highlight> [DoTweenAnimEvent](./DoTweenAnimEvent.mdx) 播放时会调用此方法计算分组等待时长，因此列表中的 DoTweenAnim **至少需启用一个补间轨道**，否则会发生 `NullReferenceException`。

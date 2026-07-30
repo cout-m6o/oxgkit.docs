@@ -1,0 +1,219 @@
+---
+sidebar_position: 1
+description: MonoSingleton is the MonoBehaviour singleton base class of SingletonSystem, supporting find-or-create instance resolution, DontDestroyOnLoad persistence control, and the OnCreate, OnStart, OnRelease lifecycle hooks.
+---
+
+# MonoSingleton
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`MonoSingleton<T>` is the `MonoBehaviour` **singleton base class** of **SingletonSystem** (thread-lock protected). When accessing the instance, it **first looks for an existing instance in the scene, otherwise automatically creates a GameObject** with the component attached; it supports **DontDestroyOnLoad cross-scene persistence control** and replaces Unity's `Awake` / `Start` / `OnDestroy` with the **OnCreate / OnStart / OnRelease** lifecycle hooks.
+
+|  |  |
+| :--- | :--- |
+| **Namespace** | `OxGKit.SingletonSystem` |
+| **Type** | `public abstract class MonoSingleton<T> : MonoBehaviour where T : MonoSingleton<T>` |
+| **Source** | [MonoSingleton.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/SingletonSystem/Scripts/Runtime/Core/MonoSingleton.cs) |
+
+```csharp
+using OxGKit.SingletonSystem;
+```
+
+<Highlight color="#00d679">Reminder</Highlight> For pure data or logic manager classes that do not need to live on a GameObject, use [NewSingleton](./NewSingleton.mdx) instead.
+
+## Quick Start {#quick-start}
+
+```csharp
+using OxGKit.SingletonSystem;
+
+public class GameManager : MonoSingleton<GameManager>
+{
+    protected override void OnCreate() { /* Call by Unity.Awake */ }
+
+    protected override void OnStart() { /* Call by Unity.Start */ }
+
+    protected override void OnRelease() { /* Call by Unity.OnDestroy */ }
+
+    public void SaveGame() { /* ... */ }
+}
+
+// Get and access the instance (find-or-create, DontDestroyOnLoad by default)
+GameManager.GetInstance().SaveGame();
+
+// Scene-scoped singleton (destroyed with the scene)
+GameManager.GetInstance(dontDestroyOnLoad: false);
+
+// Explicit initialization at boot (warm-up)
+GameManager.InitInstance();
+
+// Destroy the instance (GameObject included)
+GameManager.DestroyInstance();
+```
+
+## General Rules {#general-rules}
+
+### Lifecycle Mapping {#lifecycle-mapping}
+
+The base class implements `Awake()`, `Start()`, and `OnDestroy()` as **private methods** and invokes the following hooks guarded by flags:
+
+| Unity Method | Hook | Flag |
+| :--- | :--- | :--- |
+| `Awake` | [OnCreate](#oncreate) | `isCreated` |
+| `Start` | [OnStart](#onstart) | `isStarted` |
+| `OnDestroy` | [OnRelease](#onrelease) | `isReleased` (also resets `isCreated`, `isStarted`, and the instance reference) |
+
+<Highlight color="#ff2f00">Important</Highlight> **Do not implement `Awake()`, `Start()`, or `OnDestroy()`** (occupied by the base class); every other Unity method (`Update`, `OnEnable`, etc.) can be implemented normally.
+
+### Instance Creation Rules {#instance-rules}
+
+1. **Scene-placed instance**: registers itself as the singleton in `Awake`, and the [dontDestroyOnLoad](#members) field on the Inspector decides whether it persists (see [Module Intro](../../intro.mdx#dontdestroyonload-control)).
+2. **Created from code**: when [GetInstance](#getinstance) is called and no instance exists, it looks for an existing scene instance (`FindObjectsOfType`, first found wins), otherwise automatically creates a `new GameObject(typeof(T).Name)` with the component attached.
+
+<Highlight color="#0373fc">Attention</Highlight> [GetInstance](#getinstance) **only performs instance creation in Play Mode** (`Application.isPlaying`).
+
+<Highlight color="#0373fc">Attention</Highlight> Multiple scene-placed instances of the same type are **not automatically deduplicated** (the first found wins); avoid placing duplicates across additively-loaded scenes.
+
+<Highlight color="#00d679">Reminder</Highlight> Events registered in `OnCreate` / `OnStart` must be unregistered in [OnRelease](#onrelease) — persistent singletons accumulate stale delegates otherwise. When accessing the singleton from shutdown/teardown paths, check with [CheckInstanceExists](#checkinstanceexists) first to avoid re-creating the instance mid-quit.
+
+---
+
+## Members {#members}
+
+| Member | Description |
+| :--- | :--- |
+| `public bool dontDestroyOnLoad` | (Instance field) Whether to mark the instance with `DontDestroyOnLoad` in `Awake`, default `true`; configurable on the Inspector for scene-placed instances. |
+| `public static bool isCreated` | Whether [OnCreate](#oncreate) has been invoked. |
+| `public static bool isStarted` | Whether [OnStart](#onstart) has been invoked. |
+| `public static bool isReleased` | Whether the instance has been destroyed ([OnRelease](#onrelease) invoked); reset to `false` when a new instance runs `Awake`. |
+
+---
+
+## Instance Management {#instance-management}
+
+### Methods Overview {#instance-overview}
+
+| Method | Description |
+| :--- | :--- |
+| [GetInstance](#getinstance) | Gets the singleton instance (find-or-create). |
+| [InitInstance](#initinstance) | Initializes the singleton instance (same as calling GetInstance). |
+| [CheckInstanceExists](#checkinstanceexists) | Checks if an instance exists. |
+| [DestroyInstance](#destroyinstance) | Destroys the singleton instance. |
+
+---
+
+### GetInstance {#getinstance}
+
+```csharp
+public static T GetInstance(bool dontDestroyOnLoad = true)
+```
+
+Gets the singleton instance (thread-lock protected). If no instance exists yet (Play Mode only), it **first looks for an existing instance in the scene, otherwise automatically creates** a `new GameObject(typeof(T).Name)` with the component attached; when the `dontDestroyOnLoad` parameter is `true`, the instance is marked and `DontDestroyOnLoad` is applied.
+
+```csharp
+// Cross-scene persistence needed (default)
+GameManager.GetInstance();
+
+// No cross-scene persistence needed (set once at the first access)
+StageManager.GetInstance(dontDestroyOnLoad: false);
+```
+
+<Highlight color="#0373fc">Attention</Highlight> The `dontDestroyOnLoad` parameter takes effect on the **first instance creation** — decide it at the first access call site and keep it consistent.
+
+### InitInstance {#initinstance}
+
+```csharp
+public static void InitInstance(bool dontDestroyOnLoad = true)
+```
+
+Initializes the singleton instance (same as calling [GetInstance](#getinstance)); suitable for **explicitly controlling the creation order** during boot (warm-up), avoiding ordering issues caused by lazy creation.
+
+```csharp
+private void Awake()
+{
+    GameManager.InitInstance();
+    AudioManager.InitInstance();
+}
+```
+
+### CheckInstanceExists {#checkinstanceexists}
+
+```csharp
+public static bool CheckInstanceExists()
+```
+
+Checks if an instance exists (does **not** trigger creation).
+
+```csharp
+if (GameManager.CheckInstanceExists())
+    GameManager.GetInstance().SaveGame();
+```
+
+### DestroyInstance {#destroyinstance}
+
+```csharp
+public static void DestroyInstance(bool gameObjectIncluded = true)
+```
+
+Destroys the singleton instance; when `gameObjectIncluded` is `true`, the **GameObject is destroyed as well**, when `false`, only the component itself is destroyed. Destruction triggers [OnRelease](#onrelease) and resets the state flags and the instance reference, after which a new instance can be created again.
+
+```csharp
+// Destroy the GameObject as well (default)
+GameManager.DestroyInstance();
+
+// Destroy the component only (keep the GameObject)
+GameManager.DestroyInstance(gameObjectIncluded: false);
+```
+
+---
+
+## Lifecycle Hooks {#lifecycle-hooks}
+
+### Methods Overview {#lifecycle-overview}
+
+| Method | Description |
+| :--- | :--- |
+| [OnCreate](#oncreate) | Invoked by Unity `Awake`. |
+| [OnStart](#onstart) | Invoked by Unity `Start`. |
+| [OnRelease](#onrelease) | Invoked by Unity `OnDestroy`. |
+
+---
+
+### OnCreate {#oncreate}
+
+```csharp
+protected abstract void OnCreate()
+```
+
+Invoked by Unity `Awake` (guarded by the `isCreated` flag to fire only once); implement initialization logic here.
+
+### OnStart {#onstart}
+
+```csharp
+protected abstract void OnStart()
+```
+
+Invoked by Unity `Start` (guarded by the `isStarted` flag to fire only once); implement startup logic here.
+
+### OnRelease {#onrelease}
+
+```csharp
+protected abstract void OnRelease()
+```
+
+Invoked by Unity `OnDestroy`; implement release logic here (unregister events, release resources). Afterwards `isReleased` becomes `true`, and `isCreated`, `isStarted`, and the instance reference are reset.

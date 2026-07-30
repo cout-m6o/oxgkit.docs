@@ -1,0 +1,274 @@
+---
+sidebar_position: 1
+description: VirtualJoystick is the UGUI virtual joystick component that outputs a Vector2 stick vector through the onStickInput callback, supporting Fixed and Floating stick types, Normalized and Delta vector modes, axis constraints, and dead-zone filtering.
+---
+
+# VirtualJoystick
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`VirtualJoystick` is the **UGUI virtual joystick component** (`MonoBehaviour`). It implements the UGUI event interfaces (`IPointerDownHandler`, `IPointerUpHandler`, `IDragHandler`), converts touch / mouse dragging into a `Vector2` stick vector, and outputs it through the [onStickInput](#onstickinput) callback; supports **Fixed / Floating** stick types, **Normalized / Delta** vector modes, **axis constraints**, and **dead-zone** filtering (adjusted from [annulusgames - EnhancedOnScreenStick](https://github.com/AnnulusGames/EnhancedOnScreenStick)).
+
+|  |  |
+| :--- | :--- |
+| **Namespace** | `OxGKit.VirtualJoystick` |
+| **Type** | `public class VirtualJoystick : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, IDragHandler` |
+| **Source** | [VirtualJoystick.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/VirtualJoystick/Scripts/Runtime/Core/VirtualJoystick.cs) |
+
+```csharp
+using OxGKit.VirtualJoystick;
+```
+
+<Highlight color="#0373fc">Attention</Highlight> The component is decorated with `[AddComponentMenu("OxGKit/VirtualJoystick/VirtualJoystick")]` and `[RequireComponent(typeof(RectTransform), typeof(Image))]` — **the host object itself is the touch area** (the image can be made transparent to act as the touch surface).
+
+## Quick Start {#quick-start}
+
+```csharp
+using OxGKit.VirtualJoystick;
+using UnityEngine;
+
+public class PlayerController : MonoBehaviour
+{
+    [SerializeField]
+    private VirtualJoystick _joystick;
+
+    private Vector2 _move;
+
+    private void Awake()
+    {
+        // Configure the joystick (can also be set directly in the Inspector)
+        this._joystick.stickType = StickType.Floating;
+        this._joystick.stickVectorMode = StickVectorMode.Normalized;
+        this._joystick.axisConstraint = AxisConstraint.Both;
+        this._joystick.deadZone = 0.1f;
+
+        // Subscribe to the stick output callback (returns Vector2.zero on release)
+        this._joystick.onStickInput += this._OnStickInput;
+    }
+
+    private void _OnStickInput(Vector2 v2)
+    {
+        this._move = v2;
+    }
+
+    private void OnDestroy()
+    {
+        // Unsubscribe when the object is destroyed
+        this._joystick.onStickInput -= this._OnStickInput;
+    }
+}
+```
+
+## General Rules {#general-rules}
+
+### Requirements {#requirements}
+
+1. The component must live under a **Canvas**: `Awake` fetches the parent Canvas (used for scale-factor and position conversion) — **if none is found, it logs an error and disables itself** (`enabled = false`).
+2. The scene needs an **EventSystem**, and the component's `Image` must be **raycastable** (not blocked by `CanvasGroup.blocksRaycasts = false`, etc.), otherwise no pointer events are received.
+3. The component is **purely UGUI-event driven** — it does **not** depend on Unity New InputSystem's OnScreen controls and works with both Old and New Input backends.
+
+### Output Flow {#output-flow}
+
+1. **Press ([OnPointerDown](#onpointerdown))**: For non-`Fixed` types, the joystick background is repositioned to the press point; the press start position is recorded and `OnDrag` runs once immediately.
+2. **Drag ([OnDrag](#ondrag))**: The output vector is computed from "current position - press start position" (divided by `handleMovementRange * Canvas.scaleFactor`), then the **axis constraint**, **dead-zone filtering**, and **vector mode** are applied in order; finally the vector is emitted through `onStickInput` and the handle position is updated.
+3. **Release ([OnPointerUp](#onpointerup))**: The handle snaps back to center and `onStickInput` returns `Vector2.zero`.
+
+---
+
+## Enums {#enums}
+
+### StickVectorMode {#stickvectormode}
+
+```csharp
+public enum StickVectorMode
+{
+    Normalized,
+    Delta
+}
+```
+
+The stick vector output mode:
+
+| Value | Description |
+| :--- | :--- |
+| `Normalized` | Output is limited to **-1.00 ~ 1.00** (vectors longer than 1 are normalized); suitable for movement control. |
+| `Delta` | Mimics **Mouse Delta**; output can exceed 1, suitable for camera-look control (scale it by your sensitivity). |
+
+### StickType {#sticktype}
+
+```csharp
+public enum StickType
+{
+    Fixed = 0,
+    Floating = 1
+}
+```
+
+The stick display type:
+
+| Value | Description |
+| :--- | :--- |
+| `Fixed` | The joystick stays at its original position. |
+| `Floating` | On every press, the joystick background is repositioned to the press point. |
+
+### AxisConstraint {#axisconstraint}
+
+```csharp
+public enum AxisConstraint
+{
+    Both = 0,
+    Horizontal = 1,
+    Vertical = 2
+}
+```
+
+Constrains the stick output direction:
+
+| Value | Description |
+| :--- | :--- |
+| `Both` | Outputs both axes. |
+| `Horizontal` | Outputs the horizontal axis only. |
+| `Vertical` | Outputs the vertical axis only. |
+
+---
+
+## Members {#members}
+
+### Member Overview {#member-overview}
+
+| Member | Description |
+| :--- | :--- |
+| [onStickInput](#onstickinput) | Callback invoked when the stick output vector changes (returns `Vector2.zero` on release). |
+| [stickVectorMode](#prop-stickvectormode) | The stick vector output mode ([StickVectorMode](#stickvectormode)). |
+| [stickType](#prop-sticktype) | The stick display type ([StickType](#sticktype)). |
+| [axisConstraint](#prop-axisconstraint) | Constrains the stick output direction ([AxisConstraint](#axisconstraint)). |
+| [handleMovementRange](#handlemovementrange) | The handle movement range (pixel radius, default `100`). |
+| [deadZone](#deadzone) | Dead-zone range (0 ~ 1); stick inputs below this value are treated as invalid. |
+
+---
+
+### onStickInput {#onstickinput}
+
+```csharp
+public Action<Vector2> onStickInput
+```
+
+Callback invoked when the stick output vector changes: it fires on every input change while dragging, and **returns `Vector2.zero` on release**.
+
+```csharp
+this._joystick.onStickInput += (v2) => this._move = v2;
+```
+
+<Highlight color="#ff2f00">Important</Highlight> `onStickInput` is a plain `Action<Vector2>` **delegate field** — assigning with `=` **replaces all existing subscriptions**; prefer `+=` / `-=` for subscribing and unsubscribing (and unsubscribe when the object is destroyed).
+
+### stickVectorMode {#prop-stickvectormode}
+
+```csharp
+public StickVectorMode stickVectorMode { get; set; }
+```
+
+The stick vector output mode, default `StickVectorMode.Normalized` (see [StickVectorMode](#stickvectormode)).
+
+### stickType {#prop-sticktype}
+
+```csharp
+public StickType stickType { get; set; }
+```
+
+The stick display type, default `StickType.Fixed` (see [StickType](#sticktype)).
+
+### axisConstraint {#prop-axisconstraint}
+
+```csharp
+public AxisConstraint axisConstraint { get; set; }
+```
+
+Constrains the stick output direction, default `AxisConstraint.Both` (see [AxisConstraint](#axisconstraint)).
+
+### handleMovementRange {#handlemovementrange}
+
+```csharp
+public float handleMovementRange { get; set; }
+```
+
+The handle movement range (pixel radius, default `100`); the output vector is computed as "drag delta / (`handleMovementRange` * `Canvas.scaleFactor`)".
+
+<Highlight color="#0373fc">Attention</Highlight> The movement range is measured in **pixels** and affected by the **Canvas scaleFactor** — test at your target resolutions / aspect ratios.
+
+### deadZone {#deadzone}
+
+```csharp
+public float deadZone { get; set; }
+```
+
+Dead-zone range (`0 ~ 1`, default `0`); output vectors with a magnitude below this value are treated as invalid and emit `Vector2.zero` (prevents accidental touches).
+
+<Highlight color="#00d679">Reminder</Highlight> The dead zone is a **fraction of the movement range** — values around **0.05 ~ 0.15** filter accidental touches without hurting responsiveness.
+
+---
+
+## Inspector Fields {#inspector-fields}
+
+The following serialized fields can **only be configured in the Inspector** (no public properties); you can import the **VirtualJoystickUI Prefab** through **Package Manager -> Samples** (pre-wired, see the [Module Intro](../../intro.mdx)):
+
+| Field (Inspector) | Description |
+| :--- | :--- |
+| **Background** (`_background`) | The joystick background UI (`RectTransform`, stick base image) — **must be assigned**. |
+| **Handle** (`_handle`) | The joystick handle UI (`RectTransform`, the draggable knob) — **must be assigned**. |
+| **Show Only When Pressed** (`_showOnlyWhenPressed`) | Whether to show the joystick background only while pressed (hidden at `Awake`, shown on press, hidden on release); pairs well with the `Floating` type. |
+
+---
+
+## UGUI Event Callbacks {#ugui-callbacks}
+
+### Method Overview {#method-overview}
+
+| Method | Description |
+| :--- | :--- |
+| [OnPointerDown](#onpointerdown) | Invoked on press (repositioning and initial output). |
+| [OnPointerUp](#onpointerup) | Invoked on release (handle snaps back and output resets to zero). |
+| [OnDrag](#ondrag) | Invoked while dragging (computes and emits the stick vector). |
+
+<Highlight color="#0373fc">Attention</Highlight> These methods are the UGUI event interface implementations (`IPointerDownHandler`, `IPointerUpHandler`, `IDragHandler`) and are **driven automatically by the EventSystem** — you normally **do not call them manually**.
+
+---
+
+### OnPointerDown {#onpointerdown}
+
+```csharp
+public void OnPointerDown(PointerEventData eventData)
+```
+
+Invoked on press: shows the joystick background (if hidden); for non-`Fixed` types the background is **repositioned to the press point**; records the press start position and runs [OnDrag](#ondrag) once immediately.
+
+### OnPointerUp {#onpointerup}
+
+```csharp
+public void OnPointerUp(PointerEventData eventData)
+```
+
+Invoked on release: the handle snaps back to center; if **Show Only When Pressed** is enabled, the joystick background is hidden; and `Vector2.zero` is returned through [onStickInput](#onstickinput).
+
+### OnDrag {#ondrag}
+
+```csharp
+public void OnDrag(PointerEventData eventData)
+```
+
+Invoked while dragging: computes the output vector from the press start position, applies the **axis constraint**, **dead-zone filtering**, and **vector mode** in order, emits it through [onStickInput](#onstickinput), and updates the handle position (visually clamped to `handleMovementRange`).

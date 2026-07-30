@@ -1,0 +1,68 @@
+---
+sidebar_position: 1
+description: RectTransformAdjuster 是 RectTransform 錨點調整工具，透過 Shift+R 快捷鍵將選取物件的錨點對齊當前 Rect。
+---
+
+import ReactPlayer from 'react-player'
+
+# RectTransformAdjuster
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`RectTransformAdjuster` 為 **RectTransform 錨點調整工具**，將選取 UI 物件的**錨點 (Anchors) 對齊當前 Rect** 並將偏移歸零 (依父物件範圍換算錨點比例)，使 UI 在不同解析度下依錨點比例縮放；支援**多選批次處理**與 **Undo**。
+
+|  |  |
+| :--- | :--- |
+| **命名空間** | `OxGKit.Utilities.RectTrans.Editor` |
+| **類型** | `public class RectTransformAdjuster` |
+| **原始碼** | [RectTransformAdjuster.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/Utilities/Scripts/Editor/RectTransform/RectTransformAdjuster.cs) |
+
+<Highlight color="#00d679">提醒</Highlight> 快捷鍵為 **Shift+R** (**R**: RectTransform)。
+
+## 快速上手 {#quick-start}
+
+1. 於 **Hierarchy** 選取一個或多個 **UI 物件** (需含 `RectTransform` 且有父物件)。
+2. 按下 **Shift+R**，或透過選單 **GameObject -> Adjust RectTransform Anchors (Shift+R)**。
+3. 選取物件的**錨點會對齊當前 Rect**，`offsetMin` / `offsetMax` 歸零 (視覺上位置與大小不變)。
+
+| 選單 | 說明 |
+| :--- | :--- |
+| `GameObject/Adjust RectTransform Anchors (Shift+R)` | 將選取物件的錨點對齊當前 Rect (支援多選與 Undo)。 |
+
+<Highlight color="#0373fc">注意</Highlight> 選取物件**沒有 `RectTransform`** 或**沒有父物件**時會自動跳過，不會進行調整。
+
+---
+
+## 方法 {#methods}
+
+### AdjustAnchors {#adjustanchors}
+
+```csharp
+public static void AdjustAnchors()
+```
+
+對**當前選取的所有物件**執行錨點調整：依父物件範圍將當前位置與大小換算為錨點比例 (`anchorMin` / `anchorMax`)，並將 `offsetMin` / `offsetMax` 歸零；每個物件皆有 **Undo 記錄**。
+
+---
+
+## Demo
+
+**Utilities Demo (RectTransformAdjuster)**
+
+<ReactPlayer controls url='/video/utilities_rect_adjuster_demo.mp4' />

@@ -1,0 +1,143 @@
+---
+sidebar_position: 1
+---
+
+import ReactPlayer from 'react-player'
+
+# 模塊介紹
+
+export const Highlight = ({ children, color }) => (
+  <span
+    style={{
+      backgroundColor: color,
+      borderRadius: '5px',
+      color: '#fff',
+      padding: '2.5px'
+    }}>
+    {children}
+  </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+## 基本說明
+
+ButtonPlus 是基於繼承 Unity UGUI 的 **Button** 進行擴展的，功能擴展支持各 **Long Click (長按)** 等行為 (**Once、Continuous、PressedAndReleased** 三種長按模式，以及 **Scale (按壓縮放)** 過渡效果)；另附有 **InputFieldPlaceholderRemover** 輸入框小工具，可於輸入框聚焦時自動隱藏 Placeholder。
+
+- 版本：**v1.0.2** (`com.michaelo.oxgkit.buttonsystem`)
+- 命名空間：`OxGKit.ButtonSystem`
+
+---
+
+## 應用說明
+
+### 建立 ButtonPlus
+
+- 透過 Hierarchy 右鍵選單 **GameObject -> UI -> Button Plus - TextMeshPro** 或 **GameObject -> UI -> Legacy -> Button Plus** 直接建立 (自動附帶 Image 與對應的文字標籤)。
+- 也可透過 **Add Component -> OxGKit -> ButtonSystem -> Button -> ButtonPlus** 掛載至 UI 物件上；欲取代場景上原有的 Button 時，移除 Button 元件後改掛 ButtonPlus 並重新指定事件即可。
+
+<Highlight color="#00d679">提醒</Highlight> ButtonPlus **完整保留 Button 原有功能** (onClick、interactable、Transition、Navigation 等)，可直接當作一般 Button 使用。
+
+### 長按模式 (Extd Long Click)
+
+於 Inspector 的 **Extd Long Click** 下拉選單切換長按模式：
+
+| 模式 | 行為 |
+| :--- | :--- |
+| **None** | 無長按行為 (等同一般 Button)。 |
+| **Once** | 按住達 **Trigger Time** 後，觸發一次 **On Long Click Pressed**。 |
+| **Continuous** | 按住達 **Trigger Time** 後首次觸發 **On Long Click Pressed**，並於按住期間每 **Interval Time** 連續觸發。 |
+| **PressedAndReleased** | 按住達 **Trigger Time** 觸發 **On Long Click Pressed**；放開或指標移出按鈕時觸發 **On Long Click Released**。 |
+
+依選擇的模式，Inspector 會顯示 **Ignore Time Scale、Trigger Time、Interval Time (僅 Continuous)** 配置欄位，以及對應的長按事件槽 (**On Long Click Pressed / On Long Click Released**)。
+
+<Highlight color="#0373fc">注意</Highlight> **長按與點擊互斥**，長按觸發後該次放開**不會**再觸發 onClick (一次按壓要嘛是點擊、要嘛是長按)。
+
+### 按壓過渡 (Extd Transition)
+
+於 Inspector 的 **Extd Transition** 下拉選單切換：
+
+- **None**：無擴展過渡。
+- **Scale**：按下時依 **Size (預設 0.95)** 等比縮放按鈕，放開後恢復原尺寸。
+
+<Highlight color="#00d679">提醒</Highlight> Scale 過渡與 UGUI 原生 **Transition (Color Tint 等)** 可疊加使用，互不衝突。
+
+### InputFieldPlaceholderRemover
+
+將 [InputFieldPlaceholderRemover](/docs/buttonsystem/API/Runtime/InputFieldPlaceholderRemover) 掛載於 **InputField (Legacy)** 或 **TMP_InputField** 同一物件上，輸入框**聚焦時自動隱藏 Placeholder**，離開聚焦後恢復顯示 (純組件行為，無需任何 API 呼叫)。
+
+---
+
+## 簡單使用
+
+### Inspector 配置
+
+1. 透過 **GameObject -> UI -> Button Plus - TextMeshPro** 建立 ButtonPlus。
+2. 於 Inspector 選擇 **Extd Long Click** 模式，並調整 **Trigger Time / Interval Time**。
+3. 將回呼方法指定至 **On Click ()** 與 **On Long Click Pressed () / On Long Click Released ()** 事件槽。
+
+### 程式訂閱長按事件
+
+```csharp
+using OxGKit.ButtonSystem;
+using UnityEngine;
+
+public class ShopUI : MonoBehaviour
+{
+    public ButtonPlus buyButton;
+
+    private void Awake()
+    {
+        // 一般點擊 (繼承自 Button)
+        this.buyButton.onClick.AddListener(this.OnBuyOne);
+
+        // 長按連發 (按住 0.5 秒後，每 0.1 秒觸發一次)
+        this.buyButton.extdLongClick = ButtonPlus.ExtdLongClick.Continuous;
+        this.buyButton.triggerTime = 0.5f;
+        this.buyButton.intervalTime = 0.1f;
+        this.buyButton.onLongClickPressed.AddListener(this.OnBuyOne);
+    }
+
+    private void OnBuyOne()
+    {
+        Debug.Log("Buy x1");
+    }
+}
+```
+
+*[參考 Example]*
+
+---
+
+## Installation
+
+| Install via git URL |
+|:--- |
+| Add https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/ButtonSystem/Scripts to Package Manager |
+
+**無第三方依賴** (使用 Unity 內建 UGUI)
+
+**Samples (Package Manager -> Samples)**
+
+- **AI Agent Skills** (參考 [AI Agent Skills](/docs/agent-skills))
+- **ButtonPlus Demo**
+
+---
+
+## 模塊 API
+
+- Runtime
+  - [ButtonPlus](/docs/buttonsystem/API/Runtime/ButtonPlus) (using OxGKit.ButtonSystem)
+  - [InputFieldPlaceholderRemover](/docs/buttonsystem/API/Runtime/InputFieldPlaceholderRemover) (using OxGKit.ButtonSystem)
+
+---
+
+## Demo
+
+**ButtonSystem Demo**
+
+<ReactPlayer controls url='/video/buttonsystem_demo.mp4' />

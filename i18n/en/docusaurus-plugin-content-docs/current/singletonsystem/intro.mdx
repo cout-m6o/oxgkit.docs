@@ -1,0 +1,173 @@
+---
+sidebar_position: 1
+---
+
+# Module Intro
+
+export const Highlight = ({ children, color }) => (
+  <span
+    style={{
+      backgroundColor: color,
+      borderRadius: '5px',
+      color: '#fff',
+      padding: '2.5px'
+    }}>
+    {children}
+  </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+## Basic Instructions
+
+Singleton pattern module that supports two singleton base classes, **MonoSingleton (MonoBehaviour)** and **NewSingleton (class)**, providing **thread-safe lazy creation**, **find-or-create instance resolution in the scene**, **DontDestroyOnLoad cross-scene persistence control**, and the **OnCreate / OnStart / OnRelease lifecycle hooks**.
+
+- Version: **v1.0.2** (`com.michaelo.oxgkit.singletonsystem`)
+- Namespace: `OxGKit.SingletonSystem`
+
+<Highlight color="#00d679">Reminder</Highlight> This module has **no third-party dependencies** and can be installed standalone.
+
+---
+
+## Application Description
+
+### Two Singleton Base Classes
+
+| Base Class | Description |
+| :--- | :--- |
+| [`MonoSingleton<T>`](/docs/singletonsystem/API/Runtime/MonoSingleton) | `MonoBehaviour` singleton base class. When accessing the instance, it **first looks for an existing instance in the scene, otherwise automatically creates a GameObject** with the component attached; supports `DontDestroyOnLoad` persistence control and provides the `OnCreate` / `OnStart` / `OnRelease` lifecycle hooks. |
+| [`NewSingleton<T>`](/docs/singletonsystem/API/Runtime/NewSingleton) | Plain C# class singleton base class (non-`MonoBehaviour`), lazily creating the instance with `new T()` (double-checked locking). |
+
+### Lifecycle Hooks (MonoSingleton)
+
+`MonoSingleton<T>` implements Unity's `Awake()`, `Start()`, and `OnDestroy()` as **private methods** of the base class; implement your logic through the following hooks instead:
+
+| Hook | Invoked By |
+| :--- | :--- |
+| `OnCreate()` | Unity `Awake` |
+| `OnStart()` | Unity `Start` |
+| `OnRelease()` | Unity `OnDestroy` |
+
+<Highlight color="#ff2f00">Important</Highlight> **Do not implement `Awake()`, `Start()`, or `OnDestroy()`** (occupied by the base class); every other Unity method (`Update`, `OnEnable`, etc.) can be implemented normally.
+
+### DontDestroyOnLoad Control
+
+- **Scene-placed instance**: registers itself as the singleton in `Awake`, and the `dontDestroyOnLoad` field on the Inspector (default `true`) decides whether it persists across scenes.
+- **Created from code**: decided by the parameter of the first `GetInstance(dontDestroyOnLoad)` / `InitInstance(dontDestroyOnLoad)` call (default `true`).
+
+<Highlight color="#0373fc">Attention</Highlight> `dontDestroyOnLoad` takes effect on the **first instance creation** — decide it at the first access call site and keep it consistent.
+
+### Script Template Creation
+
+Quickly create a MonoSingleton template script via Right-Click **Create/OxGKit/SingletonSystem/Template Mono Singleton.cs**.
+
+---
+
+## Simple Usage
+
+### Implement a MonoSingleton
+
+```csharp
+using OxGKit.SingletonSystem;
+
+public class GameManager : MonoSingleton<GameManager>
+{
+    // |-------------------------------------------------------------------------------------|
+    // | Note: Except Awake(), Start() and OnDestroy(), other Unity methods can be override. |
+    // |-------------------------------------------------------------------------------------|
+
+    protected override void OnCreate()
+    {
+        /**
+         * Do Somethings OnCreate In Here (Call by Unity.Awake)
+         */
+    }
+
+    protected override void OnStart()
+    {
+        /**
+         * Do Somethings OnStart In Here (Call by Unity.Start)
+         */
+    }
+
+    protected override void OnRelease()
+    {
+        /**
+         * Do Somethings OnRelease In Here (Call by Unity.OnDestroy)
+         */
+    }
+}
+```
+
+```csharp
+// Get the instance (find-or-create, DontDestroyOnLoad by default)
+GameManager.GetInstance();
+
+// Scene-scoped singleton (destroyed with the scene, set once at the first access)
+GameManager.GetInstance(dontDestroyOnLoad: false);
+
+// Explicit initialization at boot (warm-up)
+GameManager.InitInstance();
+
+// Check if an instance exists
+if (GameManager.CheckInstanceExists()) { /* ... */ }
+
+// Destroy the instance (GameObject included)
+GameManager.DestroyInstance();
+```
+
+### Implement a NewSingleton
+
+```csharp
+using OxGKit.SingletonSystem;
+
+public class ScoreManager : NewSingleton<ScoreManager>
+{
+    public int score = 0;
+
+    public static void AddScore()
+    {
+        GetInstance().score++;
+    }
+}
+```
+
+```csharp
+// Get the instance (lazy new T() creation)
+var scoreManager = ScoreManager.GetInstance();
+ScoreManager.AddScore();
+
+// Destroy the instance (only clears the static reference)
+ScoreManager.DestroyInstance();
+```
+
+*[Refer to Example]*
+
+---
+
+## Installation
+
+| Install via git URL |
+|:--- |
+| Add https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/SingletonSystem/Scripts to Package Manager |
+
+**Third-Party Libraries**
+
+- None (this module has no third-party dependencies).
+
+**Samples (Package Manager -> Samples)**
+
+- **AI Agent Skills** (refer to [AI Agent Skills](/docs/agent-skills))
+- **MonoSingleton Demo**
+
+---
+
+## Module API
+
+- Runtime
+  - [MonoSingleton](/docs/singletonsystem/API/Runtime/MonoSingleton) (using OxGKit.SingletonSystem)
+  - [NewSingleton](/docs/singletonsystem/API/Runtime/NewSingleton) (using OxGKit.SingletonSystem)

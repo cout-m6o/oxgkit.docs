@@ -1,0 +1,274 @@
+---
+sidebar_position: 1
+description: VirtualJoystick 是 UGUI 虛擬搖桿組件，透過 onStickInput 回調輸出 Vector2 搖桿向量，支持 Fixed 與 Floating 顯示類型、Normalized 與 Delta 向量模式、軸向限制與死區過濾。
+---
+
+# VirtualJoystick
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`VirtualJoystick` 是 **UGUI 虛擬搖桿組件** (`MonoBehaviour`)，實作 UGUI 事件介面 (`IPointerDownHandler`、`IPointerUpHandler`、`IDragHandler`)，將觸控 / 滑鼠拖曳轉換為 `Vector2` 搖桿向量，並透過 [onStickInput](#onstickinput) 回調輸出；支持 **Fixed / Floating** 顯示類型、**Normalized / Delta** 向量模式、**軸向限制**與**死區**過濾 (調整自 [annulusgames - EnhancedOnScreenStick](https://github.com/AnnulusGames/EnhancedOnScreenStick))。
+
+|  |  |
+| :--- | :--- |
+| **命名空間** | `OxGKit.VirtualJoystick` |
+| **類型** | `public class VirtualJoystick : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, IDragHandler` |
+| **原始碼** | [VirtualJoystick.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/VirtualJoystick/Scripts/Runtime/Core/VirtualJoystick.cs) |
+
+```csharp
+using OxGKit.VirtualJoystick;
+```
+
+<Highlight color="#0373fc">注意</Highlight> 組件標註 `[AddComponentMenu("OxGKit/VirtualJoystick/VirtualJoystick")]` 與 `[RequireComponent(typeof(RectTransform), typeof(Image))]`，**掛載物件本身即為觸控區域** (Image 可設為透明作為觸控感應面)。
+
+## 快速上手 {#quick-start}
+
+```csharp
+using OxGKit.VirtualJoystick;
+using UnityEngine;
+
+public class PlayerController : MonoBehaviour
+{
+    [SerializeField]
+    private VirtualJoystick _joystick;
+
+    private Vector2 _move;
+
+    private void Awake()
+    {
+        // 配置搖桿 (亦可直接於 Inspector 配置)
+        this._joystick.stickType = StickType.Floating;
+        this._joystick.stickVectorMode = StickVectorMode.Normalized;
+        this._joystick.axisConstraint = AxisConstraint.Both;
+        this._joystick.deadZone = 0.1f;
+
+        // 訂閱搖桿輸出回調 (放開時會收到 Vector2.zero)
+        this._joystick.onStickInput += this._OnStickInput;
+    }
+
+    private void _OnStickInput(Vector2 v2)
+    {
+        this._move = v2;
+    }
+
+    private void OnDestroy()
+    {
+        // 物件銷毀時取消訂閱
+        this._joystick.onStickInput -= this._OnStickInput;
+    }
+}
+```
+
+## 通用規則 {#general-rules}
+
+### 環境需求 {#requirements}
+
+1. 組件必須位於 **Canvas** 之下：`Awake` 會取得父層 Canvas (用於解析比例與位置換算)，**找不到會報錯並自我停用** (`enabled = false`)。
+2. 場景中需有 **EventSystem**，且組件上的 `Image` 需可接收 **Raycast** (未被 `CanvasGroup.blocksRaycasts = false` 等阻擋)，否則收不到指標事件。
+3. 本組件為**純 UGUI 事件驅動**，**不依賴** Unity New InputSystem 的 OnScreen 控制項，Old / New Input 後端皆可搭配使用。
+
+### 輸出流程 {#output-flow}
+
+1. **按下 ([OnPointerDown](#onpointerdown))**：非 `Fixed` 類型會將搖桿背景重新定位至按壓點，記錄按壓起始位置並立即執行一次 `OnDrag`。
+2. **拖曳 ([OnDrag](#ondrag))**：以「當前位置 - 按壓起始位置」換算輸出向量 (除以 `handleMovementRange * Canvas.scaleFactor`)，依序套用**軸向限制**、**死區過濾**與**向量模式**，最後透過 `onStickInput` 輸出並更新把手位置。
+3. **放開 ([OnPointerUp](#onpointerup))**：把手歸位 (中心)，`onStickInput` 回傳 `Vector2.zero`。
+
+---
+
+## 列舉 {#enums}
+
+### StickVectorMode {#stickvectormode}
+
+```csharp
+public enum StickVectorMode
+{
+    Normalized,
+    Delta
+}
+```
+
+搖桿向量輸出模式：
+
+| 值 | 說明 |
+| :--- | :--- |
+| `Normalized` | 輸出範圍限制在 **-1.00 ~ 1.00** (向量長度超過 1 會進行正規化)，適合移動控制。 |
+| `Delta` | 模仿 **Mouse Delta**，輸出可大於 1，適合視角控制 (可自行乘上靈敏度)。 |
+
+### StickType {#sticktype}
+
+```csharp
+public enum StickType
+{
+    Fixed = 0,
+    Floating = 1
+}
+```
+
+搖桿顯示類型：
+
+| 值 | 說明 |
+| :--- | :--- |
+| `Fixed` | 搖桿固定於原位置。 |
+| `Floating` | 每次按下時，搖桿背景會重新定位至按壓點。 |
+
+### AxisConstraint {#axisconstraint}
+
+```csharp
+public enum AxisConstraint
+{
+    Both = 0,
+    Horizontal = 1,
+    Vertical = 2
+}
+```
+
+限制搖桿輸出方向：
+
+| 值 | 說明 |
+| :--- | :--- |
+| `Both` | 雙軸輸出。 |
+| `Horizontal` | 僅輸出水平軸。 |
+| `Vertical` | 僅輸出垂直軸。 |
+
+---
+
+## 成員 {#members}
+
+### 成員總覽 {#member-overview}
+
+| 成員 | 說明 |
+| :--- | :--- |
+| [onStickInput](#onstickinput) | 搖桿輸出向量變化時的回調 (放開時回傳 `Vector2.zero`)。 |
+| [stickVectorMode](#prop-stickvectormode) | 搖桿向量輸出模式 ([StickVectorMode](#stickvectormode))。 |
+| [stickType](#prop-sticktype) | 搖桿顯示類型 ([StickType](#sticktype))。 |
+| [axisConstraint](#prop-axisconstraint) | 限制搖桿輸出方向 ([AxisConstraint](#axisconstraint))。 |
+| [handleMovementRange](#handlemovementrange) | 搖桿把手控制範圍 (像素半徑，預設 `100`)。 |
+| [deadZone](#deadzone) | 死區範圍 (0 ~ 1)，低於此值的搖桿輸入視為無效。 |
+
+---
+
+### onStickInput {#onstickinput}
+
+```csharp
+public Action<Vector2> onStickInput
+```
+
+當搖桿輸出向量變化時的回調：拖曳期間每次輸入變化皆會觸發，**放開時會回傳 `Vector2.zero`**。
+
+```csharp
+this._joystick.onStickInput += (v2) => this._move = v2;
+```
+
+<Highlight color="#ff2f00">重要</Highlight> `onStickInput` 為 `Action<Vector2>` **委派欄位**，使用 `=` 直接指定會**覆蓋所有既有訂閱**，建議使用 `+=` / `-=` 進行訂閱與取消訂閱 (並於物件銷毀時取消訂閱)。
+
+### stickVectorMode {#prop-stickvectormode}
+
+```csharp
+public StickVectorMode stickVectorMode { get; set; }
+```
+
+搖桿向量輸出模式，預設 `StickVectorMode.Normalized` (詳見 [StickVectorMode](#stickvectormode))。
+
+### stickType {#prop-sticktype}
+
+```csharp
+public StickType stickType { get; set; }
+```
+
+搖桿顯示類型，預設 `StickType.Fixed` (詳見 [StickType](#sticktype))。
+
+### axisConstraint {#prop-axisconstraint}
+
+```csharp
+public AxisConstraint axisConstraint { get; set; }
+```
+
+限制搖桿輸出方向，預設 `AxisConstraint.Both` (詳見 [AxisConstraint](#axisconstraint))。
+
+### handleMovementRange {#handlemovementrange}
+
+```csharp
+public float handleMovementRange { get; set; }
+```
+
+搖桿把手控制範圍 (像素半徑，預設 `100`)，輸出向量以「拖曳位移 / (`handleMovementRange` * `Canvas.scaleFactor`)」進行換算。
+
+<Highlight color="#0373fc">注意</Highlight> 控制範圍以**像素**為單位並受 **Canvas scaleFactor** 影響，建議於目標解析度 / 縱橫比進行測試。
+
+### deadZone {#deadzone}
+
+```csharp
+public float deadZone { get; set; }
+```
+
+死區範圍 (`0 ~ 1`，預設 `0`)，輸出向量長度低於此值將視為無效並輸出 `Vector2.zero` (避免誤觸)。
+
+<Highlight color="#00d679">提醒</Highlight> 死區為**控制範圍的比例值**，約 **0.05 ~ 0.15** 即可過濾誤觸且不影響操作靈敏度。
+
+---
+
+## Inspector 欄位 {#inspector-fields}
+
+以下序列化欄位**僅能於 Inspector 配置** (無公開屬性)；可透過 **Package Manager -> Samples** 匯入 **VirtualJoystickUI Prefab** (已預先串接，詳見[模塊介紹](../../intro.mdx))：
+
+| 欄位 (Inspector) | 說明 |
+| :--- | :--- |
+| **Background** (`_background`) | 搖桿背景 UI 元件 (`RectTransform`，搖桿底圖)，**必須指定**。 |
+| **Handle** (`_handle`) | 搖桿把手 UI 元件 (`RectTransform`，可拖曳的控制點)，**必須指定**。 |
+| **Show Only When Pressed** (`_showOnlyWhenPressed`) | 是否僅在按下時顯示搖桿背景 (`Awake` 即隱藏，按下顯示、放開隱藏)，適合搭配 `Floating` 類型。 |
+
+---
+
+## UGUI 事件回調 {#ugui-callbacks}
+
+### 方法總覽 {#method-overview}
+
+| 方法 | 說明 |
+| :--- | :--- |
+| [OnPointerDown](#onpointerdown) | 按下時觸發 (重新定位與初始輸出)。 |
+| [OnPointerUp](#onpointerup) | 放開時觸發 (把手歸位並輸出歸零)。 |
+| [OnDrag](#ondrag) | 拖曳時觸發 (計算並輸出搖桿向量)。 |
+
+<Highlight color="#0373fc">注意</Highlight> 以上方法為 UGUI 事件介面實作 (`IPointerDownHandler`、`IPointerUpHandler`、`IDragHandler`)，由 **EventSystem 自動驅動**，一般情況下**無需手動呼叫**。
+
+---
+
+### OnPointerDown {#onpointerdown}
+
+```csharp
+public void OnPointerDown(PointerEventData eventData)
+```
+
+按下時觸發：顯示搖桿背景 (若為隱藏狀態)，非 `Fixed` 類型會將搖桿背景**重新定位至按壓點**，記錄按壓起始位置並立即執行一次 [OnDrag](#ondrag)。
+
+### OnPointerUp {#onpointerup}
+
+```csharp
+public void OnPointerUp(PointerEventData eventData)
+```
+
+放開時觸發：把手歸位 (中心點)，若啟用 **Show Only When Pressed** 會隱藏搖桿背景，並透過 [onStickInput](#onstickinput) 回傳 `Vector2.zero`。
+
+### OnDrag {#ondrag}
+
+```csharp
+public void OnDrag(PointerEventData eventData)
+```
+
+拖曳時觸發：依按壓起始位置計算輸出向量，依序套用**軸向限制**、**死區過濾**與**向量模式**，透過 [onStickInput](#onstickinput) 輸出，並同步更新把手位置 (視覺上以 `handleMovementRange` 為上限)。

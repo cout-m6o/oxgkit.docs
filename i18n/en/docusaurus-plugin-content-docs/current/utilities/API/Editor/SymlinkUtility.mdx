@@ -1,0 +1,58 @@
+---
+sidebar_position: 3
+description: SymlinkUtility provides menu items for creating folder symlinks (Junction/Symlink) in the project, with a link marker shown in the Project window.
+---
+
+# SymlinkUtility
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`SymlinkUtility` provides menu items for **creating folder symlinks** in the project. Link **shared folders outside the project** into it via **Junction / Absolute Symlink / Relative Symlink** (e.g. shared art assets or cross-project shared modules), with a `<=>` marker drawn next to symlinked folders in the **Project window** (modified from [karl-/unity-symlink-utility](https://github.com/karl-/unity-symlink-utility)).
+
+|  |  |
+| :--- | :--- |
+| **Namespace** | `OxGKit.Utilities.Symlink.Editor` |
+| **Type** | `public static class SymlinkUtility` |
+| **Source** | [SymlinkUtility.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/Utilities/Scripts/Editor/SymlinkUtility/SymlinkUtility.cs) |
+
+## Menu Items {#menu-items}
+
+Use them from the **Project window Right-Click** (or the Assets menu): a folder panel opens to pick the **source folder**, and the link is created under the **currently selected folder** (`Assets` when nothing is selected):
+
+| Menu | Description |
+| :--- | :--- |
+| `Assets/Create/Folder (Junction)` | Creates a **Junction** link (**Windows only**, no administrator privileges required). |
+| `Assets/Create/Folder (Absolute Symlink)` | Creates an **absolute-path** symbolic link. |
+| `Assets/Create/Folder (Relative Symlink)` | Creates a **relative-path** symbolic link. |
+
+<Highlight color="#0373fc">Attention</Highlight> On **Windows**, creating a Symlink (Absolute / Relative) requires **administrator privileges** (a UAC prompt appears), while **Junction does not**; on macOS the link is created via `ln -s`.
+
+## General Rules {#general-rules}
+
+### Constraints {#constraints}
+
+- The **source folder must not be inside this project** (under `Application.dataPath`); otherwise a warning is logged and the operation aborts.
+- The operation aborts when a **folder with the same name already exists** at the target location.
+- `AssetDatabase.Refresh` runs automatically after the link is created.
+
+### Link Marker {#symlink-marker}
+
+- In the **Project window**, symlinked folders (including Junctions) show a `<=>` marker on the right for easy identification.
+
+<Highlight color="#00d679">Reminder</Highlight> Assets inside symlinked folders are imported by Unity **as project assets**; when collaborating, make sure every team member has the source folder on their machine, and mind how your VCS handles symlinks.

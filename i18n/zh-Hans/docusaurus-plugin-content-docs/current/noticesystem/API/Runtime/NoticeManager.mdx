@@ -1,0 +1,156 @@
+---
+sidebar_position: 1
+description: NoticeManager 是 NoticeSystem 的静态通知管理器，负责通知条件的注册与条件 ID 查询，并于数据变更时通过 Notify 刷新持有条件的 NoticeItem 红点显示。
+---
+
+# NoticeManager
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`NoticeManager` 是 **NoticeSystem** 的静态通知管理器 (红点系统核心)，负责**通知条件 ([NoticeCondition](./NoticeCondition.mdx)) 的注册与条件 ID 查询**，并于数据变更时通过 **Notify** 依条件 ID 查找持有条件的 [NoticeItem](./NoticeItem.mdx) 进行刷新显示。
+
+|  |  |
+| :--- | :--- |
+| **命名空间** | `OxGKit.NoticeSystem` |
+| **类型** | `public static class NoticeManager` |
+| **源码** | [NoticeManager.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/NoticeSystem/Scripts/Runtime/Core/NoticeManager.cs) |
+
+```csharp
+using OxGKit.NoticeSystem;
+```
+
+## 快速上手 {#quick-start}
+
+```csharp
+using OxGKit.NoticeSystem;
+
+// 1. 注册通知条件 (启动时注册一次)
+NoticeManager.RegisterCondition<NewMailCond>();
+
+// 2. NoticeItem 注册条件与数据 (通过条件 ID + 数据)
+this.mailNoticeItem.RegisterNotice(new NoticeInfo(NewMailCond.id, this._mailBox));
+
+// 3. 数据变更时，通知条件 ID 刷新红点显示
+this._mailBox.unreadCount++;
+NoticeManager.Notify(NewMailCond.id);
+```
+
+## 通用规则 {#general-rules}
+
+### 条件 ID {#condition-id}
+
+- 条件 ID 于 [RegisterCondition](#registercondition) 注册时**自动分配** (以条件类型作为唯一键)。
+- 惯例上于条件类中定义静态属性 `id`，通过 [GetConditionId](#getconditionid) 获取：
+
+```csharp
+public class NewMailCond : NoticeCondition
+{
+    public static int id { get { return NoticeManager.GetConditionId<NewMailCond>(); } }
+
+    public override bool ShowCondition(object data) { /* ... */ }
+}
+```
+
+<Highlight color="#ff2f00">重要</Highlight> 必须**先 [RegisterCondition](#registercondition) 注册条件**，才能通过 [GetConditionId](#getconditionid) 获取条件 ID (未注册时返回 `0`)。
+
+### 通知刷新流程 {#notify-flow}
+
+1. 数据状态变更。
+2. 调用 [Notify](#notify) 通知条件 ID。
+3. NoticeManager 依条件 ID 查找持有该条件的所有 NoticeItem。
+4. 各 NoticeItem 重新进行条件检查 (`ShowCondition`)，任一条件符合则显示、皆不符合则隐藏。
+
+<Highlight color="#00d679">提醒</Highlight> Notify 过程会自动剔除已销毁 (Destroyed) 的 NoticeItem 注册，无需担心残留引用。
+
+---
+
+## 方法总览 {#overview}
+
+| 方法 | 说明 |
+| :--- | :--- |
+| [RegisterCondition](#registercondition) | 注册通知条件 (自动分配条件 ID)。 |
+| [GetConditionId](#getconditionid) | 获取通知条件 ID。 |
+| [Notify](#notify) | 数据变更时，依条件 ID 或 NoticeItem 通知刷新显示。 |
+
+---
+
+### RegisterCondition {#registercondition}
+
+```csharp
+public static void RegisterCondition<TNoticeCondition>() where TNoticeCondition : NoticeCondition, new()
+```
+
+注册通知条件 (创建条件实例并自动分配条件 ID)，支持于运行时动态新增条件。
+
+```csharp
+NoticeManager.RegisterCondition<NewMailCond>();
+NoticeManager.RegisterCondition<CoinInWalletCond>();
+```
+
+<Highlight color="#0373fc">注意</Highlight> **重复注册**同一条件会被忽略，并输出警告日志。
+
+### GetConditionId {#getconditionid}
+
+```csharp
+public static int GetConditionId<TNoticeCondition>() where TNoticeCondition : NoticeCondition
+```
+
+获取通知条件的条件 ID。
+
+```csharp
+int conditionId = NoticeManager.GetConditionId<NewMailCond>();
+```
+
+<Highlight color="#0373fc">注意</Highlight> 条件**尚未注册**时返回 `0`，需先通过 [RegisterCondition](#registercondition) 进行注册。
+
+### Notify {#notify}
+
+```csharp
+// 单一条件 ID (non-alloc)
+public static void Notify(int conditionId)
+
+// 多个条件 ID
+public static void Notify(params int[] conditionIds)
+
+// 依 NoticeItem 通知 (自动收集其持有条件 ID 并剔除重复)
+public static void Notify(params NoticeItem[] noticeItems)
+```
+
+数据变更时进行通知，将依条件 ID 查找持有条件的所有 NoticeItem 进行**条件检查与刷新显示**。
+
+- **依条件 ID 通知**：直接指定条件 ID (单一条件 ID 版本为 non-alloc，效率最好)。
+- **依 NoticeItem 通知**：自动收集传入 NoticeItem 持有的条件 ID，**剔除重复后**再统一通知 (避免同条件重复刷新)。
+
+```csharp
+// 数据变更
+this._wallet.IncreaseCoin();
+
+// 单一条件 ID (non-alloc)
+NoticeManager.Notify(CoinInWalletCond.id);
+
+// 多个条件 ID
+NoticeManager.Notify(CoinInWalletCond.id, CoinIsEvenCond.id);
+
+// 依 NoticeItem 通知
+NoticeManager.Notify(this.walletNoticeItem, this.coinNoticeItem);
+```
+
+<Highlight color="#ff2f00">重要</Highlight> 数据变更后**必须 Notify 相关条件 ID**，红点显示才会刷新；若使用**值类型 (Value Type)** 数据，需先通过 [NoticeItem.RenewNotice](./NoticeItem.mdx#renewnotice) 更新数据快照再 Notify。
+
+<Highlight color="#0373fc">注意</Highlight> Notify 传入**未注册**的条件 ID 时，会输出错误日志 (`Error Notice Condition Cannot find`)。

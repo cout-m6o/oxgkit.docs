@@ -1,0 +1,183 @@
+---
+sidebar_position: 2
+description: NoticeItem 是掛載於紅點圖示上的通知物件組件，持有條件 ID 與數據 (NoticeInfo) 的註冊，任一條件符合則自動顯示自身 GameObject，並於 OnDestroy 時自動註銷。
+---
+
+# NoticeItem
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`NoticeItem` 是掛載於**紅點圖示 (ICON)** 上的通知物件組件 (`MonoBehaviour`)，持有**條件 ID 與數據 ([NoticeInfo](./NoticeCondition.mdx#noticeinfo)) 的註冊**，當持有的**任一條件符合**時自動顯示自身 GameObject；可透過 **Package Manager -> Samples** 匯入 **NoticeItem Prefab** 拖曳至 UI 上直接使用，亦可透過 **Add Component -> OxGKit -> NoticeSystem -> NoticeItem** 自行掛載。
+
+|  |  |
+| :--- | :--- |
+| **命名空間** | `OxGKit.NoticeSystem` |
+| **類型** | `[DisallowMultipleComponent] public class NoticeItem : MonoBehaviour` |
+| **原始碼** | [NoticeItem.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/NoticeSystem/Scripts/Runtime/Core/NoticeItem.cs) |
+
+```csharp
+using OxGKit.NoticeSystem;
+```
+
+## 快速上手 {#quick-start}
+
+```csharp
+using OxGKit.NoticeSystem;
+using UnityEngine;
+
+public class MailUI : MonoBehaviour
+{
+    // 將 NoticeItem prefab 拖曳至 UI 上，再指定引用
+    public NoticeItem mailNoticeItem;
+
+    private MailBox _mailBox = new MailBox();
+
+    private void Awake()
+    {
+        // 註冊條件與數據 (註冊時會自動檢查條件並刷新顯示)
+        this.mailNoticeItem.RegisterNotice
+        (
+            new NoticeInfo(NewMailCond.id, this._mailBox)
+        );
+    }
+
+    public void ReceiveMail()
+    {
+        // 數據變更後，通知刷新紅點顯示
+        this._mailBox.unreadCount++;
+        this.mailNoticeItem.Notify();
+    }
+}
+```
+
+## 通用規則 {#general-rules}
+
+### 顯示規則 {#visible-rules}
+
+- 單一 NoticeItem 可持有**多個條件**，持有的**任一條件符合** (`ShowCondition` 回傳 `true`) 則顯示自身 GameObject，**皆不符合**則隱藏 (OR 邏輯)。
+
+<Highlight color="#ff2f00">重要</Highlight> NoticeItem 切換的是**自身 GameObject** 的顯示，因此紅點應為按鈕底下的**子物件圖示節點**，不要直接掛在按鈕本身，否則按鈕會跟著被隱藏。
+
+<Highlight color="#00d679">提醒</Highlight> 若需 **AND 邏輯**，將整組判斷寫在**同一個條件類**的 `ShowCondition` 中即可。
+
+### 自動註銷 {#auto-deregister}
+
+<Highlight color="#0373fc">注意</Highlight> 當 NoticeItem **OnDestroy** 時，會**自動 [DeregisterNotice](#deregisternotice)** 註銷自身全部持有條件。
+
+<Highlight color="#00d679">提醒</Highlight> **物件池 (Pooled UI)** 回收時不會觸發 OnDestroy，需自行呼叫 [DeregisterNotice](#deregisternotice) 避免殘留註冊。
+
+### 數值類型數據 {#value-type-data}
+
+<Highlight color="#ff2f00">重要</Highlight> `NoticeInfo.data` 對**數值類型 (Value Type)** 數據 (如 `int`) 儲存的是**快照**，數據變更後必須透過 [RenewNotice](#renewnotice) 更新數據再 Notify；**參考類型 (Reference Type)** 則持有引用，變更後僅需 Notify。
+
+---
+
+## 方法總覽 {#overview}
+
+| 方法 | 說明 |
+| :--- | :--- |
+| [HasCondition](#hascondition) | 檢查是否持有指定條件 ID。 |
+| [Notify](#notify) | 通知自身持有的所有條件進行刷新顯示。 |
+| [RenewNotice](#renewnotice) | 更新條件數據 (Method Chaining)，未持有時自動註冊。 |
+| [RegisterNotice](#registernotice) | 註冊條件與數據，並自動檢查條件刷新顯示。 |
+| [DeregisterNotice](#deregisternotice) | 註銷指定條件 (不帶參數 = 註銷全部)。 |
+
+---
+
+### HasCondition {#hascondition}
+
+```csharp
+public bool HasCondition(int conditionId)
+```
+
+檢查自身是否持有指定條件 ID 的註冊。
+
+```csharp
+if (this.mailNoticeItem.HasCondition(NewMailCond.id))
+{
+    // ...
+}
+```
+
+### Notify {#notify}
+
+```csharp
+public void Notify()
+```
+
+通知**自身持有的所有條件 ID** 進行 [NoticeManager.Notify](./NoticeManager.mdx#notify) 刷新顯示。
+
+```csharp
+// 數據變更後 (參考類型)，直接通知刷新
+this._mailBox.unreadCount++;
+this.mailNoticeItem.Notify();
+```
+
+### RenewNotice {#renewnotice}
+
+```csharp
+public NoticeItem RenewNotice(NoticeInfo noticeInfo)
+```
+
+更新指定條件的數據 (回傳自身，可 **Method Chaining**)；若條件**尚未持有**，會自動轉為 [RegisterNotice](#registernotice) 進行註冊。
+
+```csharp
+// 數值類型數據為快照，變更後必須 RenewNotice 更新數據，再 Notify 刷新顯示
+this._coin++;
+this.coinNoticeItem.RenewNotice(new NoticeInfo(CoinInWalletCond.id, this._coin)).Notify();
+```
+
+### RegisterNotice {#registernotice}
+
+```csharp
+public void RegisterNotice(params NoticeInfo[] noticeInfos)
+```
+
+註冊條件與數據 ([NoticeInfo](./NoticeCondition.mdx#noticeinfo))，註冊後**自動檢查條件並刷新顯示**；**重複註冊**同一條件時會改為**更新數據 (Renew) 並再次通知**。
+
+```csharp
+// 單一 NoticeItem 可持有多個條件 (任一條件符合即顯示紅點)
+this.walletNoticeItem.RegisterNotice
+(
+    // 數值類型數據
+    new NoticeInfo(CoinInWalletCond.id, this._coin),
+    // 參考類型數據
+    new NoticeInfo(CoinIsEvenCond.id, this._wallet)
+);
+```
+
+<Highlight color="#0373fc">注意</Highlight> 註冊前條件必須已透過 [NoticeManager.RegisterCondition](./NoticeManager.mdx#registercondition) 完成註冊，否則條件 ID 無法解析 (回傳 `0`)。
+
+### DeregisterNotice {#deregisternotice}
+
+```csharp
+public void DeregisterNotice(params int[] conditionIds)
+```
+
+註銷指定條件 ID 的註冊；**不帶參數時註銷自身全部持有條件**，註銷後會重新檢查條件刷新顯示。
+
+```csharp
+// 註銷指定條件
+this.walletNoticeItem.DeregisterNotice(CoinInWalletCond.id);
+
+// 不帶參數 => 註銷自身全部持有條件
+this.walletNoticeItem.DeregisterNotice();
+```
+
+<Highlight color="#00d679">提醒</Highlight> OnDestroy 時會**自動呼叫**此方法註銷全部持有條件，一般無需手動處理 (物件池回收除外)。

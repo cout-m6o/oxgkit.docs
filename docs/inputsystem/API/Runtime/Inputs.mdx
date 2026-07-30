@@ -1,0 +1,233 @@
+---
+sidebar_position: 1
+description: Inputs 是 InputSystem 的靜態輸入調度門面，透過 Inputs.CM 管理 Unity New InputSystem 的控制表 (Control Maps)，並透過 Inputs.IA 註冊與驅動 Input Actions (通用訊號派送者)。
+---
+
+# Inputs
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`Inputs` 是 **InputSystem** 的**靜態輸入調度門面** (Facade)，內部由 `InputCenter` 單例 (internal) 集中管理註冊緩存，並區分為兩組 API：**Inputs.CM** (Control Map，管理 Unity New InputSystem 的 `IInputActionCollection` 控制表) 與 **Inputs.IA** (Input Action，註冊與驅動 [IInputAction](./IInputAction.mdx) 通用訊號派送者)。
+
+|  |  |
+| :--- | :--- |
+| **命名空間** | `OxGKit.InputSystem` |
+| **類型** | `public static class Inputs` (內含巢狀 `public static class CM` 與 `public static class IA`) |
+| **原始碼** | [InputCenter.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/InputSystem/Scripts/Runtime/InputCenter/InputCenter.cs) |
+
+```csharp
+using OxGKit.InputSystem;
+```
+
+## 快速上手 {#quick-start}
+
+```csharp
+using OxGKit.InputSystem;
+
+// 1. 註冊 Control Map (Unity New InputSystem 生成的類，註冊時預設自動 Enable)
+Inputs.CM.RegisterControlMap<PlayerControls>();
+
+// 2. 註冊 Input Action (註冊時會自動呼叫 OnCreate 進行事件綁定)
+Inputs.IA.RegisterInputAction<PlayerAction>();
+
+// 3. 訂閱 Input Action 派送的輸入訊號
+Inputs.IA.GetInputAction<PlayerAction>().onMoveAction += OnMoveActionHandler;
+
+// 4. 由主程式的 MonoBehaviour (Update) 每幀驅動更新
+Inputs.IA.DriveUpdate(Time.unscaledDeltaTime);
+```
+
+## 通用規則 {#general-rules}
+
+### 註冊順序 {#register-order}
+
+<Highlight color="#ff2f00">重要</Highlight> **先註冊 Control Maps，再註冊 Input Actions**：Input Action 的 `OnCreate` 通常會透過 [GetControlMap](#getcontrolmap) 取得控制表進行綁定，若 Control Map 尚未註冊會取得 null，導致綁定被靜默略過。
+
+### 驅動更新 {#drive-update}
+
+<Highlight color="#ff2f00">重要</Highlight> 應由**單一**主程式 MonoBehaviour 呼叫 [DriveUpdate](#driveupdate)：忘記呼叫會使所有依賴 `OnUpdate` 的輪詢邏輯失效；多處呼叫則會重複驅動 (double-tick)。
+
+### 重複註冊 {#duplicate-register}
+
+<Highlight color="#0373fc">注意</Highlight> 註冊採**靜態緩存**：同一型別重複註冊會輸出警告並**以首次註冊的實例為準**，重啟流程 (場景重載) 需自行考量此行為。
+
+---
+
+## Inputs.CM (Control Map) {#inputs-cm}
+
+管理 **Unity New InputSystem** 的控制表 (Input Action Asset 生成類，泛型約束為 `IInputActionCollection`)。
+
+### 方法總覽 {#cm-overview}
+
+| 方法 | 說明 |
+| :--- | :--- |
+| [RegisterControlMap](#registercontrolmap) | 註冊控制表 (註冊時預設自動 Enable)。 |
+| [GetControlMap](#getcontrolmap) | 取得已註冊的控制表。 |
+| [SetActive](#setactive) | 開關控制表 (Enable / Disable)。 |
+| [IsActive](#isactive) | 檢查控制表啟用狀態。 |
+
+---
+
+### RegisterControlMap {#registercontrolmap}
+
+```csharp
+public static void RegisterControlMap<TIInputActionCollection>() where TIInputActionCollection : IInputActionCollection, new()
+```
+
+註冊控制表 (Input Action Asset)，內部會以 `new()` 建立實例並**自動 Enable** (註冊後即可接收輸入)。
+
+```csharp
+Inputs.CM.RegisterControlMap<PlayerControls>();
+```
+
+<Highlight color="#0373fc">注意</Highlight> 同一型別重複註冊會輸出警告 `[ControlMap] <TypeName> already exist.`，並保留首次註冊的實例。
+
+### GetControlMap {#getcontrolmap}
+
+```csharp
+public static TIInputActionCollection GetControlMap<TIInputActionCollection>() where TIInputActionCollection : IInputActionCollection
+```
+
+取得已註冊的控制表實例；**未註冊時回傳 `default` (null)**，建議搭配 null 檢查使用。
+
+```csharp
+var ctrls = Inputs.CM.GetControlMap<PlayerControls>();
+if (ctrls != null)
+{
+    ctrls.Player.Move.performed += this.OnMoveAction;
+}
+```
+
+### SetActive {#setactive}
+
+```csharp
+public static void SetActive<TIInputActionCollection>(bool active) where TIInputActionCollection : IInputActionCollection
+```
+
+開關控制表：`true` 呼叫 `Enable()`、`false` 呼叫 `Disable()` (例如 UI 模式或過場動畫時停用玩家輸入)；未註冊時輸出錯誤 `[ControlMap] <TypeName> cannot found.`。
+
+```csharp
+// 停用整組控制表
+Inputs.CM.SetActive<PlayerControls>(false);
+
+// 僅開關單一 Action Map (使用 Unity New InputSystem 原生 API)
+Inputs.CM.GetControlMap<PlayerControls>()?.Player.Disable();
+Inputs.CM.GetControlMap<PlayerControls>()?.Player.Enable();
+```
+
+### IsActive {#isactive}
+
+```csharp
+public static bool IsActive<TIInputActionCollection>() where TIInputActionCollection : IInputActionCollection
+```
+
+檢查控制表啟用狀態；未註冊時輸出錯誤並回傳 `false`。
+
+```csharp
+bool isActive = Inputs.CM.IsActive<PlayerControls>();
+```
+
+---
+
+## Inputs.IA (Input Action) {#inputs-ia}
+
+註冊與驅動 [IInputAction](./IInputAction.mdx) (通用訊號派送者，不依賴任何輸入控制插件)。
+
+### 方法總覽 {#ia-overview}
+
+| 方法 | 說明 |
+| :--- | :--- |
+| [RegisterInputAction](#registerinputaction) | 註冊 Input Action (註冊時自動呼叫 OnCreate)。 |
+| [GetInputAction](#getinputaction) | 取得已註冊的 Input Action。 |
+| [DriveUpdate](#driveupdate) | 驅動所有 Input Action 的 OnUpdate (由主程式 Update 呼叫)。 |
+| [UpdateInputActions](#updateinputactions) | (Obsolete) 已棄用，請改用 DriveUpdate。 |
+
+---
+
+### RegisterInputAction {#registerinputaction}
+
+```csharp
+public static void RegisterInputAction<TInputAction>() where TInputAction : IInputAction, new()
+```
+
+註冊 Input Action，內部會以 `new()` 建立實例並**自動呼叫 [OnCreate](./IInputAction.mdx#oncreate)** (通常於此取得 Control Map 進行事件綁定)。
+
+```csharp
+// 先註冊 Control Maps，再註冊 Input Actions
+Inputs.CM.RegisterControlMap<PlayerControls>();
+Inputs.IA.RegisterInputAction<PlayerAction>();
+```
+
+<Highlight color="#0373fc">注意</Highlight> 同一型別重複註冊會輸出警告 `[InputAction] <TypeName> already exist.`，並保留首次註冊的實例。
+
+### GetInputAction {#getinputaction}
+
+```csharp
+public static TInputAction GetInputAction<TInputAction>() where TInputAction : IInputAction
+```
+
+取得已註冊的 Input Action 實例 (供訂閱與退訂事件)；未註冊時回傳 `default` (null)。
+
+```csharp
+// 訂閱輸入訊號
+Inputs.IA.GetInputAction<PlayerAction>().onMoveAction += this._OnMoveAction;
+
+// 退訂輸入訊號
+Inputs.IA.GetInputAction<PlayerAction>().onMoveAction -= this._OnMoveAction;
+```
+
+### DriveUpdate {#driveupdate}
+
+```csharp
+public static void DriveUpdate(float dt)
+```
+
+驅動**所有**已註冊 Input Action 的 [OnUpdate](./IInputAction.mdx#onupdate) (傳入 dt)，由主程式的 MonoBehaviour (Update) 呼叫。
+
+```csharp
+private void Update()
+{
+    // Call by Main MonoBehaviour (Main Program)
+    Inputs.IA.DriveUpdate(Time.unscaledDeltaTime);
+}
+```
+
+<Highlight color="#ff2f00">重要</Highlight> 應由**單一**主程式呼叫：若依賴 `OnUpdate` 的輪詢邏輯無反應，請先檢查是否有每幀呼叫 `DriveUpdate`。
+
+### UpdateInputActions {#updateinputactions}
+
+```csharp
+[Obsolete("UpdateInputActions is deprecated. Use DriveUpdate instead.")]
+public static void UpdateInputActions(float dt)
+```
+
+(已棄用) 行為等同 [DriveUpdate](#driveupdate)，請改用 `DriveUpdate` (v1.0.3 起棄用)。
+
+---
+
+## Logger {#logger}
+
+本模組的日誌器 (**OxGKit.LoggingSystem** 的 `Logging` 實作)，日誌器名稱為 `OxGKit.InputSystem.Logger`，可透過 [LoggingLauncher](/docs/loggingsystem/API/Runtime/LoggingLauncher) 進行開關與級別配置。
+
+|  |  |
+| :--- | :--- |
+| **類型** | `[LoggerName("OxGKit.InputSystem.Logger")] public class Logger : Logging` |
+| **原始碼** | [Logger.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/InputSystem/Scripts/Runtime/Logger.cs) |
+
+<Highlight color="#00d679">提醒</Highlight> 發布 (Build) 時，需依 [LoggingSystem](/docs/loggingsystem/intro) 的規則加入 **OXGKIT_LOGGER_ON** 宏，本模組的日誌才會輸出。

@@ -1,0 +1,321 @@
+---
+sidebar_position: 3
+description: The built-in default actions of the ActionSystem - SequenceAction, ParallelAction, ParallelDelayAction, DelayAction, and DelegateAction.
+---
+
+# Default Actions
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+The **ActionSystem** ships with **5 default actions** (all inheriting [ActionBase](./ActionBase.mdx)). By composing them you can build all kinds of run groups (sequences, parallels, delays, callbacks), **nesting them freely** (a sequence containing parallels, a parallel containing sequences), and finally start them with an [ActionRunner](./ActionRunner.mdx).
+
+|  |  |
+| :--- | :--- |
+| **Namespace** | `OxGKit.ActionSystem` |
+| **Type** | `SequenceAction`, `ParallelAction`, `ParallelDelayAction`, `DelayAction`, `DelegateAction` (all inherit `ActionBase`) |
+| **Source** | [SequenceAction.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/ActionSystem/Scripts/Runtime/DefaultActions/SequenceAction.cs), [ParallelAction.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/ActionSystem/Scripts/Runtime/DefaultActions/ParallelAction.cs), [ParallelDelayAction.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/ActionSystem/Scripts/Runtime/DefaultActions/ParallelDelayAction.cs), [DelayAction.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/ActionSystem/Scripts/Runtime/DefaultActions/DelayAction.cs), [DelegateAction.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/ActionSystem/Scripts/Runtime/DefaultActions/DelegateAction.cs) |
+
+```csharp
+using OxGKit.ActionSystem;
+```
+
+## Quick Start {#quick-start}
+
+```csharp
+using OxGKit.ActionSystem;
+using UnityEngine;
+
+// Parallel group: runs simultaneously, finishes when all are done
+var parAction = new ParallelAction("Burst");
+parAction
+    .AddAction(DelayAction.CreateDelayAction(1f, () => Debug.Log("Delay 1s done")))
+    .AddAction(DelayAction.CreateDelayAction(2f, () => Debug.Log("Delay 2s done")));
+
+// Sequence group: runs one by one (Step 1 -> 1s delay -> Step 2 -> parallel group)
+var seqAction = new SequenceAction("OpenFlow");
+seqAction
+    .AddAction(DelegateAction.CreateDelegateAction(() => Debug.Log("Step 1")))
+    .AddAction(DelayAction.CreateDelayAction(1f))
+    .AddAction(DelegateAction.CreateDelegateAction(() => Debug.Log("Step 2")))
+    .AddAction(parAction);
+
+// Start with an ActionRunner (pumped by the owner via DriveUpdate)
+this._runner.RunAction(seqAction);
+```
+
+## General Rules {#general-rules}
+
+### Composition Rules {#composition-rules}
+
+- All default actions inherit [ActionBase](./ActionBase.mdx) and can be **nested** into each other; every `AddAction` is **chainable**.
+- Every default action provides the four constructors `()`, `(int uid)`, `(string name)`, `(string name, int uid)`, so you can set a custom name (log identification) and UID (for removal via `RemoveAction`).
+
+<Highlight color="#0373fc">Attention</Highlight> The composite actions (SequenceAction / ParallelAction / ParallelDelayAction) run internally with `SetDuration(-1)` - their **completion is decided by the child actions** (they finish only when all children are done).
+
+### Action Overview {#actions-overview}
+
+| Action | Description |
+| :--- | :--- |
+| [SequenceAction](#sequenceaction) | Sequence action - runs child actions one by one. |
+| [ParallelAction](#parallelaction) | Parallel action - runs all child actions simultaneously. |
+| [ParallelDelayAction](#paralleldelayaction) | Staggered parallel action - starts children one by one with a delay interval, then runs them in parallel. |
+| [DelayAction](#delayaction) | Delay action - finishes after the given seconds (with an optional end callback). |
+| [DelegateAction](#delegateaction) | Delegate action - invokes a callback on start (with an optional delay). |
+
+---
+
+## SequenceAction {#sequenceaction}
+
+```csharp
+public class SequenceAction : ActionBase
+```
+
+**Sequence action**: runs child actions **one at a time** in the order they were added; the next action starts only after the previous one is all done (`IsAllDone`). The sequence finishes once every child action is done (if it starts with no actions, it is marked done immediately).
+
+### Constructors {#seq-constructors}
+
+```csharp
+public SequenceAction()
+
+public SequenceAction(int uid)
+
+public SequenceAction(string name)
+
+public SequenceAction(string name, int uid)
+```
+
+### Method Overview {#seq-overview}
+
+| Method | Description |
+| :--- | :--- |
+| [AddAction](#seq-addaction) | Adds an action (compose before starting). |
+| [QueueAction](#seq-queueaction) | Queues an action (append while running). |
+| [RemoveAction](#seq-removeaction) | Removes an action by UID. |
+
+---
+
+### AddAction {#seq-addaction}
+
+```csharp
+public SequenceAction AddAction(ActionBase action)
+```
+
+Adds an action to the preparing list (the same instance is never added twice). Returns the sequence itself, so calls are **chainable**.
+
+<Highlight color="#0373fc">Attention</Highlight> `AddAction` must be called **before the sequence starts** (starting moves the preparing list into the pending queue); to append actions while the sequence is **already running**, use [QueueAction](#seq-queueaction) instead.
+
+```csharp
+var seqAction = new SequenceAction("OpenFlow");
+seqAction
+    .AddAction(DelegateAction.CreateDelegateAction(() => Debug.Log("Step 1")))
+    .AddAction(DelayAction.CreateDelayAction(1f))
+    .AddAction(DelegateAction.CreateDelegateAction(() => Debug.Log("Step 2")));
+
+this._runner.RunAction(seqAction);
+```
+
+### QueueAction {#seq-queueaction}
+
+```csharp
+public SequenceAction QueueAction(ActionBase action)
+```
+
+Queues an action while the sequence is **running** (chainable); it is merged into the pending queue on the next update and runs after the existing actions in order.
+
+### RemoveAction {#seq-removeaction}
+
+```csharp
+public void RemoveAction(int uid)
+```
+
+Removes an action by `uid` from the current/pending/queued caches (marks it all done and prints a removal report).
+
+---
+
+## ParallelAction {#parallelaction}
+
+```csharp
+public class ParallelAction : ActionBase
+```
+
+**Parallel action**: starts **all child actions at once** and updates them in parallel; it finishes once **all** child actions are done (if it starts with no actions, it is marked done immediately).
+
+### Constructors {#par-constructors}
+
+```csharp
+public ParallelAction()
+
+public ParallelAction(int uid)
+
+public ParallelAction(string name)
+
+public ParallelAction(string name, int uid)
+```
+
+### AddAction {#par-addaction}
+
+```csharp
+public ParallelAction AddAction(ActionBase action)
+```
+
+Adds an action (the same instance is never added twice). Returns the parallel action itself, so calls are **chainable**; must be called **before** the parallel action starts.
+
+```csharp
+var parAction = new ParallelAction("Burst");
+parAction
+    .AddAction(DelayAction.CreateDelayAction(1f, () => Debug.Log("Delay 1s done")))
+    .AddAction(DelayAction.CreateDelayAction(2f, () => Debug.Log("Delay 2s done")));
+
+this._runner.RunAction(parAction);
+```
+
+---
+
+## ParallelDelayAction {#paralleldelayaction}
+
+```csharp
+public class ParallelDelayAction : ActionBase
+```
+
+**Staggered parallel action**: similar to [ParallelAction](#parallelaction), but child actions are **started one by one with a `delayTime` interval** between starts (staggered starts, delayed internally with **UniTask**), then updated in parallel; it finishes once all child actions are done.
+
+### Constructors {#pardelay-constructors}
+
+```csharp
+public ParallelDelayAction()
+
+public ParallelDelayAction(int uid)
+
+public ParallelDelayAction(string name)
+
+public ParallelDelayAction(string name, int uid)
+
+public ParallelDelayAction(float delayTime)
+```
+
+`delayTime` is the **start interval in seconds** between child actions (staggering only happens when it is greater than 0).
+
+### AddAction {#pardelay-addaction}
+
+```csharp
+public ParallelDelayAction AddAction(ActionBase action)
+```
+
+Adds an action (the same instance is never added twice). Returns the staggered parallel action itself, so calls are **chainable**; must be called **before** the action starts.
+
+```csharp
+// Start one child action every 0.2 seconds, then run them in parallel
+var staggerAction = new ParallelDelayAction(0.2f);
+staggerAction
+    .AddAction(DelegateAction.CreateDelegateAction(() => Debug.Log("Spawn 1")))
+    .AddAction(DelegateAction.CreateDelegateAction(() => Debug.Log("Spawn 2")))
+    .AddAction(DelegateAction.CreateDelegateAction(() => Debug.Log("Spawn 3")));
+
+this._runner.RunAction(staggerAction);
+```
+
+---
+
+## DelayAction {#delayaction}
+
+```csharp
+public class DelayAction : ActionBase
+```
+
+**Delay action**: finishes after `delayTime` seconds and invokes the optional `onEndAction` callback on completion (fired once, then cleared).
+
+### Members {#delay-members}
+
+| Member | Description |
+| :--- | :--- |
+| `public float delayTime` | Delay in seconds (set as the duration in `OnStart`). |
+| `public Action onEndAction` | End callback (fired once on completion, then cleared). |
+
+### Constructors {#delay-constructors}
+
+```csharp
+public DelayAction()
+
+public DelayAction(int uid)
+
+public DelayAction(string name)
+
+public DelayAction(string name, int uid)
+```
+
+### CreateDelayAction {#createdelayaction}
+
+```csharp
+public static DelayAction CreateDelayAction(float delayTime, Action onEndAction = null)
+```
+
+**[Factory]** Creates a delay action with the given delay seconds and end callback.
+
+```csharp
+// Invoke the callback after a 1.5 second delay
+var delayAction = DelayAction.CreateDelayAction(1.5f, () => Debug.Log("1.5s done"));
+```
+
+---
+
+## DelegateAction {#delegateaction}
+
+```csharp
+public class DelegateAction : ActionBase
+```
+
+**Delegate action**: invokes the `onAction` callback on start (fired once, then cleared).
+
+### Members {#delegate-members}
+
+| Member | Description |
+| :--- | :--- |
+| `public event Action onAction` | Delegate callback (fired once on start, then cleared). |
+
+### Constructors {#delegate-constructors}
+
+```csharp
+public DelegateAction()
+
+public DelegateAction(int uid)
+
+public DelegateAction(string name)
+
+public DelegateAction(string name, int uid)
+```
+
+### CreateDelegateAction {#createdelegateaction}
+
+```csharp
+public static ActionBase CreateDelegateAction(Action onAction, float delayTime = 0f)
+```
+
+**[Factory]** Creates a delegate action and automatically hooks `MarkAsDone` into the callback chain (the action finishes right after the callback fires). When `delayTime` is **greater than 0**, it returns a **[SequenceAction](#sequenceaction) wrapping a DelayAction + DelegateAction** (delay first, then invoke the callback).
+
+<Highlight color="#0373fc">Attention</Highlight> With `delayTime` greater than 0 the return value is a **SequenceAction wrapper** (static type `ActionBase`) - do not cast it to `DelegateAction`.
+
+<Highlight color="#00d679">Reminder</Highlight> Prefer the `CreateDelegateAction` factory; if you `new DelegateAction()` yourself and subscribe to `onAction`, the action runs with `SetDuration(-1)` internally, so you must call `MarkAsDone()` inside the callback to finish it.
+
+```csharp
+// Invoke the callback immediately
+var callback = DelegateAction.CreateDelegateAction(() => Debug.Log("Hello"));
+
+// Invoke the callback after a 1 second delay (returns a SequenceAction wrapper)
+var delayedCallback = DelegateAction.CreateDelegateAction(() => Debug.Log("Hello Delayed"), 1f);
+```

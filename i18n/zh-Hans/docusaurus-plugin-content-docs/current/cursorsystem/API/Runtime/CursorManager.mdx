@@ -1,0 +1,379 @@
+---
+sidebar_position: 2
+description: CursorManager 是 CursorSystem 的游标管理器 (MonoBehaviour 单例)，管理 CursorState 状态列表并驱动动态游标序列帧动画，并涵盖 CursorState 的状态参数与运行时调整 API。
+---
+
+# CursorManager
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`CursorManager` 是 **CursorSystem** 的**游标管理器** (`MonoBehaviour` 单例)，管理 Inspector 上配置的 [CursorState](#cursorstate) 状态列表，并在 `Update` 驱动**动态游标的序列帧动画**；可通过 Samples 导入 **CursorManager Prefab** 拖拽至启动场景，或由 [Cursors](./Cursors.mdx) 门面自动创建。
+
+|  |  |
+| :--- | :--- |
+| **命名空间** | `OxGKit.CursorSystem` |
+| **类型** | `[DisallowMultipleComponent] public class CursorManager : MonoBehaviour` |
+| **源码** | [CursorManager.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/CursorSystem/Scripts/Runtime/Core/CursorManager.cs) |
+
+```csharp
+using OxGKit.CursorSystem;
+```
+
+<Highlight color="#00d679">提醒</Highlight> `CursorManager` 的实例方法与 [Cursors](./Cursors.mdx) 静态门面**一一对应** (单例的获取方法为 `internal`)，建议一律通过 `Cursors` 调用，无需自行持有实例引用。
+
+## 快速上手 {#quick-start}
+
+```csharp
+using OxGKit.CursorSystem;
+
+// CursorManager 由 Cursors 门面自动查找或创建 (单例)
+Cursors.InitInstance();
+
+// 在 Inspector 配置 Cursor States 后，即可按名称切换
+Cursors.SetCursorState("Loading");
+```
+
+## 通用规则 {#general-rules}
+
+### 单例与生命周期 {#singleton-lifecycle}
+
+1. 首次通过 [Cursors](./Cursors.mdx) 访问时，会自动查找场景上的 `CursorManager`；找不到则自动创建 `[CursorManager]` 节点。
+2. `Awake` 时会自动整理至 `OxGKit` 容器节点下并 **DontDestroyOnLoad** 常驻，同时将当前状态初始为列表第一条。
+3. `Start` 时会重置渲染 (应用默认状态)；`Update` 依 **Ignore Time Scale** 设置驱动当前状态的动态游标动画。
+4. `OnEnable` 会重置回默认状态；`OnDisable` 会移除游标渲染 (恢复系统游标)。
+
+### Inspector 成员 {#inspector-members}
+
+| 成员 | 说明 |
+| :--- | :--- |
+| `Ignore Time Scale` | 动态游标动画是否忽略 `Time.timeScale` (默认 `true`，使用 `Time.unscaledDeltaTime` 驱动)。 |
+| `List Cursor States` | [CursorState](#cursorstate) 状态列表，**第一条即为默认状态** (内置一条 `Default` 状态，frameRate 为 30)。 |
+
+---
+
+## 方法总览 {#methods-overview}
+
+| 方法 | 说明 |
+| :--- | :--- |
+| [SetIgnoreScale](#setignorescale) | 设置动态游标动画是否忽略 Time.timeScale。 |
+| [GetCurrentCursorLockState](#getcurrentcursorlockstate) | 获取当前游标锁定模式。 |
+| [SetCursorLockState](#setcursorlockstate) | 设置游标锁定模式。 |
+| [IsCursorVisible](#iscursorvisible) | 检查游标是否显示。 |
+| [SetCursorVisible](#setcursorvisible) | 设置游标显示开关。 |
+| [SetScaleToAllCursors](#setscaletoallcursors) | 设置所有游标状态的缩放比例并重置渲染。 |
+| [GetAllCursorStates](#getallcursorstates) | 获取所有游标状态。 |
+| [GetCursorState](#getcursorstate) | 获取指定名称的游标状态。 |
+| [GetCurrentCursorState](#getcurrentcursorstate) | 获取当前游标状态。 |
+| [SetCursorState](#setcursorstate) | 按名称切换游标状态。 |
+| [ResetCursorState](#resetcursorstate) | 重置回默认状态 (列表第一条)。 |
+| [ResetRender](#resetrender) | 重置当前游标状态的渲染。 |
+| [RemoveCursorRender](#removecursorrender) | 移除游标渲染 (恢复系统游标)。 |
+
+---
+
+### SetIgnoreScale {#setignorescale}
+
+```csharp
+public void SetIgnoreScale(bool ignore)
+```
+
+设置动态游标动画更新是否忽略 `Time.timeScale` (默认 `true`，使用 `Time.unscaledDeltaTime` 驱动)。
+
+### GetCurrentCursorLockState {#getcurrentcursorlockstate}
+
+```csharp
+public CursorLockMode GetCurrentCursorLockState()
+```
+
+获取当前游标锁定模式 (即 `Cursor.lockState`)。
+
+### SetCursorLockState {#setcursorlockstate}
+
+```csharp
+public void SetCursorLockState(CursorLockMode cursorLockMode)
+```
+
+设置游标锁定模式 (`None`、`Locked`、`Confined`)。
+
+### IsCursorVisible {#iscursorvisible}
+
+```csharp
+public bool IsCursorVisible()
+```
+
+检查返回游标当前是否显示 (即 `Cursor.visible`)。
+
+### SetCursorVisible {#setcursorvisible}
+
+```csharp
+public void SetCursorVisible(bool visible)
+```
+
+设置游标显示开关 (即 `Cursor.visible`)。
+
+### SetScaleToAllCursors {#setscaletoallcursors}
+
+```csharp
+public void SetScaleToAllCursors(Vector2 scale)
+```
+
+设置**所有**游标状态的缩放比例并重置渲染 (缩放仅在 **scalingEnabled + ForceSoftware** 时生效)。
+
+### GetAllCursorStates {#getallcursorstates}
+
+```csharp
+public CursorState[] GetAllCursorStates()
+```
+
+获取所有已配置的游标状态 ([CursorState](#cursorstate))。
+
+### GetCursorState {#getcursorstate}
+
+```csharp
+public CursorState GetCursorState(string stateName)
+```
+
+获取指定名称的游标状态，找不到返回 `null`。
+
+### GetCurrentCursorState {#getcurrentcursorstate}
+
+```csharp
+public CursorState GetCurrentCursorState()
+```
+
+获取当前游标状态。
+
+### SetCursorState {#setcursorstate}
+
+```csharp
+public bool SetCursorState(string stateName)
+```
+
+按名称切换游标状态并重置渲染，切换成功返回 `true`；找不到该名称返回 `false`。
+
+### ResetCursorState {#resetcursorstate}
+
+```csharp
+public void ResetCursorState()
+```
+
+重置游标状态为**默认状态 (列表第一条)** 并重置渲染。
+
+### ResetRender {#resetrender}
+
+```csharp
+public void ResetRender()
+```
+
+重置**当前**游标状态的渲染。
+
+### RemoveCursorRender {#removecursorrender}
+
+```csharp
+public void RemoveCursorRender()
+```
+
+移除游标渲染 (将当前状态置空并恢复**系统默认游标**)；若要恢复自定义游标渲染，请调用 [ResetCursorState](#resetcursorstate) 重新初始并重置渲染。
+
+---
+
+## CursorState {#cursorstate}
+
+游标状态 (可序列化，嵌套于 `CursorManager`)，定义**单一游标状态**的渲染类型、贴图、热点与动画参数；可在 Inspector 上配置，也可通过 [Cursors.GetCursorState](./Cursors.mdx#getcursorstate) 获取后在运行时动态调整 (例如指定从 AssetBundle 加载的贴图)。
+
+|  |  |
+| :--- | :--- |
+| **类型** | `[Serializable] public class CursorState` |
+| **源码** | [CursorManager.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/CursorSystem/Scripts/Runtime/Core/CursorManager.cs) |
+
+### 成员 {#cursorstate-members}
+
+| 成员 | 说明 |
+| :--- | :--- |
+| `public string stateName` | 状态名称 (运行时切换的依据)。 |
+| `public RenderType renderType` | 静态或动态游标类型，默认 `Static`。 |
+| `public CursorMode cursorMode` | Cursor 渲染模式 (`Auto` / `ForceSoftware`)，默认 `Auto`。 |
+| `public bool scalingEnabled` | 缩放开关，默认 `false` (缩放仅支持 `ForceSoftware` 渲染模式)。 |
+| `public Vector2 scale` | 缩放比例，默认 `(1, 1)` (需启用 `scalingEnabled` 才会生效)。 |
+| `public Vector2 hotspot` | 游标热点位置，默认 `(0, 0)`。 |
+| `public Texture2D staticCursorTexture` | 静态游标贴图。 |
+| `public List<Texture2D> dynamicCursorTextures` | 动态游标序列帧。 |
+| `public bool isLoop` | 动态游标是否循环播放，默认 `false`。 |
+| `public PlayMode playMode` | 动态游标播放模式，默认 `Normal`。 |
+| `public int frameRate` | 动态游标播放速率 (FPS)，字段默认 `0` (**需大于 0 动画才会播放**)。 |
+
+### RenderType {#rendertype}
+
+定义静态或动态游标类型。
+
+```csharp
+public enum RenderType
+{
+    Static, // 静态游标
+    Dynamic // 动态游标 (序列帧动画)
+}
+```
+
+### PlayMode {#playmode}
+
+定义动画的播放模式。
+
+```csharp
+public enum PlayMode
+{
+    Normal,         // 顺放
+    Reverse,        // 倒放
+    PingPong,       // 顺放 -> 倒放
+    PingPongReverse // 倒放 -> 顺放
+}
+```
+
+<Highlight color="#0373fc">注意</Highlight> 未开启 `isLoop` 时，`Normal` / `Reverse` 播放至最后一帧即停止；`PingPong` / `PingPongReverse` 则完成**一次来回**后停止。
+
+### 方法总览 {#cursorstate-overview}
+
+| 方法 | 说明 |
+| :--- | :--- |
+| [GetStateName](#state-getstatename) | 获取状态名称。 |
+| [SetStateName](#state-setstatename) | 设置状态名称。 |
+| [SetRenderType](#state-setrendertype) | 设置渲染类型 (静态/动态)。 |
+| [SetCursorMode](#state-setcursormode) | 设置 Cursor 渲染模式。 |
+| [SetCursorScale](#state-setcursorscale) | 设置缩放比例。 |
+| [SetCursorOffset](#state-setcursoroffset) | 设置游标热点位置。 |
+| [SetStaticCursor](#state-setstaticcursor) | 设置静态游标贴图并立即应用渲染。 |
+| [SetDynamicCursor](#state-setdynamiccursor) | 替换动态游标序列帧并重置动画。 |
+| [SetFrameRate](#state-setframerate) | 设置播放速率。 |
+| [SetLoop](#state-setloop) | 设置循环开关。 |
+| [ResetRender](#state-resetrender) | 按渲染类型重置渲染。 |
+| [DriveUpdate](#state-driveupdate) | 驱动动态游标动画更新 (由 CursorManager 自动调用)。 |
+
+---
+
+### GetStateName {#state-getstatename}
+
+```csharp
+public string GetStateName()
+```
+
+获取状态名称。
+
+### SetStateName {#state-setstatename}
+
+```csharp
+public void SetStateName(string stateName)
+```
+
+设置状态名称。
+
+### SetRenderType {#state-setrendertype}
+
+```csharp
+public void SetRenderType(RenderType renderType)
+```
+
+设置渲染类型 ([RenderType](#rendertype) 静态/动态)。
+
+### SetCursorMode {#state-setcursormode}
+
+```csharp
+public void SetCursorMode(CursorMode cursorMode)
+```
+
+设置 Cursor 渲染模式 (`Auto` / `ForceSoftware`)。
+
+### SetCursorScale {#state-setcursorscale}
+
+```csharp
+public void SetCursorScale(Vector2 scale)
+```
+
+设置缩放比例 (需启用 `scalingEnabled` 且 `ForceSoftware` 模式才会生效)。
+
+### SetCursorOffset {#state-setcursoroffset}
+
+```csharp
+public void SetCursorOffset(Vector2 offset)
+```
+
+设置游标热点位置 (hotspot)。
+
+### SetStaticCursor {#state-setstaticcursor}
+
+```csharp
+public void SetStaticCursor(Texture2D t2d = null)
+```
+
+设置静态游标贴图并**立即应用渲染**；`t2d` 传入 `null` 时，直接以当前 `staticCursorTexture` 重新应用 (`ForceSoftware` 模式下若启用缩放，会应用缩放后的贴图)。
+
+```csharp
+// 运行时动态指定贴图 (例如从 AssetBundle 加载)
+var cursorState = Cursors.GetCursorState("Default");
+cursorState.SetStaticCursor(tex);
+```
+
+### SetDynamicCursor {#state-setdynamiccursor}
+
+```csharp
+public void SetDynamicCursor(Texture2D[] t2ds)
+```
+
+替换动态游标序列帧并**重置动画参数** (从头播放)。
+
+```csharp
+// 运行时替换序列帧与参数调整
+var cursorState = Cursors.GetCursorState("Loading");
+cursorState.SetDynamicCursor(texture2ds);
+cursorState.SetFrameRate(12);
+cursorState.SetLoop(true);
+cursorState.ResetRender();
+```
+
+<Highlight color="#0373fc">注意</Highlight> [SetStaticCursor](#state-setstaticcursor) / [SetDynamicCursor](#state-setdynamiccursor) **不会**变更 `renderType`；若要切换该状态的渲染类型，请调用 [SetRenderType](#state-setrendertype) 后再 [ResetRender](#state-resetrender)。
+
+### SetFrameRate {#state-setframerate}
+
+```csharp
+public void SetFrameRate(int frameRate)
+```
+
+设置动态游标播放速率 (FPS)。
+
+### SetLoop {#state-setloop}
+
+```csharp
+public void SetLoop(bool isLoop)
+```
+
+设置动态游标循环开关。
+
+### ResetRender {#state-resetrender}
+
+```csharp
+public void ResetRender()
+```
+
+按渲染类型重置渲染 (`Static` 重新应用静态贴图；`Dynamic` 重置动画参数重新播放)。
+
+### DriveUpdate {#state-driveupdate}
+
+```csharp
+public void DriveUpdate(float dt)
+```
+
+驱动动态游标的序列帧动画更新，由 `CursorManager` 的 `Update` **自动调用** (一般无需自行调用)。

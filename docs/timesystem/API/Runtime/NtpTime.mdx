@@ -1,0 +1,187 @@
+---
+sidebar_position: 8
+description: NtpTime 是與 NTP 伺服器或 HTTP 時間 API 進行時鐘同步的靜態授時工具，同步後可取得經過校正的當前時間，適用於防作弊、每日重置等需要可信時間的場景。
+---
+
+# NtpTime
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`NtpTime` 是**與 NTP 伺服器或 HTTP 時間 API 進行時鐘同步的靜態授時工具**，同步一次後即可持續取得**經過校正的當前時間** (以「收到回應的時間點 + 經過時間」推算)，不受用戶修改裝置時間影響，適用於**防作弊、每日重置**等需要可信時間的場景。
+
+|  |  |
+| :--- | :--- |
+| **命名空間** | `OxGKit.TimeSystem` |
+| **類型** | `public static class NtpTime` |
+| **原始碼** | [NtpTime.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/TimeSystem/Scripts/Runtime/Core/Time/NtpTime.cs) |
+
+```csharp
+using OxGKit.TimeSystem;
+```
+
+## 快速上手 {#quick-start}
+
+```csharp
+using Cysharp.Threading.Tasks;
+using OxGKit.TimeSystem;
+
+// 與 NTP 伺服器同步 (預設 time.google.com、10 秒逾時)
+await NtpTime.Synchronize();
+
+// 同步完成後取得校正時間
+if (NtpTime.IsSynchronized())
+{
+    System.DateTime now = NtpTime.GetNow();       // 本地時間
+    System.DateTime utcNow = NtpTime.GetUtcNow(); // UTC 時間
+}
+```
+
+## 通用規則 {#general-rules}
+
+### 同步方式 {#sync-methods}
+
+`Synchronize` 依 `ntpServer` 參數自動判斷同步方式：
+
+| 方式 | ntpServer 參數 | 說明 |
+| :--- | :--- | :--- |
+| **NTP (UDP)** | 主機名稱 (如 `time.google.com`) | 透過 UDP Socket (Port 123) 向 NTP 伺服器請求 (於執行緒池執行)。 |
+| **HTTP 時間 API** | `http://` 或 `https://` 開頭的網址 | 透過 UnityWebRequest 請求 (**WebGL 相容**)，預設解析 **TimeAPI.io Timezone API** 響應格式，如 `https://timeapi.io/api/timezone/zone?timeZone=Asia/Taipei`。 |
+
+<Highlight color="#0373fc">注意</Highlight> **WebGL 平台無法使用 UDP Socket**，請改用 **HTTP 時間 API** 方式同步 (將 API 網址傳入 `ntpServer`)。
+
+### 未同步的返回行為 {#no-sync-fallback}
+
+<Highlight color="#ff2f00">重要</Highlight> `Synchronize` 為**異步**流程，請以 [IsSynchronized](#issynchronized) 判斷同步完成後再取時；**未同步時各取時方法只會輸出警告日誌 (`[NTP] No synchronized.`) 並改返回本地系統時間** (`GetTimeZone` 返回空字串、`GetUtcOffset` 返回 0)，不會擲出例外。
+
+### 時間推算 {#time-correction}
+
+<Highlight color="#00d679">提醒</Highlight> 同步成功後會記錄「收到回應的時間點」，之後的取時皆以**同步時間 + 經過時間**推算，**不需重複同步**；如需重新校正 (例如網路恢復後)，再次呼叫 [Synchronize](#synchronize) 即可。
+
+---
+
+## 方法 {#methods}
+
+### 方法總覽 {#methods-overview}
+
+| 方法 | 說明 |
+| :--- | :--- |
+| [Synchronize](#synchronize) | 開始與 NTP 伺服器或 HTTP 時間 API 同步。 |
+| [IsSynchronized](#issynchronized) | 是否已完成同步。 |
+| [GetNow](#getnow) | 取得校正後的本地時間。 |
+| [GetUtcNow](#getutcnow) | 取得校正後的 UTC 時間。 |
+| [GetNtpDate](#getntpdate) | 取得校正後的原始同步時區時間。 |
+| [GetTimeZone](#gettimezone) | 取得同步使用的時區名稱。 |
+| [GetUtcOffset](#getutcoffset) | 取得同步時間的 UTC 偏移 (小時)。 |
+
+---
+
+### Synchronize {#synchronize}
+
+```csharp
+public static UniTask Synchronize(string ntpServer = "time.google.com", int requestTimeout = 10)
+
+public static UniTask Synchronize<TResponseFormat>(string ntpServer = "time.google.com", int requestTimeout = 10) where TResponseFormat : TimeApiResponseFormat
+```
+
+開始與 NTP 伺服器或 HTTP 時間 API 同步 (會先將同步狀態重置為未同步)：
+
+- `ntpServer`：NTP 伺服器主機名稱，或 `http(s)://` 開頭的時間 API 網址 (詳見[同步方式](#sync-methods))。
+- `requestTimeout`：請求逾時秒數 (預設 10 秒)，逾時會輸出錯誤日誌。
+- 泛型版本可指定 HTTP 響應的**反序列化格式** (需繼承 [TimeApiResponseFormat](#response-format))。
+
+```csharp
+// NTP (UDP) 同步
+await NtpTime.Synchronize();
+
+// HTTP 時間 API 同步 (WebGL 相容)
+await NtpTime.Synchronize("https://timeapi.io/api/timezone/zone?timeZone=Asia/Taipei");
+```
+
+<Highlight color="#0373fc">注意</Highlight> 網路不可達時 (`Application.internetReachability` 為 NotReachable) 會輸出警告並直接返回，不會進行同步。
+
+### IsSynchronized {#issynchronized}
+
+```csharp
+public static bool IsSynchronized()
+```
+
+返回是否已完成與 NTP 伺服器的同步。
+
+### GetNow {#getnow}
+
+```csharp
+public static DateTime GetNow()
+```
+
+取得校正後的**本地時間**；當系統時區與伺服器時區相近 (差距小於 0.1 小時) 時直接返回同步時間，否則會先轉為 UTC 再轉為系統本地時間。未同步時輸出警告並返回 `DateTime.Now.ToLocalTime()`。
+
+### GetUtcNow {#getutcnow}
+
+```csharp
+public static DateTime GetUtcNow()
+```
+
+取得校正後的 **UTC 時間** (依同步時儲存的時區偏移換算)。未同步時輸出警告並返回 `DateTime.Now.ToUniversalTime()`。
+
+### GetNtpDate {#getntpdate}
+
+```csharp
+public static DateTime GetNtpDate()
+```
+
+取得校正後的**原始同步時區時間** (保持收到回應時的時區，僅加上經過時間)。未同步時輸出警告並返回 `DateTime.Now`。
+
+### GetTimeZone {#gettimezone}
+
+```csharp
+public static string GetTimeZone()
+```
+
+取得同步使用的**時區名稱** (如 `Asia/Taipei`，由 HTTP 時間 API 提供)；未同步時返回空字串。
+
+### GetUtcOffset {#getutcoffset}
+
+```csharp
+public static double GetUtcOffset()
+```
+
+取得同步時間的 **UTC 偏移 (小時)**；未同步時返回 0。
+
+---
+
+## 響應格式 {#response-format}
+
+HTTP 時間 API 的響應以 `JsonUtility` 反序列化，格式類別皆標註 `[Serializable]`：
+
+```csharp
+public abstract class TimeApiResponseFormat { }
+
+public class TimeApiTimezoneResponse : TimeApiResponseFormat
+{
+    public string timeZone;              // 如 "Asia/Taipei"
+    public string currentLocalTime;      // 如 "2025-05-15T12:55:08.5386566"
+    public UtcOffset currentUtcOffset;
+    public UtcOffset standardUtcOffset;
+    public bool hasDayLightSaving;
+    public bool isDayLightSavingActive;
+    public DstInterval dstInterval;
+}
+```
+
+<Highlight color="#0373fc">注意</Highlight> 內建處理流程目前僅支持 **`TimeApiTimezoneResponse`** (TimeAPI.io Timezone API) 格式：需要包含 `timeZone`、`currentLocalTime` 與 `currentUtcOffset` 欄位，其他格式會輸出解析失敗的錯誤日誌。

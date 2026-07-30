@@ -1,0 +1,247 @@
+---
+sidebar_position: 1
+description: Cacher 提供 ARC、LRU、LRU-K 三种容量控制的泛型缓存容器，支持自定义移除处理器与线程安全操作。
+---
+
+# Cacher
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+**Cacher** 为 **Utilities** 的**容量控制缓存容器**，提供三种淘汰策略的泛型缓存：`ARCCache<TKey, TValue>` (自适应替换)、`LRUCache<TKey, TValue>` (最近最少使用)、`LRUKCache<TKey, TValue>` (LRU-K 扫描防护)，所有操作皆有**线程锁 (Thread Lock)**，并支持**自定义移除处理器** `IRemoveCacheHandler<TKey, TValue>` 于淘汰或移除时对缓存值进行特殊处理。
+
+|  |  |
+| :--- | :--- |
+| **命名空间** | `OxGKit.Utilities.Cacher` |
+| **类型** | `public class ARCCache<TKey, TValue>`、`public class LRUCache<TKey, TValue>`、`public class LRUKCache<TKey, TValue>` |
+| **源码** | [ARCCache.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/Utilities/Scripts/Runtime/Cacher/ARCCache.cs)、[LRUCache.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/Utilities/Scripts/Runtime/Cacher/LRUCache.cs)、[LRUKCache.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/Utilities/Scripts/Runtime/Cacher/LRUKCache.cs) |
+
+```csharp
+using OxGKit.Utilities.Cacher;
+```
+
+<Highlight color="#ff2f00">重要</Highlight> 三种缓存的**默认移除处理器**皆为 `UnityObjectRemoveCacheHandler<TKey, TValue>`，当缓存值为 `UnityEngine.Object` 时，**淘汰或移除会自动 Destroy 该对象**；若缓存值仍会被外部持有使用，请自定义 `IRemoveCacheHandler<TKey, TValue>` 更换处理行为。
+
+## 快速上手 {#quick-start}
+
+```csharp
+using OxGKit.Utilities.Cacher;
+using UnityEngine;
+
+// 创建容量 60 的 LRU 缓存
+var cache = new LRUCache<string, Texture2D>(60);
+
+// 加入缓存
+cache.Add("key", texture);
+
+// 获取缓存 (未命中返回 default)
+Texture2D t2d = cache.Get("key");
+
+// 检查是否存在
+bool contains = cache.Contains("key");
+
+// 移除缓存 (默认处理器会自动 Destroy Unity 对象)
+cache.Remove("key");
+
+// 清空缓存
+cache.Clear();
+
+// 自定义移除处理器 (取代默认的 UnityObjectRemoveCacheHandler)
+public class MyRemoveCacheHandler : IRemoveCacheHandler<string, Texture2D>
+{
+    public void RemoveCache(string key, Texture2D value)
+    {
+        // 自行决定淘汰时的处理 (例如不进行 Destroy)
+    }
+}
+
+var customCache = new LRUCache<string, Texture2D>(60, new MyRemoveCacheHandler());
+```
+
+## 通用规则 {#general-rules}
+
+### 策略选择 {#strategy}
+
+| 缓存 | 策略 | 适用场景 |
+| :--- | :--- | :--- |
+| `ARCCache<TKey, TValue>` | Adaptive Replacement Cache | **兼顾新近性与频率**的混合访问模式。 |
+| `LRUCache<TKey, TValue>` | Least Recently Used | 单纯**以新近性淘汰** (最久未使用先淘汰)。 |
+| `LRUKCache<TKey, TValue>` | LRU-K | **扫描防护**，需累积 K 次访问才视为热门，淘汰时优先移除**最久未使用且人气最低**的项目。 |
+
+### 淘汰处理器 {#remove-handler}
+
+- 淘汰 (容量满) 与 `Remove`、`Clear` 时，会调用 `IRemoveCacheHandler<TKey, TValue>.RemoveCache(key, value)` 对移除的缓存值进行处理。
+- 未指定时，默认为 [UnityObjectRemoveCacheHandler](#unityobjectremovecachehandler) (自动 Destroy Unity 对象)。
+
+### 线程安全 {#thread-safety}
+
+- 三种缓存的 `GetKeys`、`Contains`、`Get`、`Add`、`Remove`、`Clear` 与 `Count` 操作皆有 **lock** 保护，可于多线程环境下操作。
+
+<Highlight color="#0373fc">注意</Highlight> `ARCCache` 与 `LRUCache` 的构造函数在 **capacity 小于等于 0** 时会抛出 `ArgumentException`；`LRUKCache` 则无此检查，请自行传入合理的容量与 K 值。
+
+---
+
+## ARCCache {#arccache}
+
+### 构造函数 {#arccache-constructors}
+
+```csharp
+public ARCCache(int capacity)
+
+public ARCCache(int capacity, IRemoveCacheHandler<TKey, TValue> removeCacheHandler)
+```
+
+创建指定容量的 **ARC 缓存**，可额外指定移除处理器。
+
+- **行为说明**：内部以 **T1 (新近)** 与 **T2 (频率)** 双链表管理，新加入的 Key 进入 T1，**再次命中 (Get) 或更新 (Add) 会提升至 T2**；容量满时优先淘汰 T1 尾部，其次 T2 尾部。
+
+```csharp
+var arc = new ARCCache<string, Texture2D>(60);
+```
+
+## LRUCache {#lrucache}
+
+### 构造函数 {#lrucache-constructors}
+
+```csharp
+public LRUCache(int capacity)
+
+public LRUCache(int capacity, IRemoveCacheHandler<TKey, TValue> removeCacheHandler)
+```
+
+创建指定容量的 **LRU 缓存**，可额外指定移除处理器。
+
+- **行为说明**：`Get` 与 `Add` (更新) 会将节点移至列表**最前面**；容量满时淘汰**最久未使用** (列表尾部) 的项目。
+
+```csharp
+var lru = new LRUCache<string, Texture2D>(60);
+```
+
+## LRUKCache {#lrukcache}
+
+### 构造函数 {#lrukcache-constructors}
+
+```csharp
+public LRUKCache(int capacity, int k)
+
+public LRUKCache(int capacity, int k, IRemoveCacheHandler<TKey, TValue> removeCacheHandler)
+```
+
+创建指定容量的 **LRU-K 缓存**，`k` 为访问次数阈值，可额外指定移除处理器。
+
+- **行为说明**：每次 `Get` / `Add` 会累加该 Key 的计数器 (上限为 K) 并移至列表尾部 (最新使用)；淘汰时从最久未使用端开始，移除**计数最低**的项目，并对其余项目进行**计数衰减**。
+
+```csharp
+var lruk = new LRUKCache<string, Texture2D>(60, 3);
+```
+
+---
+
+## 共用成员与方法 {#common-members}
+
+以下成员与方法于 `ARCCache<TKey, TValue>`、`LRUCache<TKey, TValue>`、`LRUKCache<TKey, TValue>` **皆相同**。
+
+### 成员 {#members}
+
+| 成员 | 说明 |
+| :--- | :--- |
+| `public int Count` | 当前缓存数量。 |
+
+### 方法总览 {#method-overview}
+
+| 方法 | 说明 |
+| :--- | :--- |
+| [GetKeys](#getkeys) | 获取当前所有缓存的 Key 数组。 |
+| [Contains](#contains) | 检查指定 Key 是否存在于缓存中。 |
+| [Get](#get) | 获取指定 Key 的缓存值 (会更新使用状态)。 |
+| [Add](#add) | 加入或更新缓存 (容量满时触发淘汰)。 |
+| [Remove](#remove) | 移除指定 Key 的缓存 (会触发移除处理器)。 |
+| [Clear](#clear) | 清空所有缓存 (逐一触发移除处理器)。 |
+
+---
+
+### GetKeys {#getkeys}
+
+```csharp
+public TKey[] GetKeys()
+```
+
+获取当前所有缓存的 **Key 数组**。
+
+### Contains {#contains}
+
+```csharp
+public bool Contains(TKey key)
+```
+
+检查指定 Key 是否存在于缓存中。
+
+### Get {#get}
+
+```csharp
+public TValue Get(TKey key)
+```
+
+获取指定 Key 的缓存值，**未命中返回 `default`**；命中时会依策略更新使用状态 (ARC 提升至 T2 / LRU 移至最前面 / LRU-K 计数累加并移至尾部)。
+
+### Add {#add}
+
+```csharp
+public void Add(TKey key, TValue value)
+```
+
+加入或更新缓存；**容量满时会先淘汰**再加入，淘汰的缓存值会交由移除处理器处理。
+
+### Remove {#remove}
+
+```csharp
+public bool Remove(TKey key)
+```
+
+移除指定 Key 的缓存，移除成功返回 `true`；移除的缓存值会交由**移除处理器**处理 (默认会 Destroy Unity 对象)。
+
+### Clear {#clear}
+
+```csharp
+public void Clear()
+```
+
+清空所有缓存，**逐一触发移除处理器**后重置内部结构。
+
+---
+
+## IRemoveCacheHandler {#iremovecachehandler}
+
+```csharp
+public interface IRemoveCacheHandler<TKey, TValue>
+{
+    void RemoveCache(TKey key, TValue value);
+}
+```
+
+移除处理器接口 ([IRemoveCacheHandler.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/Utilities/Scripts/Runtime/Cacher/Interface/IRemoveCacheHandler.cs))，当缓存项目被**淘汰或移除**时调用，可实现此接口自定义处理行为 (例如归还对象池、释放资源或不做任何处理)。
+
+## UnityObjectRemoveCacheHandler {#unityobjectremovecachehandler}
+
+```csharp
+public class UnityObjectRemoveCacheHandler<TKey, TValue> : IRemoveCacheHandler<TKey, TValue>
+```
+
+**默认的移除处理器** ([UnityObjectRemoveCacheHandler.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/Utilities/Scripts/Runtime/Cacher/Implement/UnityObjectRemoveCacheHandler.cs))，当缓存值为 `UnityEngine.Object` 时，直接调用 `UnityEngine.Object.Destroy` 销毁。
+
+<Highlight color="#00d679">提醒</Highlight> 若缓存值**非 Unity 对象** (例如 `string`、自定义类)，默认处理器不会有任何动作，仅移出缓存交由 GC 回收。

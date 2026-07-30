@@ -1,0 +1,146 @@
+---
+sidebar_position: 1
+---
+
+import ReactPlayer from 'react-player'
+
+# Module Intro
+
+export const Highlight = ({ children, color }) => (
+  <span
+    style={{
+      backgroundColor: color,
+      borderRadius: '5px',
+      color: '#fff',
+      padding: '2.5px'
+    }}>
+    {children}
+  </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+## Basic Instructions
+
+Cursor manager that supports **static and dynamic cursors** with **various state-behavior switching** (for example, simulation/management games that need different cursor states per interaction mode).
+
+- Version: **v1.0.1** (`com.michaelo.oxgkit.cursorsystem`)
+- Namespace: `OxGKit.CursorSystem`
+
+---
+
+## Application Description
+
+### CursorManager Configuration
+
+- Import the **CursorManager Prefab** via **Package Manager -> Samples**, then drop it into the boot scene (placing the prefab is optional — the first call to any [Cursors](/docs/cursorsystem/API/Runtime/Cursors) API automatically finds or creates a `[CursorManager]` node). The CursorManager parents itself under the `OxGKit` container node and persists with **DontDestroyOnLoad**.
+- Author the **Cursor States** list in the Inspector; each [CursorState](/docs/cursorsystem/API/Runtime/CursorManager#cursorstate) entry can configure the following:
+  - **stateName**: The state name (the key for runtime switching).
+  - **renderType**: Static (static cursor) or Dynamic (frame-animated cursor sequence).
+  - **cursorMode**: Cursor rendering mode (Auto or ForceSoftware).
+  - **scalingEnabled, scale**: Scaling toggle and scale factor.
+  - **hotspot**: The cursor hotspot position.
+  - **staticCursorTexture**: The static cursor texture.
+  - **dynamicCursorTextures, isLoop, playMode, frameRate**: Dynamic cursor frame sequence, loop toggle, play mode, and frame rate.
+
+<Highlight color="#0373fc">Attention</Highlight> The **first state in the Cursor States list is the default state** (Default); `ResetCursorState` resets back to the first state.
+
+### Play Modes (PlayMode)
+
+Dynamic cursors support the following play modes:
+
+- Normal (forward)
+- Reverse (backward)
+- PingPong (forward -> backward)
+- PingPongReverse (backward -> forward)
+
+<Highlight color="#ff2f00">Important</Highlight> A dynamic cursor only animates when **frameRate is greater than 0**; scaling only takes effect when **scalingEnabled** is on and **cursorMode is set to ForceSoftware**.
+
+<Highlight color="#00d679">Reminder</Highlight> Import cursor textures with the **Cursor** texture type for crisp rendering; on **WebGL**, browsers restrict custom cursor sizes, so prefer small textures.
+
+---
+
+## Simple Usage
+
+### Switching Cursor States
+
+```csharp
+using OxGKit.CursorSystem;
+
+// Initialize the CursorManager instance (auto-finds the CursorManager Prefab placed in the scene)
+Cursors.InitInstance();
+
+// Switch the cursor state by name (returns bool indicating success)
+Cursors.SetCursorState("Loading");
+
+// Reset back to the default state (first element in the list)
+Cursors.ResetCursorState();
+```
+
+### Visibility and Lock Control
+
+```csharp
+// Hide the cursor and lock it to the screen center (FPS-style)
+Cursors.SetCursorVisible(false);
+Cursors.SetCursorLockState(CursorLockMode.Locked);
+
+// Release when opening a menu
+Cursors.SetCursorLockState(CursorLockMode.None);
+Cursors.SetCursorVisible(true);
+```
+
+### Assigning Textures at Runtime
+
+```csharp
+// Load a Texture2D however you like (e.g., Resources or AssetBundle)
+Texture2D tex = Resources.Load<Texture2D>("Cursors/cursor_default");
+
+// Get a specific state and swap the cursor texture at runtime
+var cursorState = Cursors.GetCursorState("Default");
+cursorState.SetStaticCursor(tex);
+
+// Swap the dynamic cursor frame sequence and adjust parameters
+Texture2D[] texture2ds = Resources.LoadAll<Texture2D>("Cursors/Loading");
+cursorState.SetDynamicCursor(texture2ds);
+cursorState.SetFrameRate(12);
+cursorState.SetLoop(true);
+cursorState.ResetRender();
+```
+
+*[See Example]*
+
+---
+
+## Installation
+
+| Install via git URL |
+|:--- |
+| Add https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/CursorSystem/Scripts to Package Manager |
+
+**No third-party dependencies**
+
+**Samples (Package Manager -> Samples)**
+
+- **AI Agent Skills** (see [AI Agent Skills](/docs/agent-skills))
+- **CursorManager Prefab**
+- **CursorManager Demo**
+
+---
+
+## Module API
+
+- Runtime
+  - [Cursors](/docs/cursorsystem/API/Runtime/Cursors) (using OxGKit.CursorSystem)
+  - [CursorManager](/docs/cursorsystem/API/Runtime/CursorManager) (using OxGKit.CursorSystem)
+
+---
+
+## Demo
+
+**CursorSystem Demo**
+
+<ReactPlayer controls url='/video/cursorsystem_demo.mp4' />

@@ -1,0 +1,166 @@
+---
+sidebar_position: 4
+description: EasyAnim 为简易动画播放封装 (EasyAnimation 与 EasyAnimator)，通过名为 AnimEnd 的动画事件触发播放结束回调。
+---
+
+# EasyAnim
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`EasyAnim` 为**简易动画播放封装** (播放 + 结束回调) 的抽象基类，实现分为 **EasyAnimation (Animation 旧版动画系统)** 与 **EasyAnimator (Animator)**，通过统一的 `Play(name, animEnd)` 接口播放动画并于**动画事件 AnimEnd** 触发时执行结束回调。
+
+|  |  |
+| :--- | :--- |
+| **命名空间** | `OxGKit.Utilities.EasyAnim` |
+| **类型** | `public abstract class EasyAnim : MonoBehaviour`、`public class EasyAnimation : EasyAnim`、`public class EasyAnimator : EasyAnim` |
+| **源码** | [EasyAnim.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/Utilities/Scripts/Runtime/EasyAnim/EasyAnim.cs)、[EasyAnimation.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/Utilities/Scripts/Runtime/EasyAnim/EasyAnimation.cs)、[EasyAnimator.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/Utilities/Scripts/Runtime/EasyAnim/EasyAnimator.cs) |
+
+```csharp
+using OxGKit.Utilities.EasyAnim;
+```
+
+<Highlight color="#ff2f00">重要</Highlight> **必须在动画片段 (Clip) 上设置名为 `AnimEnd` 的动画事件 (Animation Event)**，动画播放至该事件时才会触发 `animEnd` 回调；**未设置该事件时回调永远不会触发**，这是“动画回调没有执行”时的首要检查点。
+
+## 快速上手 {#quick-start}
+
+```csharp
+using OxGKit.Utilities.EasyAnim;
+using UnityEngine;
+
+public class EasyAnimDemo : MonoBehaviour
+{
+    private void Start()
+    {
+        // 获取 EasyAnim (EasyAnimation 或 EasyAnimator)
+        var easyAnim = this.GetComponent<EasyAnim>();
+
+        // EasyAnimation 传入 Clip 名称; EasyAnimator 传入 Trigger 参数名称
+        easyAnim.Play("Open", () =>
+        {
+            Debug.Log("Animation End");
+        });
+
+        // 检查是否有该动画
+        bool hasAnim = easyAnim.HasAnim("Open");
+    }
+}
+```
+
+## 通用规则 {#general-rules}
+
+### AnimEnd 动画事件 {#animend-event}
+
+1. 于 **Animation 窗口**选择动画片段 (Clip)。
+2. 在结尾帧 (或希望触发回调的时间点) **新增 Animation Event**。
+3. **Function 名称填入 `AnimEnd`** (对应 `EasyAnim` 基类的 `protected virtual void AnimEnd()` 事件函数)。
+
+### Fail-Open 行为 {#fail-open}
+
+- `Play` 时若**找不到指定的 Clip 名称 (EasyAnimation) 或参数名称 (EasyAnimator)**，会**直接调用 `AnimEnd` 立即触发回调** (不会卡住流程)。
+
+<Highlight color="#00d679">提醒</Highlight> 每次 `Play` 会**覆盖**上一次设置的结束回调；回调触发后即清空 (单次触发)。
+
+---
+
+## EasyAnim (基类) {#easyanim-base}
+
+### 方法总览 {#base-overview}
+
+| 方法 | 说明 |
+| :--- | :--- |
+| [Play](#play) | (抽象) 播放动画并设置结束回调。 |
+| [HasAnim](#hasanim) | (抽象) 检查是否有指定动画。 |
+
+### Play {#play}
+
+```csharp
+public abstract void Play(string name, Action animEnd)
+```
+
+播放指定名称的动画，并设置**结束回调** (由动画事件 `AnimEnd` 触发)。
+
+### HasAnim {#hasanim}
+
+```csharp
+public abstract bool HasAnim(string name)
+```
+
+检查是否有指定名称的动画。
+
+---
+
+## EasyAnimation {#easyanimation}
+
+适用于 **Animation (旧版动画系统)**，通过 **AddComponentMenu: OxGKit/Utilities/EasyAnim/EasyAnimation** 加入；Inspector 可指定 `Animation` 组件，未指定时于 `Awake` 自动 `GetComponent`。
+
+### GetAnimation {#easyanimation-getanimation}
+
+```csharp
+public Animation GetAnimation()
+```
+
+获取绑定的 `Animation` 组件。
+
+### Play (EasyAnimation) {#easyanimation-play}
+
+```csharp
+public override void Play(string animName, Action animEnd)
+```
+
+以 **Clip 名称**播放动画 (`Animation.Play`)；找不到该 Clip 时**直接触发回调**。
+
+### HasAnim (EasyAnimation) {#easyanimation-hasanim}
+
+```csharp
+public override bool HasAnim(string animName)
+```
+
+检查 `Animation` 中是否含有指定名称的 Clip (`GetClip`)。
+
+---
+
+## EasyAnimator {#easyanimator}
+
+适用于 **Animator**，通过 **AddComponentMenu: OxGKit/Utilities/EasyAnim/EasyAnimator** 加入；Inspector 可指定 `Animator` 组件，未指定时于 `Awake` 自动 `GetComponent`。
+
+### GetAnimation (EasyAnimator) {#easyanimator-getanimation}
+
+```csharp
+public Animator GetAnimation()
+```
+
+获取绑定的 `Animator` 组件 (方法名称为 `GetAnimation`，**返回类型为 `Animator`**)。
+
+### Play (EasyAnimator) {#easyanimator-play}
+
+```csharp
+public override void Play(string paramName, Action animEnd)
+```
+
+以 **Trigger 参数名称**播放动画 (先 `ResetTrigger` 再 `SetTrigger`)；找不到该参数时**直接触发回调**。
+
+<Highlight color="#0373fc">注意</Highlight> `paramName` 必须是 Animator Controller 中的 **Trigger 参数名称** (而非 State 或 Clip 名称)。
+
+### HasAnim (EasyAnimator) {#easyanimator-hasanim}
+
+```csharp
+public override bool HasAnim(string paramName)
+```
+
+检查 `Animator` 的参数列表中是否含有指定名称的参数 (内部有**参数缓存**优化，Controller 变更时自动重新缓存)。

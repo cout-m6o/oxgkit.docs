@@ -1,0 +1,151 @@
+---
+sidebar_position: 3
+description: NoticeCondition is the notice condition base class of the NoticeSystem. Custom conditions inherit it and implement ShowCondition to decide whether the red dot shows; also covers the NoticeInfo (condition ID + data) struct.
+---
+
+# NoticeCondition
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`NoticeCondition` is the **notice condition base class (abstract class)** of the **NoticeSystem**. Custom conditions inherit it and implement `ShowCondition` to decide whether the red dot shows, and are auto-assigned a condition ID once registered via [NoticeManager.RegisterCondition](./NoticeManager.mdx#registercondition). Condition templates can be created via Right-Click **Create/OxGKit/Notice System/Template Notice Condition.cs** (refer to the [Module Intro](../../intro.mdx)).
+
+|  |  |
+| :--- | :--- |
+| **Namespace** | `OxGKit.NoticeSystem` |
+| **Type** | `public abstract class NoticeCondition` |
+| **Source** | [NoticeCondition.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/NoticeSystem/Scripts/Runtime/Core/NoticeCondition.cs) |
+
+```csharp
+using OxGKit.NoticeSystem;
+```
+
+## Quick Start {#quick-start}
+
+```csharp
+using OxGKit.NoticeSystem;
+using UnityEngine;
+
+public class NewMailCond : NoticeCondition
+{
+    #region Default
+    // Convention: define a static property to get the auto-assigned condition ID
+    public static int id { get { return NoticeManager.GetConditionId<NewMailCond>(); } }
+
+    // Auto-register the condition before the scene loads (matches the BeforeSceneLoad template)
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+    static void Register()
+    {
+        NoticeManager.RegisterCondition<NewMailCond>();
+    }
+    #endregion
+
+    public override bool ShowCondition(object data)
+    {
+        if (data != null)
+        {
+            MailBox mailBox = data as MailBox;
+
+            // Show the red dot when there is unread mail
+            if (mailBox.unreadCount > 0) return true;
+        }
+
+        return false;
+    }
+}
+```
+
+## General Rules {#general-rules}
+
+- Condition classes are **pure logic classes** — do not hold MonoBehaviour state or scene references inside `ShowCondition`.
+- The `data` passed to `ShowCondition` can be `null` or of a different type (when multiple UIs share the same condition) — perform **defensive checks**.
+- The condition ID is **auto-assigned** on registration by [NoticeManager.RegisterCondition](./NoticeManager.mdx#registercondition); by convention, define a static `id` property in the condition class.
+
+<Highlight color="#00d679">Reminder</Highlight> A NoticeItem holding multiple conditions uses **OR logic** (shown when any matches); for **AND logic**, put the whole predicate inside a single condition class's `ShowCondition`.
+
+---
+
+## Method Overview {#overview}
+
+| Method | Description |
+| :--- | :--- |
+| [SetId](#setid) | Sets the condition ID (called automatically by NoticeManager on registration). |
+| [GetId](#getid) | Gets the condition ID. |
+| [ShowCondition](#showcondition) | (abstract) Decides from the data whether the condition matches (whether the red dot shows). |
+
+---
+
+### SetId {#setid}
+
+```csharp
+public void SetId(int id)
+```
+
+Sets the condition ID.
+
+<Highlight color="#0373fc">Attention</Highlight> Called **automatically** by [NoticeManager.RegisterCondition](./NoticeManager.mdx#registercondition) on registration — usually there is no need to call it yourself.
+
+### GetId {#getid}
+
+```csharp
+public int GetId()
+```
+
+Gets the condition ID (can also be queried by type via `NoticeManager.GetConditionId<T>()`).
+
+### ShowCondition {#showcondition}
+
+```csharp
+public abstract bool ShowCondition(object data)
+```
+
+Decides from the given data whether the condition matches — returning `true` means **the red dot shows**; `data` is the data passed in via [NoticeInfo](#noticeinfo) when registering on a NoticeItem.
+
+---
+
+## NoticeInfo {#noticeinfo}
+
+Notice info (struct) containing the **condition ID and the data to check**, used as the registration unit for [NoticeItem.RegisterNotice](./NoticeItem.mdx#registernotice) / [RenewNotice](./NoticeItem.mdx#renewnotice).
+
+|  |  |
+| :--- | :--- |
+| **Type** | `public struct NoticeInfo` |
+| **Source** | [NoticeInfo.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/NoticeSystem/Scripts/Runtime/Core/NoticeInfo.cs) |
+
+### Members {#noticeinfo-members}
+
+| Member | Description |
+| :--- | :--- |
+| `public int conditionId` | The condition ID. |
+| `public object data` | The data handed to `ShowCondition` for the check (value type or reference type). |
+
+### Constructors {#noticeinfo-constructors}
+
+```csharp
+public NoticeInfo(int conditionId, object data)
+```
+
+```csharp
+// Reference-type data (Notify alone is enough after changes)
+new NoticeInfo(NewMailCond.id, this._mailBox);
+
+// Value-type data (RenewNotice to update the snapshot after changes, then Notify)
+new NoticeInfo(CoinInWalletCond.id, this._coin);
+```
+
+<Highlight color="#ff2f00">Important</Highlight> **Value-type** data is stored as a **snapshot** — after the data changes, update it via [NoticeItem.RenewNotice](./NoticeItem.mdx#renewnotice) and then Notify, otherwise the red dot will not refresh.

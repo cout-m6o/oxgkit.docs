@@ -1,0 +1,217 @@
+---
+sidebar_position: 3
+description: InfiniteCell is the base class attached to the cell prefab, implementing display logic through the OnCreate, OnRefresh, OnRecycle, OnSnap, and OnClick lifecycle; it also covers the data carrier InfiniteCellData.
+---
+
+# InfiniteCell
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`InfiniteCell` is the **base class of cells** (`MonoBehaviour`), attached to the root node of the cell prefab. Cells are **recycled** by the object pool — implement your display logic by overriding the **lifecycle methods**, while the data required for rendering is carried by [InfiniteCellData](#infinitecelldata).
+
+|  |  |
+| :--- | :--- |
+| **Namespace** | `OxGKit.InfiniteScrollView` |
+| **Type** | `public class InfiniteCell : MonoBehaviour` |
+| **Source** | [InfiniteCell.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/InfiniteScrollView/Scripts/Runtime/Core/CellObject/InfiniteCell.cs) |
+
+```csharp
+using OxGKit.InfiniteScrollView;
+```
+
+<Highlight color="#00d679">Reminder</Highlight> Cell script and prefab templates can be created quickly via Right-Click **Create/OxGKit/Infinite ScrollView/Template Infinite Cell.cs (Script)** and **Template Infinite Cell (RectTransform Prefab)**.
+
+## Quick Start {#quick-start}
+
+```csharp
+using Cysharp.Threading.Tasks;
+using OxGKit.InfiniteScrollView;
+using UnityEngine.UI;
+
+public class ItemCell : InfiniteCell
+{
+    public Text titleTxt;
+    public Button button;
+
+    public override async UniTask OnCreate(object args)
+    {
+        // One-time initialization on creation (args forwarded from InitializePool(args))
+        this.button.onClick.AddListener(this.OnClick);
+    }
+
+    public override void OnRefresh()
+    {
+        // Cells are pooled and recycled — rendering must be fully driven by cellData
+        string text = (string)this.cellData.data;
+        this.titleTxt.text = $"[{this.cellData.index}] {text}";
+    }
+
+    public override void OnRecycle()
+    {
+        // Cleanup when recycled back into the pool
+    }
+
+    public override void OnSnap()
+    {
+        // Presentation when becoming the snap target (e.g. highlight)
+    }
+
+    public override void OnClick()
+    {
+        // Triggers the scroll view's onCellSelected event
+        base.OnClick();
+    }
+}
+```
+
+## General Rules {#general-rules}
+
+### Lifecycle {#lifecycle}
+
+| Method | When |
+| :--- | :--- |
+| [OnCreate](#oncreate) | When [InitializePool](./InfiniteScrollView.mdx#initializepool) instantiates the cell (once, `await`ed). |
+| [OnRefresh](#onrefresh) | When `cellData` is assigned (the cell enters the visible range and gets placed, or the data refreshes). |
+| [OnRecycle](#onrecycle) | When the cell is recycled back into the pool (the GameObject is already deactivated). |
+| [OnSnap](#onsnap) | When a [Snap](./InfiniteScrollView.mdx#snap) finishes and this cell is the target. |
+| [OnClick](#onclick) | On click (wire the Button event to this method yourself). |
+
+<Highlight color="#ff2f00">Important</Highlight> Cells are **pooled and recycled** — the same cell instance displays different data entries in turn, so [OnRefresh](#onrefresh) must **redraw fully driven by `cellData`**; never store per-item state on the cell itself (store it in the data object).
+
+<Highlight color="#0373fc">Attention</Highlight> `Insert` / `Remove` shift the data indexes — read `this.cellData.index` on demand inside the cell instead of caching index values.
+
+---
+
+## Members {#members}
+
+| Member | Description |
+| :--- | :--- |
+| `public RectTransform rectTransform` | The cell's `RectTransform` (cached automatically). |
+| `public InfiniteCellData cellData` | The currently bound data; **assigning it (set) automatically triggers [OnRefresh](#onrefresh)**. |
+
+---
+
+## Methods {#methods}
+
+### Methods Overview {#methods-overview}
+
+| Method | Description |
+| :--- | :--- |
+| [OnCreate](#oncreate) | One-time initialization on creation. |
+| [OnRefresh](#onrefresh) | Redraws the display from the data. |
+| [OnRecycle](#onrecycle) | Cleanup on recycling. |
+| [OnSnap](#onsnap) | When becoming the snap target. |
+| [OnClick](#onclick) | Click event (triggers selection). |
+| [InvokeSelected](#invokeselected) | (protected) Actively triggers the selection event. |
+
+---
+
+### OnCreate {#oncreate}
+
+```csharp
+public virtual async UniTask OnCreate(object args)
+```
+
+`await`ed **once** when [InitializePool](./InfiniteScrollView.mdx#initializepool) instantiates the cell; `args` is the custom argument forwarded from `InitializePool(args)` — suited to one-time setup such as component initialization.
+
+### OnRefresh {#onrefresh}
+
+```csharp
+public virtual void OnRefresh()
+```
+
+Called automatically when `cellData` is assigned — triggered when the cell is placed for display (enters the visible range); redraw the display content from `cellData` here.
+
+### OnRecycle {#onrecycle}
+
+```csharp
+public virtual void OnRecycle()
+```
+
+Called when the cell is recycled back into the pool (the GameObject is already deactivated at this point); perform cleanup here (e.g. stop animations, release temporary states).
+
+### OnSnap {#onsnap}
+
+```csharp
+public virtual void OnSnap()
+```
+
+Called when a [Snap](./InfiniteScrollView.mdx#snap) finishes and this cell is the target index (suited to tab switching, selection presentation, etc.).
+
+### OnClick {#onclick}
+
+```csharp
+public virtual void OnClick()
+```
+
+Click event entry — the default implementation calls [InvokeSelected](#invokeselected) to trigger the scroll view's [onCellSelected](./InfiniteScrollView.mdx#events) event; wire the cell's `Button` event to this method yourself (remember to call `base.OnClick()` when overriding).
+
+### InvokeSelected {#invokeselected}
+
+```csharp
+protected void InvokeSelected()
+```
+
+Actively triggers the selection event (notifies the scroll view's [onCellSelected](./InfiniteScrollView.mdx#events)); call it directly for custom click flows that do not go through [OnClick](#onclick).
+
+---
+
+## InfiniteCellData {#infinitecelldata}
+
+The **data carrier** of a cell, determining the cell size and the rendering data; separated from the cell (view), held by the scroll view, and bound to a cell when it is placed for display.
+
+|  |  |
+| :--- | :--- |
+| **Type** | `public class InfiniteCellData : IDisposable` |
+| **Source** | [InfiniteCellData.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/InfiniteScrollView/Scripts/Runtime/Core/CellData/InfiniteCellData.cs) |
+
+| Member | Description |
+| :--- | :--- |
+| `public int index { get; internal set; }` | The data index (maintained automatically by the scroll view, updated after `Insert` / `Remove`). |
+| `public Vector2 cellSize` | The cell size (x = width, y = height): vertical lists use `y`, horizontal lists use `x`, grids use both. |
+| `public object data` | The custom data required to render the cell. |
+
+**Constructors**
+
+```csharp
+public InfiniteCellData()
+public InfiniteCellData(Vector2 cellSize)
+public InfiniteCellData(Vector2 cellSize, object data)
+```
+
+**Methods**
+
+```csharp
+public void Dispose()
+```
+
+Releases the data reference (`data = null`); called automatically by the scroll view's `Remove` / `Clear`.
+
+**Dynamic Size Example (Chat Room)**
+
+```csharp
+// Measure the text height with a measuring Text first, then create data with a dynamic height
+this.heightInstrument.text = message;
+float height = this.heightInstrument.preferredHeight;
+this.chatScrollView.Add(new InfiniteCellData(new Vector2(0f, height), new ChatData(user, message)));
+this.chatScrollView.Refresh();
+this.chatScrollView.SnapLast(0.1f);
+```
+
+<Highlight color="#0373fc">Attention</Highlight> `cellSize` must be decided **before adding to the list**; to change a size later, update the entry's `cellSize` and run a full [Refresh](./InfiniteScrollView.mdx#refresh).

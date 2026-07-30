@@ -1,0 +1,200 @@
+---
+sidebar_position: 1
+---
+
+import ReactPlayer from 'react-player'
+
+# Module Intro
+
+export const Highlight = ({ children, color }) => (
+  <span
+    style={{
+      backgroundColor: color,
+      borderRadius: '5px',
+      color: '#fff',
+      padding: '2.5px'
+    }}>
+    {children}
+  </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+## Basic Instructions
+
+Input control system that supports **Unity New InputSystem**. When using Unity New InputSystem, you create its **Control Maps** yourself, and the module also provides a **Binding Composite script template** for Unity New InputSystem. Finally, **Input Actions dispatch input signals** that are **subscribed to by subscribers**, so the in-game **control logic does not need to know about platform or device differences** — everything is integrated by Input Actions. Of course, Input Actions also support **other input plugins**, acting as pure input-signal dispatchers.
+
+- Version: **v1.0.4** (`com.michaelo.oxgkit.inputsystem`)
+- Namespace: `OxGKit.InputSystem`
+
+<Highlight color="#0373fc">Attention</Highlight> This module depends on **Unity New InputSystem** and [OxGKit.LoggingSystem](/docs/loggingsystem/intro) (for log output); install the dependencies first.
+
+---
+
+## Application Description
+
+### Main Drive Layers
+
+- **For Unity New InputSystem**
+  - Control Maps (Input Action Asset)
+  - Binding Composites
+- **For Any Inputs**
+  - Input Actions (standalone universal signal dispatchers that do not depend on any input plugin — any input source can be implemented freely)
+
+### Script Templates (Right-Click)
+
+- Use Right-Click **Create/OxGKit/Input System/Template Input Action.cs (Input Interface For Any)** to implement the InputAction interface (universal signal dispatcher).
+- Use Right-Click **Create/OxGKit/Input System/New Input System (Extension)/Template Input Binding Composite.cs (For Unity New Input System)** to create a Binding Composite script for Unity New InputSystem (custom composite input).
+
+<Highlight color="#00d679">Reminder</Highlight> The Editor part of this module only provides the **script-template MenuItems** above (`InputSystemCreateScriptEditor`) as a script-creation helper; there is no other Editor API.
+
+### Using the Inputs API
+
+- Call the [Inputs](/docs/inputsystem/API/Runtime/Inputs) API (`using OxGKit.InputSystem`) and use **Inputs.CM** (Control Maps) and **Inputs.IA** (Input Actions) to register, get, toggle, and drive updates.
+
+### Module Logger
+
+- This module logs through **OxGKit.LoggingSystem** with the logger name `OxGKit.InputSystem.Logger`; its toggle and level can be configured in **LoggingLauncher**.
+
+---
+
+## Simple Usage
+
+### Implement an Input Action (Signal Dispatcher)
+
+```csharp
+using System;
+using OxGKit.InputSystem;
+using UnityEngine.InputSystem;
+
+public class PlayerAction : IInputAction
+{
+    // Custom input event (subscribed to by subscribers)
+    public event Action<MoveInputComposite.MoveInput> onMoveAction;
+
+    public void OnCreate()
+    {
+        // On registration, get the registered Control Map and bind events
+        var ctrls = Inputs.CM.GetControlMap<PlayerControls>();
+        if (ctrls != null)
+        {
+            // add move input performed (player move)
+            ctrls.Player.Move.performed += this.OnMoveAction;
+            // add move input canceled to reset input data
+            ctrls.Player.Move.canceled += this.OnMoveAction;
+        }
+    }
+
+    public void OnUpdate(float dt)
+    {
+        // Optional polling-style input detection (driven by Inputs.IA.DriveUpdate)
+    }
+
+    public void RemoveAllListeners()
+    {
+        this.onMoveAction = null;
+    }
+
+    protected void OnMoveAction(InputAction.CallbackContext context)
+    {
+        // If there is a special input can make composite by yourself
+        // Read your composite values
+        var moveInput = context.ReadValue<MoveInputComposite.MoveInput>();
+        this.onMoveAction?.Invoke(moveInput);
+    }
+}
+```
+
+### Register and Drive Updates
+
+```csharp
+using OxGKit.InputSystem;
+using UnityEngine;
+
+public class InputDemo : MonoBehaviour
+{
+    private void Awake()
+    {
+        // If use Unity New Input System must register control maps
+        Inputs.CM.RegisterControlMap<PlayerControls>();
+
+        // Register an input action (after control maps registered)
+        Inputs.IA.RegisterInputAction<PlayerAction>();
+    }
+
+    private void OnEnable()
+    {
+        // Add handle event
+        Inputs.IA.GetInputAction<PlayerAction>().onMoveAction += this._OnMoveAction;
+    }
+
+    private void OnDisable()
+    {
+        // Del handle event
+        Inputs.IA.GetInputAction<PlayerAction>().onMoveAction -= this._OnMoveAction;
+    }
+
+    private void Update()
+    {
+        // Call by Main MonoBehaviour (Main Program)
+        Inputs.IA.DriveUpdate(Time.unscaledDeltaTime);
+    }
+
+    private void _OnMoveAction(MoveInputComposite.MoveInput moveInput)
+    {
+        // Records move input signals and input data
+    }
+}
+```
+
+<Highlight color="#ff2f00">Important</Highlight> Registration order: **register Control Maps first, then Input Actions** (an Input Action's `OnCreate` usually fetches a Control Map for binding).
+
+### Toggle Control Maps
+
+```csharp
+// Disable the whole control map (e.g., during UI modes or cutscenes)
+Inputs.CM.SetActive<PlayerControls>(false);
+
+// Check the control map's active state
+bool isActive = Inputs.CM.IsActive<PlayerControls>();
+```
+
+*[Refer to Example]*
+
+---
+
+## Installation
+
+| Install via git URL |
+|:--- |
+| Add https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/InputSystem/Scripts to Package Manager |
+
+**Third-party libraries (install manually)**
+
+- Use [Unity New InputSystem v1.5.1 or higher](https://docs.unity3d.com/Packages/com.unity.inputsystem@1.5/manual/Installation.html), install via Package Manager -> Add package by name **com.unity.inputsystem**
+- Use OxGKit.LoggingSystem, Add https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/LoggingSystem/Scripts to Package Manager
+
+**Samples (Package Manager -> Samples)**
+
+- **AI Agent Skills** (refer to [AI Agent Skills](/docs/agent-skills))
+- **InputSystem Demo**
+
+---
+
+## Module API
+
+- Runtime
+  - [Inputs](/docs/inputsystem/API/Runtime/Inputs) (using OxGKit.InputSystem)
+  - [IInputAction](/docs/inputsystem/API/Runtime/IInputAction) (using OxGKit.InputSystem)
+
+---
+
+## Demo
+
+**InputSystem Demo**
+
+<ReactPlayer controls url='/video/inputsystem_demo.mp4' />

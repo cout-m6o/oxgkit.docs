@@ -1,0 +1,390 @@
+---
+sidebar_position: 1
+description: DeltaTimer is a game-time timer driven by externally fed deltaTime accumulation, supporting Timer (one-shot), Tick (repeating), and Mark (time anchor) modes plus time-speed adjustment.
+---
+
+# DeltaTimer
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`DeltaTimer` is a timer driven by **accumulating externally fed deltaTime** (game time). The owner (a MonoBehaviour `Update`, etc.) must **keep calling `UpdateTimer(dt)` to drive it** — the timer freezes as soon as feeding stops, and feeding `Time.deltaTime` makes it naturally follow `Time.timeScale` and game pause. It supports the **Timer (one-shot)**, **Tick (repeating)**, and **Mark (time anchor)** modes plus time-speed adjustment.
+
+|  |  |
+| :--- | :--- |
+| **Namespace** | `OxGKit.TimeSystem` |
+| **Type** | `public class DeltaTimer` |
+| **Source** | [DeltaTimer.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/TimeSystem/Scripts/Runtime/Core/Timer/DeltaTimer.cs) |
+
+```csharp
+using OxGKit.TimeSystem;
+```
+
+## Quick Start {#quick-start}
+
+```csharp
+using OxGKit.TimeSystem;
+using UnityEngine;
+
+public class SkillCooldown : MonoBehaviour
+{
+    private DeltaTimer _cooldown;
+
+    private void Start()
+    {
+        // Create and auto play (autoPlay: true)
+        this._cooldown = new DeltaTimer(true);
+        // Set a 3-second cooldown
+        this._cooldown.SetTimer(3f);
+    }
+
+    private void Update()
+    {
+        // Must keep feeding deltaTime to drive the timer
+        this._cooldown.UpdateTimer(Time.deltaTime);
+
+        if (this._cooldown.IsTimerTimeout())
+        {
+            // Cooldown finished (time's up)
+        }
+    }
+}
+```
+
+## General Rules {#general-rules}
+
+### DeltaTimer vs RealTimer {#deltatimer-vs-realtimer}
+
+<Highlight color="#0373fc">Attention</Highlight> A `DeltaTimer` only advances **while `UpdateTimer(dt)` is being fed**; feeding `Time.deltaTime` makes it follow `Time.timeScale` and game pause (it freezes). A [RealTimer](./RealTimer.mdx) counts by the **system clock** and keeps running even while the game is paused — pick deliberately (see [Picking the Right Tool](../../intro.mdx#picking-the-right-tool-by-time-base)).
+
+### Playback State {#playback-state}
+
+<Highlight color="#ff2f00">Important</Highlight> A timer is **stopped by default after construction** — call [Play](#play) (or use the `autoPlay: true` constructor) to start counting.
+
+<Highlight color="#00d679">Reminder</Highlight> [Stop](#stop) clears all timing data (keeps the time speed); [Reset](#reset) also resets the time speed back to its default; [Pause](#pause) only pauses and can be resumed with [Play](#play).
+
+---
+
+## Constructors {#constructors}
+
+```csharp
+public DeltaTimer()
+
+public DeltaTimer(bool autoPlay)
+```
+
+Creates the timer (internally runs `Reset` first); with `autoPlay` set to true, it starts counting immediately after creation.
+
+---
+
+## Members {#members}
+
+| Member | Description |
+| :--- | :--- |
+| `public float deltaTime { get; }` | The last deltaTime fed through [UpdateTimer](#updatetimer). |
+
+---
+
+## Driving and Playback Control {#playback-control}
+
+### Method Overview {#playback-overview}
+
+| Method | Description |
+| :--- | :--- |
+| [UpdateTimer](#updatetimer) | Fed deltaTime by the owner to drive the timer. |
+| [Play](#play) | Starts or resumes counting. |
+| [Pause](#pause) | Pauses counting (resumable). |
+| [Stop](#stop) | Stops and clears timing data. |
+| [Reset](#reset) | Resets all state (including time speed). |
+| [IsPlaying](#isplaying) | Whether the timer is counting. |
+| [IsPause](#ispause) | Whether the timer is paused (stopped). |
+| [GetTime](#gettime) | Gets the timer's current time (seconds). |
+| [SetTimeSpeed](#settimespeed) | Sets the time speed. |
+| [GetTimeSpeed](#gettimespeed) | Gets the time speed. |
+
+---
+
+### UpdateTimer {#updatetimer}
+
+```csharp
+public void UpdateTimer(float dt)
+```
+
+Must be **fed deltaTime continuously** through a MonoBehaviour `Update` to drive the timer (accumulates internally).
+
+```csharp
+private void Update()
+{
+    this._deltaTimer.UpdateTimer(Time.deltaTime);
+}
+```
+
+<Highlight color="#ff2f00">Important</Highlight> No feeding = frozen timer — none of the Timer / Tick / Mark checks will advance.
+
+### Play {#play}
+
+```csharp
+public void Play()
+```
+
+Starts counting, or **resumes** from a paused state (the paused span is deducted — the time does not jump).
+
+### Pause {#pause}
+
+```csharp
+public void Pause()
+```
+
+Pauses counting and records the pause point; resumable with [Play](#play).
+
+### Stop {#stop}
+
+```csharp
+public void Stop()
+```
+
+Stops counting and **clears all timing data** (Timer / Tick / Mark settings are zeroed), but **keeps the time speed** (timeSpeed).
+
+### Reset {#reset}
+
+```csharp
+public void Reset()
+```
+
+Resets all state to defaults (including **resetting the time speed to 1**) and returns to the stopped state.
+
+### IsPlaying {#isplaying}
+
+```csharp
+public bool IsPlaying()
+```
+
+Returns whether the timer is currently counting.
+
+### IsPause {#ispause}
+
+```csharp
+public bool IsPause()
+```
+
+Returns whether the timer is paused (not playing).
+
+### GetTime {#gettime}
+
+```csharp
+public float GetTime()
+```
+
+Gets the timer's **current accumulated time (seconds)**; while counting it is affected by [SetTimeSpeed](#settimespeed), and while paused it returns the time at the pause point.
+
+### SetTimeSpeed {#settimespeed}
+
+```csharp
+public void SetTimeSpeed(float timeSpeed)
+```
+
+Sets the time speed (default 1), affecting the flow of [GetTime](#gettime) (and therefore the Timer / Tick / Mark checks).
+
+### GetTimeSpeed {#gettimespeed}
+
+```csharp
+public float GetTimeSpeed()
+```
+
+Gets the current time speed.
+
+---
+
+## Timer (One-Shot) {#timer}
+
+A **one-shot countdown** based on the configured seconds.
+
+### Method Overview {#timer-overview}
+
+| Method | Description |
+| :--- | :--- |
+| [SetTimer](#settimer) | Sets the seconds to count. |
+| [TimerCountdown](#timercountdown) | Gets the remaining seconds (0 when reached). |
+| [IsTimerTimeout](#istimertimeout) | Returns whether the timer has reached its time. |
+| [GetTimerCountdownRatio](#gettimercountdownratio) | Gets the countdown ratio (1 decreasing to 0). |
+
+---
+
+### SetTimer {#settimer}
+
+```csharp
+public void SetTimer(float timeSeconds)
+```
+
+Sets the seconds to count (current time + seconds becomes the trigger point).
+
+```csharp
+this._deltaTimer.SetTimer(3f);
+this._deltaTimer.Play();
+```
+
+### TimerCountdown {#timercountdown}
+
+```csharp
+public float TimerCountdown()
+```
+
+Calculates the remaining seconds until the trigger point; returns 0 directly once the trigger time has been exceeded.
+
+### IsTimerTimeout {#istimertimeout}
+
+```csharp
+public bool IsTimerTimeout()
+```
+
+Returns whether the timer has reached its time (true once past the trigger point).
+
+<Highlight color="#00d679">Reminder</Highlight> After the time is up, `IsTimerTimeout()` **keeps returning true** — for one-shot behavior, call [Stop](#stop) or a new [SetTimer](#settimer) after handling the trigger.
+
+### GetTimerCountdownRatio {#gettimercountdownratio}
+
+```csharp
+public float GetTimerCountdownRatio()
+```
+
+Gets the countdown ratio of the Timer, **from 1 decreasing to 0, where 0 = time's up** (handy for progress-bar UI).
+
+---
+
+## Tick (Repeating) {#tick}
+
+Fires **repeatedly** at the configured interval (re-arms automatically after each timeout).
+
+### Method Overview {#tick-overview}
+
+| Method | Description |
+| :--- | :--- |
+| [SetTick](#settick) | Sets the Tick interval in seconds. |
+| [GetTick](#gettick) | Gets the configured Tick interval. |
+| [TickCountdown](#tickcountdown) | Gets the remaining seconds of the current Tick. |
+| [IsTickTimeout](#isticktimeout) | Returns whether the Tick is due (auto re-arms). |
+| [GetTickCountdownRatio](#gettickcountdownratio) | Gets the Tick countdown ratio (1 decreasing to 0). |
+
+---
+
+### SetTick {#settick}
+
+```csharp
+public void SetTick(float tickSeconds)
+```
+
+Sets the Tick interval in seconds; after [IsTickTimeout](#isticktimeout) fires, the Tick **keeps cycling**.
+
+```csharp
+// Fire every 0.5 seconds
+this._deltaTimer.SetTick(0.5f);
+this._deltaTimer.Play();
+```
+
+### GetTick {#gettick}
+
+```csharp
+public float GetTick()
+```
+
+Gets the configured Tick interval in seconds.
+
+### TickCountdown {#tickcountdown}
+
+```csharp
+public float TickCountdown()
+```
+
+Gets the remaining seconds until the current Tick fires; returns 0 directly once the trigger time has been exceeded.
+
+### IsTickTimeout {#isticktimeout}
+
+```csharp
+public bool IsTickTimeout()
+```
+
+Returns whether the Tick is due; when it returns true, the next Tick is **automatically re-armed from the current time**, forming a repeating trigger.
+
+```csharp
+private void Update()
+{
+    this._deltaTimer.UpdateTimer(Time.deltaTime);
+
+    if (this._deltaTimer.IsTickTimeout())
+    {
+        // Fires once per Tick cycle
+    }
+}
+```
+
+<Highlight color="#ff2f00">Important</Highlight> When `IsTickTimeout()` returns true it **re-arms automatically**, which "consumes" that trigger — **check it from exactly one caller per cycle**, or the trigger will be eaten by another caller.
+
+### GetTickCountdownRatio {#gettickcountdownratio}
+
+```csharp
+public float GetTickCountdownRatio()
+```
+
+Gets the Tick countdown ratio, **from 1 decreasing to 0, where 0 = time's up**.
+
+---
+
+## Mark (Time Anchor) {#mark}
+
+Marks a point in time to measure elapsed time against (stopwatch-style).
+
+### Method Overview {#mark-overview}
+
+| Method | Description |
+| :--- | :--- |
+| [SetMark](#setmark) | Sets the mark to the current time. |
+| [GetMark](#getmark) | Gets the marked time. |
+| [GetElapsedMarkTime](#getelapsedmarktime) | Gets the elapsed seconds since the mark. |
+
+---
+
+### SetMark {#setmark}
+
+```csharp
+public void SetMark()
+```
+
+Sets the mark to the timer's current time.
+
+### GetMark {#getmark}
+
+```csharp
+public float GetMark()
+```
+
+Gets the marked time.
+
+### GetElapsedMarkTime {#getelapsedmarktime}
+
+```csharp
+public float GetElapsedMarkTime()
+```
+
+Gets the elapsed time (seconds) since the last mark; returns 0 while the current time has not passed the mark.
+
+```csharp
+this._deltaTimer.SetMark();
+
+// ... some time later
+float elapsed = this._deltaTimer.GetElapsedMarkTime();
+```

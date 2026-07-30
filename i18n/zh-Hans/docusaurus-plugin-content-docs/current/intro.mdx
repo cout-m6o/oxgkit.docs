@@ -1,0 +1,91 @@
+---
+sidebar_position: 0
+---
+
+# 工具组介绍
+
+export const Highlight = ({children, color}) => (
+  <span
+    style={{
+      backgroundColor: color,
+      borderRadius: '5px',
+      color: '#fff',
+      padding: '2.5px'
+    }}>
+    {children}
+  </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+## 基本说明
+
+OxGKit 是基于 Unity 设计于游戏开发常用的系统工具组 (**皆为独立工具**)，需要什么装什么，各系统模块可通过 UPM 单独安装、单独使用，彼此互不强制绑定。
+
+<Highlight color="#00d679">提醒</Highlight> 部分模块依赖 [LoggingSystem](/docs/loggingsystem/intro)，因为必要时，有日志整合输出的需求 (由 LoggingLauncher 统一控管各模块日志的开关与级别)。
+
+**目前包含以下**
+
+- [日志系统 (LoggingSystem)](/docs/loggingsystem/intro)
+- [无限列表 (InfiniteScrollView)](/docs/infinitescrollview/intro)
+- [动作序列系统 (ActionSystem)](/docs/actionsystem/intro)
+- [通知系统 (NoticeSystem)](/docs/noticesystem/intro)
+- [输入控制系统 (InputSystem)](/docs/inputsystem/intro)
+- [补间动画系统 (TweenSystem)](/docs/tweensystem/intro)
+- [按钮系统 (ButtonSystem)](/docs/buttonsystem/intro)
+- [时间系统 (TimeSystem)](/docs/timesystem/intro)
+- [鼠标系统 (CursorSystem)](/docs/cursorsystem/intro)
+- [对象池系统 (PoolSystem)](/docs/poolsystem/intro)
+- [单例系统 (SingletonSystem)](/docs/singletonsystem/intro)
+- [存储系统 (SaverSystem)](/docs/saversystem/intro)
+- [本地化系统 (LocalizationSystem)](/docs/localizationsystem/intro)
+- [虚拟摇杆系统 (VirtualJoystick)](/docs/virtualjoystick/intro)
+- [各通用必备组件工具 (Utilities)](/docs/utilities/intro)
+
+*[会持续扩充工具系统组]*
+
+![](/img/intro/img_1.png)
+
+---
+
+## 工具组特点
+
+- **独立模块化**
+
+  皆为独立工具系统，通过 UPM 各自安装、各自升级，需要什么装什么，不会强迫引入用不到的模块，也可以搭配 [OxGFrame](https://github.com/michael811125/OxGFrame) 框架一起使用。
+
+- **轻量依赖**
+
+  各模块依赖极少 (部分模块依赖 [UniTask](https://github.com/Cysharp/UniTask)、[LWMyBox](https://github.com/michael811125/LWMyBox) 与 OxGKit.LoggingSystem)，安装清单一目了然。
+
+- **完整示例**
+
+  各模块皆附有 Example (通过 Package Manager -> Samples 导入)，可以直接参考示例快速上手。
+
+- **AI 辅助开发 (AI Agent Skills)**
+
+  各系统模块皆内置 **AI Agent Skills** (SKILL.md)，教导 AI 编码代理 (Claude Code、OpenAI Codex CLI、Cursor、Copilot 等) 正确使用各模块 API，详细说明请参考 [AI Agent Skills](/docs/agent-skills)。
+
+- **模板创建菜单**
+
+  部分模块提供 Right-Click Create/OxGKit/... 脚本模板菜单 (例如 ActionSystem、NoticeSystem、InputSystem、InfiniteScrollView 等)，快速创建实现脚本。
+
+---
+
+## 平台测试
+- Windows (Passed)
+- MacOSX (Passed)
+- Android (Passed)
+- iOS (Passed)
+- WebGL (Passed)
+
+---
+
+## 兼容 Unity 版本
+
+- 建议使用 **Unity 6000.3.20f1(LTS) or higher** 版本 - [Unity Download](https://unity3d.com/get-unity/download/archive)。
+- 各套件支持 **Unity 2021.3 以上** (Unity 2021 LTS、2022 LTS、Unity 6 皆兼容)。

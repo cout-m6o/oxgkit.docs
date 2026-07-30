@@ -1,0 +1,155 @@
+---
+sidebar_position: 4
+description: RTUpdater 是獨立於 MonoBehaviour 的 UniTask 真實時間更新迴圈，不受 Unity Time.timeScale 影響，提供 onUpdate、onFixedUpdate、onLateUpdate 回調，並支持 StartOnThread 於執行緒池運轉。
+---
+
+# RTUpdater
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`RTUpdater` 是**獨立於 MonoBehaviour 的真實時間更新迴圈** (UniTask 驅動)，提供 `onUpdate`、`onFixedUpdate`、`onLateUpdate` 回調，可自訂 **targetFrameRate (更新頻率)** 與 **timeScale (自身時間尺度)**；**不受 Unity `Time.timeScale` 影響** (遊戲暫停仍持續運轉)，並額外支持 `StartOnThread()` 將迴圈切至執行緒池，適合網路心跳、背景輪詢等場景。
+
+|  |  |
+| :--- | :--- |
+| **命名空間** | `OxGKit.TimeSystem` |
+| **類型** | `public class RTUpdater` |
+| **原始碼** | [RTUpdater.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/TimeSystem/Scripts/Runtime/Core/Updater/RTUpdater.cs) |
+
+```csharp
+using OxGKit.TimeSystem;
+```
+
+## 快速上手 {#quick-start}
+
+```csharp
+using OxGKit.TimeSystem;
+
+var rtUpdater = new RTUpdater();
+
+// 訂閱更新回調
+rtUpdater.onUpdate += (dt) => { /* 每次更新 (實際經過時間) */ };
+rtUpdater.onFixedUpdate += (fdt) => { /* 固定間隔更新 */ };
+rtUpdater.onLateUpdate += (dt) => { /* 後更新 */ };
+
+// 可自訂更新頻率與時間尺度
+rtUpdater.targetFrameRate = 60f; // 預設 60
+rtUpdater.timeScale = 1f;        // 0 ~ 64，預設 1
+
+// 啟動更新迴圈 (即使 Time.timeScale = 0 仍持續運轉)
+rtUpdater.Start();
+
+// 功能結束時務必停止
+rtUpdater.Stop();
+```
+
+## 通用規則 {#general-rules}
+
+### 更新頻率與時間縮放 {#update-rate}
+
+- 每輪迴圈的更新頻率 = `targetFrameRate` × `timeScale` (**不乘算 Unity `Time.timeScale`**)，並以 `fixedDeltaTime = 1 / 更新頻率` 作為等待間隔。
+- 每輪依序觸發：`onFixedUpdate(fixedDeltaTime)` → `onUpdate(deltaTime)` → `onLateUpdate(deltaTime)`；其中 `deltaTime` 為以系統時鐘計算的**上一輪實際經過時間**，`fixedDeltaTime` 為固定間隔值。
+
+<Highlight color="#0373fc">注意</Highlight> 僅於 **`targetFrameRate` 大於 0 且 `timeScale` 大於 0** 時運轉，任一為 0 時迴圈**閒置等待** (不觸發回調)。若需要跟隨 `Time.timeScale` 與遊戲暫停的更新迴圈，請改用 [DTUpdater](./DTUpdater.mdx) (詳見[模組選型](../../intro.mdx#模組選型-依時間基準區分))。
+
+### 生命週期 {#lifecycle}
+
+<Highlight color="#ff2f00">重要</Highlight> 更新迴圈為 **UniTask 迴圈**，擁有者 (功能/場景) 結束時**務必呼叫 [Stop](#stop) 停止**，否則迴圈會持續運轉；迴圈中回調擲出例外時會自動停止並重新擲出。
+
+---
+
+## 委派 {#delegates}
+
+```csharp
+public delegate void RealTimeUpdate(float deltaTime);
+public delegate void RealTimeFixedUpdate(float fixedDeltaTime);
+public delegate void RealTimeLateUpdate(float deltaTime);
+```
+
+## 成員 {#members}
+
+| 成員 | 說明 |
+| :--- | :--- |
+| `public RealTimeUpdate onUpdate` | 每輪更新回調 (參數為上一輪實際經過時間 deltaTime)。 |
+| `public RealTimeFixedUpdate onFixedUpdate` | 每輪固定間隔回調 (參數為 fixedDeltaTime)。 |
+| `public RealTimeLateUpdate onLateUpdate` | 每輪後更新回調 (於 onUpdate 之後觸發)。 |
+| `public float timeSinceStartup { get; }` | 自實例建立以來的經過時間 (秒，系統時鐘計算)。 |
+| `public float timeAtLastFrame { get; }` | 上一輪更新的時間點 (秒)。 |
+| `public float timeScale { get; set; }` | 自身時間尺度，**設值會被限制於 0 ~ 64** (預設 1)。 |
+| `public float targetFrameRate { get; set; }` | 目標更新頻率 (每秒次數)，負值會被歸 0 (預設 60)。 |
+| `public float deltaTime { get; }` | 上一輪的實際經過時間 (秒)。 |
+| `public float fixedDeltaTime { get; }` | 當前的固定間隔時間 (1 / 更新頻率)。 |
+
+## 建構子 {#constructors}
+
+```csharp
+public RTUpdater()
+```
+
+建立更新器並以建立當下的系統時間作為 `timeSinceStartup` 的基準點。
+
+---
+
+## 方法 {#methods}
+
+### 方法總覽 {#methods-overview}
+
+| 方法 | 說明 |
+| :--- | :--- |
+| [Start](#start) | 啟動更新迴圈。 |
+| [StartOnThread](#startonthread) | 啟動更新迴圈並切換至執行緒池運轉。 |
+| [Stop](#stop) | 停止更新迴圈。 |
+| [IsRunning](#isrunning) | 是否正在運轉中。 |
+
+---
+
+### Start {#start}
+
+```csharp
+public void Start()
+```
+
+啟動更新迴圈 (UniTask)，已在運轉中時再次呼叫**無作用**。
+
+### StartOnThread {#startonthread}
+
+```csharp
+public void StartOnThread()
+```
+
+啟動更新迴圈並**先切換至執行緒池 (`UniTask.SwitchToThreadPool`)** 運轉，已在運轉中時再次呼叫**無作用**。
+
+<Highlight color="#ff2f00">重要</Highlight> 回調可能於**非 Unity 主執行緒**執行，**請勿直接存取 UnityEngine 物件** (需自行封送回主執行緒)。
+
+<Highlight color="#0373fc">注意</Highlight> **WebGL 平台不支持多執行緒**，於 WebGL 上不會進行切換 (行為等同 [Start](#start))。
+
+### Stop {#stop}
+
+```csharp
+public void Stop()
+```
+
+停止更新迴圈並取消內部的 CancellationTokenSource；停止後可再次 [Start](#start) 重新啟動。
+
+### IsRunning {#isrunning}
+
+```csharp
+public bool IsRunning()
+```
+
+返回更新迴圈是否正在運轉中。

@@ -1,0 +1,70 @@
+---
+sidebar_position: 2
+---
+
+# AI Agent Skills
+
+export const Highlight = ({ children, color }) => (
+  <span
+    style={{
+      backgroundColor: color,
+      borderRadius: '5px',
+      color: '#fff',
+      padding: '2.5px'
+    }}>
+    {children}
+  </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+## 基本說明
+
+OxGKit 支援使用 **AI 編碼代理** (Claude Code、OpenAI Codex CLI、Cursor、Copilot 等) 輔助開發。**各系統模組**皆內建「**AI Agent Skills**」範例——一份 Agent Skill (`SKILL.md` 入口，YAML frontmatter ＋ 指令內容)，教導 AI 代理正確使用**該模組**的 API、編碼風格與常見陷阱，API 用法皆依該套件版本的源碼核實。
+
+<Highlight color="#0373fc">注意</Highlight> **所有模組的 Skill 資料夾/名稱皆為 `oxgkit-unity-skill`**，內容則為各模組專屬 (方便各模組獨立出貨)；若專案同時使用多個 OxGKit 模組，需**合併成一份 Skill** (詳見[合併多模組 Skill](#merge-skills))。
+
+---
+
+## 匯入與安裝 {#import-install}
+
+1. 透過 **Package Manager -> 選擇 OxGKit 模組 -> Samples -> AI Agent Skills** 匯入，檔案會複製到 `Assets/Samples/OxGKit.[模組名]/<version>/AI Agent Skills/`。
+2. 將 `oxgkit-unity-skill` 資料夾複製 (或建立符號連結) 到你的 AI 代理讀取技能的位置：
+
+| 代理 | 位置 |
+| :--- | :--- |
+| Claude Code | `<project>/.claude/skills/oxgkit-unity-skill/` (或 `~/.claude/skills/` 供所有專案共用) |
+| OpenAI Codex CLI | `<project>/.agents/skills/oxgkit-unity-skill/` (或 `~/.codex/skills/`) |
+| 其他代理 (Cursor、Copilot 等) | 於代理的上下文檔 (`AGENTS.md`、`CLAUDE.md`、`.cursorrules` 等) 引用該資料夾，例如：「使用 OxGKit.ActionSystem API 前先閱讀 `oxgkit-unity-skill/SKILL.md`」。 |
+
+<Highlight color="#0373fc">注意</Highlight> 技能**放入 skills 目錄，代理才會自動發現，並於任務相關時自動觸發** (按需載入，無需每次對話提醒)；若僅留在 `Assets/Samples/` 內，代理不會知道它的存在，且該路徑含版本號、升級後即失效。
+
+<Highlight color="#00d679">提醒</Highlight> 建議將 skills 目錄一併提交到版本控制，全團隊即可自動生效。
+
+3. 複製完成後，`Assets/Samples/` 下匯入的副本可自行刪除 (技能檔為純 Markdown，不需要留在 Unity 專案內；保留也無妨，會以 TextAsset 匯入)。
+
+---
+
+## 合併多模組 Skill {#merge-skills}
+
+所有 OxGKit 模組的 Skill 共用 `oxgkit-unity-skill` 資料夾/名稱，若專案同時使用多個模組，請**合併為一份 Skill 資料夾**：
+
+1. 保留**單一** `SKILL.md` 的 frontmatter 區塊 (`name: oxgkit-unity-skill`，並將 `description:` 合併為涵蓋你使用的所有模組)。
+2. 將各模組 Skill 的內文**串接**即可——每個模組的內文皆以自己的 `# OxGKit.[模組名] Unity Skill` 標題開頭，可直接依序附加。
+
+```
+.claude/skills/oxgkit-unity-skill/
+└── SKILL.md   <- 單一 frontmatter + 多個模組內文串接
+```
+
+---
+
+## 備註
+
+<Highlight color="#00d679">提醒</Highlight> 技能內容以英文撰寫 (任何語系的代理皆可讀取，回覆會依你的語言)；API 簽名依各套件版本核實，技能也會指示代理在有疑慮時，直接以安裝的套件源碼再次核對。
+
+<Highlight color="#0373fc">注意</Highlight> [OxGFrame](https://github.com/michael811125/OxGFrame) 框架另有專屬的 `oxgframe-unity-skill` (由 OxGFrame 提供)，兩者可並存於 skills 目錄。

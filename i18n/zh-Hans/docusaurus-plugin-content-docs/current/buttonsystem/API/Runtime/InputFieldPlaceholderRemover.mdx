@@ -1,0 +1,78 @@
+---
+sidebar_position: 2
+description: InputFieldPlaceholderRemover 是输入框小工具，在输入框聚焦时自动隐藏 Placeholder，离开聚焦后恢复显示，支持 InputField (Legacy) 与 TMP_InputField。
+---
+
+# InputFieldPlaceholderRemover
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`InputFieldPlaceholderRemover` 是 **ButtonSystem** 附带的输入框小工具 (`MonoBehaviour` 组件，详见[模块介绍](../../intro.mdx#inputfieldplaceholderremover))，挂载在 **InputField (Legacy)** 或 **TMP_InputField** **同一对象**上，在输入框**聚焦 (编辑) 时自动隐藏 Placeholder**，离开聚焦后恢复显示；纯组件行为，**挂上即生效，无需任何 API 调用**。
+
+|  |  |
+| :--- | :--- |
+| **命名空间** | `OxGKit.ButtonSystem` |
+| **类型** | `public class InputFieldPlaceholderRemover : MonoBehaviour` |
+| **源码** | [InputFieldPlaceholderRemover.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/ButtonSystem/Scripts/Runtime/Core/InputField/InputFieldPlaceholderRemover.cs) |
+
+```csharp
+using OxGKit.ButtonSystem;
+```
+
+## 快速上手 {#quick-start}
+
+1. 在 **InputField (Legacy)** 或 **TMP_InputField** 所在对象上 **Add Component -> InputFieldPlaceholderRemover**。
+2. 完成，进入 Play Mode 点击输入框，Placeholder 会在聚焦时自动隐藏、失焦时恢复显示。
+
+也可在运行时动态挂载：
+
+```csharp
+using OxGKit.ButtonSystem;
+using TMPro;
+using UnityEngine;
+
+public class SetupInputField : MonoBehaviour
+{
+    public TMP_InputField inputField;
+
+    private void Awake()
+    {
+        // 挂载在输入框同一对象上即生效
+        this.inputField.gameObject.AddComponent<InputFieldPlaceholderRemover>();
+    }
+}
+```
+
+## 通用规则 {#general-rules}
+
+### 支持的输入框类型 {#supported-input-fields}
+
+| 输入框 | 实现方式 |
+| :--- | :--- |
+| `TMP_InputField` | 以 **onSelect / onDeselect** 事件驱动：选取时隐藏 Placeholder，取消选取时恢复显示。 |
+| `InputField` (Legacy) | 以 **isFocused** 在 `Update` 每帧轮询：聚焦时隐藏 Placeholder，失焦时恢复显示。 |
+
+### 挂载规则 {#attach-rules}
+
+- 组件在 `Awake` 自动获取**同一 GameObject** 上的 `InputField` 与 `TMP_InputField` 引用，**必须与输入框挂在同一对象上** (挂在父对象或子对象上无效)。
+- 本组件**无公开 API 成员**，行为全自动，无需 (也无法) 进行参数配置。
+
+<Highlight color="#0373fc">注意</Highlight> 输入框需正确指定 **Placeholder** (UGUI 默认结构即有)，组件是以 `placeholder.gameObject.SetActive` 进行隐藏/显示控制。
+
+<Highlight color="#00d679">提醒</Highlight> 在运行时动态挂载时，请确保输入框组件已存在于对象上再 `AddComponent`，让 `Awake` 能获取到输入框引用。

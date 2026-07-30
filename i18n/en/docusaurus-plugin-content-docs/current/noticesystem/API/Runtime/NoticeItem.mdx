@@ -1,0 +1,183 @@
+---
+sidebar_position: 2
+description: NoticeItem is the notice component mounted on the red-dot icon. It holds condition ID and data (NoticeInfo) registrations, shows its own GameObject when any condition matches, and auto-deregisters on OnDestroy.
+---
+
+# NoticeItem
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`NoticeItem` is the notice component (`MonoBehaviour`) mounted on the **red-dot icon (ICON)**. It holds **condition ID and data ([NoticeInfo](./NoticeCondition.mdx#noticeinfo)) registrations** and automatically shows its own GameObject when **any held condition matches**. Import the **NoticeItem Prefab** via **Package Manager -> Samples** and drag it onto the UI to use it directly, or mount it yourself via **Add Component -> OxGKit -> NoticeSystem -> NoticeItem**.
+
+|  |  |
+| :--- | :--- |
+| **Namespace** | `OxGKit.NoticeSystem` |
+| **Type** | `[DisallowMultipleComponent] public class NoticeItem : MonoBehaviour` |
+| **Source** | [NoticeItem.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/NoticeSystem/Scripts/Runtime/Core/NoticeItem.cs) |
+
+```csharp
+using OxGKit.NoticeSystem;
+```
+
+## Quick Start {#quick-start}
+
+```csharp
+using OxGKit.NoticeSystem;
+using UnityEngine;
+
+public class MailUI : MonoBehaviour
+{
+    // Drag the NoticeItem prefab onto the UI, then assign the reference
+    public NoticeItem mailNoticeItem;
+
+    private MailBox _mailBox = new MailBox();
+
+    private void Awake()
+    {
+        // Register the condition and data (registration auto-checks the condition and refreshes the display)
+        this.mailNoticeItem.RegisterNotice
+        (
+            new NoticeInfo(NewMailCond.id, this._mailBox)
+        );
+    }
+
+    public void ReceiveMail()
+    {
+        // After the data changes, notify to refresh the red-dot display
+        this._mailBox.unreadCount++;
+        this.mailNoticeItem.Notify();
+    }
+}
+```
+
+## General Rules {#general-rules}
+
+### Visibility Rules {#visible-rules}
+
+- A single NoticeItem can hold **multiple conditions**. It shows its own GameObject when **any held condition matches** (`ShowCondition` returns `true`) and hides it when **none** match (OR logic).
+
+<Highlight color="#ff2f00">Important</Highlight> A NoticeItem toggles **its own GameObject** — make the red dot a **child icon node** under the button, do not mount it on the button itself, or the button will be hidden along with it.
+
+<Highlight color="#00d679">Reminder</Highlight> For **AND logic**, put the whole predicate inside a **single condition class**'s `ShowCondition`.
+
+### Auto Deregistration {#auto-deregister}
+
+<Highlight color="#0373fc">Attention</Highlight> When a NoticeItem is **OnDestroy**, it **automatically calls [DeregisterNotice](#deregisternotice)** to remove all of its held conditions.
+
+<Highlight color="#00d679">Reminder</Highlight> Recycling **pooled UI** does not trigger OnDestroy — call [DeregisterNotice](#deregisternotice) yourself on recycle to avoid stale registrations.
+
+### Value-Type Data {#value-type-data}
+
+<Highlight color="#ff2f00">Important</Highlight> For **value-type** data (such as `int`), `NoticeInfo.data` stores a **snapshot** — after the data changes, you must update it via [RenewNotice](#renewnotice) and then Notify; **reference-type** data is held by reference, so Notify alone is enough after changes.
+
+---
+
+## Method Overview {#overview}
+
+| Method | Description |
+| :--- | :--- |
+| [HasCondition](#hascondition) | Checks whether the item holds the given condition ID. |
+| [Notify](#notify) | Notifies all conditions held by this item to refresh the display. |
+| [RenewNotice](#renewnotice) | Renews the condition data (Method Chaining); auto-registers when not held. |
+| [RegisterNotice](#registernotice) | Registers conditions with data, then auto-checks conditions and refreshes the display. |
+| [DeregisterNotice](#deregisternotice) | Deregisters the given conditions (no arguments = deregister all). |
+
+---
+
+### HasCondition {#hascondition}
+
+```csharp
+public bool HasCondition(int conditionId)
+```
+
+Checks whether this item holds a registration for the given condition ID.
+
+```csharp
+if (this.mailNoticeItem.HasCondition(NewMailCond.id))
+{
+    // ...
+}
+```
+
+### Notify {#notify}
+
+```csharp
+public void Notify()
+```
+
+Notifies **all condition IDs held by this item** through [NoticeManager.Notify](./NoticeManager.mdx#notify) to refresh the display.
+
+```csharp
+// After the data changes (reference type), notify directly to refresh
+this._mailBox.unreadCount++;
+this.mailNoticeItem.Notify();
+```
+
+### RenewNotice {#renewnotice}
+
+```csharp
+public NoticeItem RenewNotice(NoticeInfo noticeInfo)
+```
+
+Renews the data of the given condition (returns itself for **Method Chaining**); when the condition is **not held yet**, it automatically falls back to [RegisterNotice](#registernotice).
+
+```csharp
+// Value-type data is a snapshot — RenewNotice to update the data first, then Notify to refresh
+this._coin++;
+this.coinNoticeItem.RenewNotice(new NoticeInfo(CoinInWalletCond.id, this._coin)).Notify();
+```
+
+### RegisterNotice {#registernotice}
+
+```csharp
+public void RegisterNotice(params NoticeInfo[] noticeInfos)
+```
+
+Registers conditions with data ([NoticeInfo](./NoticeCondition.mdx#noticeinfo)), then **auto-checks the conditions and refreshes the display**; **registering the same condition again renews its data** and notifies once more.
+
+```csharp
+// A single NoticeItem can hold multiple conditions (the red dot shows when any condition matches)
+this.walletNoticeItem.RegisterNotice
+(
+    // Value-type data
+    new NoticeInfo(CoinInWalletCond.id, this._coin),
+    // Reference-type data
+    new NoticeInfo(CoinIsEvenCond.id, this._wallet)
+);
+```
+
+<Highlight color="#0373fc">Attention</Highlight> The condition must already be registered via [NoticeManager.RegisterCondition](./NoticeManager.mdx#registercondition) beforehand, otherwise its condition ID cannot be resolved (returns `0`).
+
+### DeregisterNotice {#deregisternotice}
+
+```csharp
+public void DeregisterNotice(params int[] conditionIds)
+```
+
+Deregisters the given condition IDs; **called without arguments it deregisters all conditions held by this item**, then re-checks the conditions and refreshes the display.
+
+```csharp
+// Deregister specific conditions
+this.walletNoticeItem.DeregisterNotice(CoinInWalletCond.id);
+
+// No arguments => deregister all held conditions
+this.walletNoticeItem.DeregisterNotice();
+```
+
+<Highlight color="#00d679">Reminder</Highlight> This method is **called automatically** on OnDestroy to deregister all held conditions — usually no manual handling is needed (except for pooled UI recycling).

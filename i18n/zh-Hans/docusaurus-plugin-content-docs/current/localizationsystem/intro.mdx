@@ -1,0 +1,199 @@
+---
+sidebar_position: 1
+---
+
+# 模块介绍
+
+export const Highlight = ({ children, color }) => (
+  <span
+    style={{
+      backgroundColor: color,
+      borderRadius: '5px',
+      color: '#fff',
+      padding: '2.5px'
+    }}>
+    {children}
+  </span>
+);
+
+<Highlight color="#ff2f00">重要</Highlight> <Highlight color="#0373fc">注意</Highlight> <Highlight color="#00d679">提醒</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+## 基本说明
+
+本地化系统，支持**自定义解表方式**与**自定义支持语系**。本模块为**回调驱动**的本地化核心：语言表数据来源由项目自行提供 (JSON、表格导出、服务器、游戏数据库等)，通过回调交由 `Localization` 进行**支持语系管理**、**语系切换**与**代码取字 (Code -> Text)**。
+
+- 版本：**v1.0.2** (`com.michaelo.oxgkit.localizationsystem`)
+- 命名空间：`OxGKit.LocalizationSystem`
+
+<Highlight color="#00d679">提醒</Highlight> 本模块**无任何第三方依赖**，可独立安装使用。
+
+---
+
+## 应用说明
+
+### 必须实现的回调
+
+必须实现以下回调进行初始配置：
+
+| 回调 | 类型 | 说明 |
+| :--- | :--- | :--- |
+| `Localization.onAddSupportedLanguages` | `Action<HashSet<LangType>>` | 新增支持语系 (声明项目支持哪些语系)。 |
+| `Localization.onParsingLanguageData` | `Func<LangType, Dictionary<string, string>, bool>` | 解析语言表数据 (将指定语系的 Code -> Text 填入 `langData`)，解析成功返回 `true`。 |
+| `Localization.onChangeLanguage` | `Action<LangType>` | 切换语系成功后通知 (在此刷新 UI 文字)。 |
+
+<Highlight color="#ff2f00">重要</Highlight> 必须在**首次调用 `ChangeLanguage` 前**完成 `onAddSupportedLanguages` 与 `onParsingLanguageData` 的赋值；若 `onParsingLanguageData` **未赋值或解析失败**，`ChangeLanguage` 会**抛出异常**。
+
+### 语系切换流程
+
+1. 赋值上述回调 (解表所需的数据来源需先准备完成，例如已下载/读取的语言表)。
+2. 调用 `Localization.ChangeLanguage(langType)`：内部会先通过 `onParsingLanguageData` 解表，再验证是否属于支持语系，通过后**缓存语言表数据**、更新 `currentLanguage`，最后触发 `onChangeLanguage`。
+3. UI 一律通过 `Localization.GetStringByCode("code")` 获取当前语系的对应文字。
+
+<Highlight color="#0373fc">注意</Highlight> 切换**不支持的语系**仅会输出警告并**维持当前语系**；`GetStringByCode` 查无代码时会返回 `"Unknown Text"` (QA 验证时可视为缺漏字符串代码的信号)。
+
+### 系统语系检测与回退
+
+- `Localization.systemLanguage` 会将 OS 系统语言 (`UnityEngine.Application.systemLanguage`) 对应为 `LangType`，若不属于支持语系则**一律回退 `LangType.English`**。
+- 可搭配 `Localization.GetAndCheckIsSupportedLanguage(langType)` 校正玩家保存的语系值 (不支持时回退 English)。
+
+### 语系保存
+
+<Highlight color="#00d679">提醒</Highlight> 模块本身**不负责保存所选语系**，由项目自行保存/还原 `LangType` (例如 `PlayerPrefs` 或搭配保存系统)，还原时建议先以 `GetAndCheckIsSupportedLanguage` 校正再切换。
+
+---
+
+## 简单使用
+
+### 初始配置 (Localization Config)
+
+```csharp
+using System.Collections.Generic;
+using OxGKit.LocalizationSystem;
+
+#region Localization Config
+/// <summary>
+/// Initialize localization config
+/// </summary>
+public static void InitializeLocalization()
+{
+    // Add supported languages
+    Localization.onAddSupportedLanguages = AddSupportedLanguages;
+
+    // Parsing language table data
+    Localization.onParsingLanguageData = ParsingLanguageData;
+}
+
+/// <summary>
+/// Handle by Localization.onAddSupportedLanguages
+/// </summary>
+/// <param name="supportedLanguages"></param>
+public static void AddSupportedLanguages(HashSet<LangType> supportedLanguages)
+{
+    supportedLanguages.Add(LangType.English);
+    supportedLanguages.Add(LangType.ChineseTraditional);
+    supportedLanguages.Add(LangType.ChineseSimplified);
+    supportedLanguages.Add(LangType.Japanese);
+    supportedLanguages.Add(LangType.Korean);
+}
+
+/// <summary>
+/// Handle by Localization.onParsingLanguageData
+/// </summary>
+/// <param name="langType"></param>
+/// <param name="langData"></param>
+/// <returns></returns>
+public static bool ParsingLanguageData(LangType langType, Dictionary<string, string> langData)
+{
+    // Your lang sheet (can load from json or server)
+    if (langSheet.ContainsKey(langType.ToString()))
+    {
+        // The ref langData will be cached by Localization
+        foreach (var pair in langSheet[langType.ToString()])
+            langData.TryAdd(pair.Key, pair.Value);
+        return true;
+    }
+    return false;
+}
+#endregion
+```
+
+### UI 刷新 (UI View Logic)
+
+```csharp
+#region UI View Logic
+/// <summary>
+/// Init events
+/// </summary>
+private void _InitEvents()
+{
+    // Refresh lang text callback
+    Localization.onChangeLanguage += this._RefreshLanguage;
+}
+
+/// <summary>
+/// Handle by Localization.onChangeLanguage
+/// </summary>
+private void _RefreshLanguage(LangType langType)
+{
+    if (this.texts != null)
+    {
+        this.texts[0].text = Localization.GetStringByCode("Str1");
+        this.texts[1].text = Localization.GetStringByCode("Str2");
+        this.texts[2].text = Localization.GetStringByCode("Str3");
+    }
+}
+#endregion
+```
+
+### 切换语系
+
+```csharp
+// 初始配置后，于启动流程进行首次切换 (还原玩家保存的语系，无保存则回退系统语系)
+InitializeLocalization();
+var savedLang = (LangType)PlayerPrefs.GetInt("language", (int)Localization.systemLanguage);
+Localization.ChangeLanguage(Localization.GetAndCheckIsSupportedLanguage(savedLang));
+
+// 语言菜单切换 (切换成功后会触发 onChangeLanguage 刷新 UI)
+Localization.ChangeLanguage(LangType.Japanese);
+
+// 保存所选语系 (模块不负责保存)
+PlayerPrefs.SetInt("language", (int)Localization.currentLanguage);
+```
+
+*[参考 Example]*
+
+---
+
+## Installation
+
+| Install via git URL |
+|:--- |
+| Add https://github.com/michael811125/OxGKit.git?path=Assets/OxGKit/LocalizationSystem/Scripts to Package Manager |
+
+**第三方库**
+
+- 无 (本模块无任何第三方依赖)。
+
+**Samples (Package Manager -> Samples)**
+
+- **AI Agent Skills** (参考 [AI Agent Skills](/docs/agent-skills))
+- **Localization Demo**
+
+---
+
+## 模块 API
+
+- Runtime
+  - [Localization](/docs/localizationsystem/API/Runtime/Localization) (using OxGKit.LocalizationSystem)
+
+---
+
+## Demo
+
+**Localization Demo**
+
+![](/img/localizationsystem/gif_3.gif)

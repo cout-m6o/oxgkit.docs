@@ -1,0 +1,127 @@
+---
+sidebar_position: 5
+description: IntervalTimer is a JavaScript-setInterval-style interval ticker (UniTask-driven) that fires an Action every specified milliseconds, supporting ignoreTimeScale and thread-pool execution.
+---
+
+# IntervalTimer
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`IntervalTimer` is a **JavaScript-setInterval-style interval ticker** (UniTask-driven) that fires an `Action` every specified milliseconds, supporting `ignoreTimeScale` (whether to ignore `Time.timeScale`) and `SetIntervalOnThread` (running on the thread pool). It can also be created and managed centrally through the static manager [IntervalSetter](./IntervalSetter.mdx).
+
+|  |  |
+| :--- | :--- |
+| **Namespace** | `OxGKit.TimeSystem` |
+| **Type** | `public class IntervalTimer` |
+| **Source** | [IntervalTimer.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/TimeSystem/Scripts/Runtime/Core/Ticker/IntervalTimer.cs) |
+
+```csharp
+using OxGKit.TimeSystem;
+```
+
+## Quick Start {#quick-start}
+
+```csharp
+using OxGKit.TimeSystem;
+
+var intervalTimer = new IntervalTimer();
+
+// Fire every 1000 milliseconds
+intervalTimer.SetInterval(() =>
+{
+    // Periodic work
+}, 1000);
+
+// Always stop when the feature exits
+intervalTimer.StopInterval();
+```
+
+## General Rules {#general-rules}
+
+- The **first trigger** fires **after the first interval** (wait first, then invoke), and it keeps cycling afterwards.
+- While an instance is **already running**, calling `SetInterval` / `SetIntervalOnThread` again has **no effect** — call [StopInterval](#stopinterval) first, then set it again.
+- `ignoreTimeScale` defaults to false: the interval is measured in **Unity scaled time** (no triggering while `Time.timeScale = 0`); set it to true to measure in **unscaled time**.
+
+<Highlight color="#ff2f00">Important</Highlight> The interval ticking is a **UniTask loop** — when the owner (feature/scene) exits, **always call [StopInterval](#stopinterval)**, otherwise the loop keeps running; if the callback throws inside the loop, the timer stops automatically and rethrows.
+
+---
+
+## Constructors {#constructors}
+
+```csharp
+public IntervalTimer()
+```
+
+Creates the interval ticker (call [SetInterval](#setinterval) afterwards to start it).
+
+---
+
+## Methods {#methods}
+
+### Method Overview {#methods-overview}
+
+| Method | Description |
+| :--- | :--- |
+| [SetInterval](#setinterval) | Starts interval ticking (fires an Action every specified milliseconds). |
+| [SetIntervalOnThread](#setintervalonthread) | Starts interval ticking switched to the thread pool. |
+| [StopInterval](#stopinterval) | Stops interval ticking. |
+| [IsRunning](#isrunning) | Whether the ticker is running. |
+
+---
+
+### SetInterval {#setinterval}
+
+```csharp
+public void SetInterval(Action action, int milliseconds, bool ignoreTimeScale = false)
+```
+
+Starts interval ticking, invoking `action` every `milliseconds` milliseconds; calling it again while already running has **no effect**.
+
+```csharp
+// Fire every 500 milliseconds, ignoring Time.timeScale
+intervalTimer.SetInterval(() => { /* ... */ }, 500, true);
+```
+
+### SetIntervalOnThread {#setintervalonthread}
+
+```csharp
+public void SetIntervalOnThread(Action action, int milliseconds, bool ignoreTimeScale = false)
+```
+
+Starts interval ticking **switched to the thread pool first (`UniTask.SwitchToThreadPool`)**; calling it again while already running has **no effect**.
+
+<Highlight color="#ff2f00">Important</Highlight> The callback may run **off the Unity main thread** — **do not access UnityEngine objects directly** (marshal back to the main thread yourself).
+
+<Highlight color="#0373fc">Attention</Highlight> **WebGL does not support multithreading** — no switch happens on WebGL (behaves the same as [SetInterval](#setinterval)).
+
+### StopInterval {#stopinterval}
+
+```csharp
+public void StopInterval()
+```
+
+Stops interval ticking and cancels the internal CancellationTokenSource; after stopping, [SetInterval](#setinterval) can be called again to restart.
+
+### IsRunning {#isrunning}
+
+```csharp
+public bool IsRunning()
+```
+
+Returns whether the interval ticker is currently running.

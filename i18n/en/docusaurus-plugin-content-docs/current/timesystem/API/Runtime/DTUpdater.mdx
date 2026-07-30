@@ -1,0 +1,142 @@
+---
+sidebar_position: 3
+description: DTUpdater is a UniTask update loop independent of MonoBehaviour, exposing onUpdate, onFixedUpdate, and onLateUpdate callbacks with configurable targetFrameRate and timeScale, multiplied by Unity Time.timeScale.
+---
+
+# DTUpdater
+
+export const Highlight = ({ children, color }) => (
+    <span
+        style={{
+            backgroundColor: color,
+            borderRadius: '5px',
+            color: '#fff',
+            padding: '2.5px'
+        }}>
+        {children}
+    </span>
+);
+
+<Highlight color="#ff2f00">Important</Highlight> <Highlight color="#0373fc">Attention</Highlight> <Highlight color="#00d679">Reminder</Highlight>
+
+### [Coding Style wiki](https://github.com/michael811125/OxGFrame/wiki/Coding-Style)
+
+---
+
+`DTUpdater` is an **update loop independent of MonoBehaviour** (UniTask-driven), exposing `onUpdate`, `onFixedUpdate`, and `onLateUpdate` callbacks with a configurable **targetFrameRate (loop frequency)** and **timeScale (own time scale)**. The loop frequency is **multiplied by Unity's `Time.timeScale`** — with `Time.timeScale = 0` the loop idles (follows game pause) — making it suitable for driving non-MonoBehaviour systems that should follow game time.
+
+|  |  |
+| :--- | :--- |
+| **Namespace** | `OxGKit.TimeSystem` |
+| **Type** | `public class DTUpdater` |
+| **Source** | [DTUpdater.cs](https://github.com/michael811125/OxGKit/blob/master/Assets/OxGKit/TimeSystem/Scripts/Runtime/Core/Updater/DTUpdater.cs) |
+
+```csharp
+using OxGKit.TimeSystem;
+```
+
+## Quick Start {#quick-start}
+
+```csharp
+using OxGKit.TimeSystem;
+
+var dtUpdater = new DTUpdater();
+
+// Subscribe update callbacks
+dtUpdater.onUpdate += (dt) => { /* per update (actual elapsed time) */ };
+dtUpdater.onFixedUpdate += (fdt) => { /* fixed-interval update */ };
+dtUpdater.onLateUpdate += (dt) => { /* late update */ };
+
+// Configurable loop frequency and time scale
+dtUpdater.targetFrameRate = 60f; // default 60
+dtUpdater.timeScale = 1f;        // 0 ~ 64, default 1
+
+// Start the update loop
+dtUpdater.Start();
+
+// Always stop when the feature exits
+dtUpdater.Stop();
+```
+
+## General Rules {#general-rules}
+
+### Loop Frequency and Time Scaling {#update-rate}
+
+- Per cycle, the loop frequency = `targetFrameRate` × (`Time.timeScale` × `timeScale`), and the wait interval is `fixedDeltaTime = 1 / frequency`.
+- Each cycle fires in order: `onFixedUpdate(fixedDeltaTime)` → `onUpdate(deltaTime)` → `onLateUpdate(deltaTime)`, where `deltaTime` is the **actual elapsed time of the previous cycle** measured by the system clock, and `fixedDeltaTime` is the fixed interval value.
+
+<Highlight color="#0373fc">Attention</Highlight> The loop only runs while **`Time.timeScale` is greater than 0 AND `targetFrameRate` is greater than 0 AND `timeScale` is greater than 0**; if any of them is 0, the loop **idles** (no callbacks) — so a `DTUpdater` **follows Unity game pause**. For an update loop unaffected by `Time.timeScale`, use an [RTUpdater](./RTUpdater.mdx) instead (see [Picking the Right Tool](../../intro.mdx#picking-the-right-tool-by-time-base)).
+
+### Lifecycle {#lifecycle}
+
+<Highlight color="#ff2f00">Important</Highlight> The update loop is a **UniTask loop** — when the owner (feature/scene) exits, **always call [Stop](#stop)**, otherwise the loop keeps running; if a callback throws inside the loop, the updater stops automatically and rethrows.
+
+---
+
+## Delegates {#delegates}
+
+```csharp
+public delegate void DeltaTimeUpdate(float deltaTime);
+public delegate void DeltaTimeFixedUpdate(float fixedDeltaTime);
+public delegate void DeltaTimeLateUpdate(float deltaTime);
+```
+
+## Members {#members}
+
+| Member | Description |
+| :--- | :--- |
+| `public DeltaTimeUpdate onUpdate` | Per-cycle update callback (parameter is the previous cycle's actual elapsed deltaTime). |
+| `public DeltaTimeFixedUpdate onFixedUpdate` | Per-cycle fixed-interval callback (parameter is fixedDeltaTime). |
+| `public DeltaTimeLateUpdate onLateUpdate` | Per-cycle late-update callback (fires after onUpdate). |
+| `public float timeSinceStartup { get; }` | Elapsed time since instance creation (seconds, system clock). |
+| `public float timeAtLastFrame { get; }` | Time point of the previous cycle (seconds). |
+| `public float timeScale { get; set; }` | Own time scale; **assigned values are clamped to 0 ~ 64** (default 1). |
+| `public float targetFrameRate { get; set; }` | Target loop frequency (times per second); negative values are clamped to 0 (default 60). |
+| `public float deltaTime { get; }` | Actual elapsed time of the previous cycle (seconds). |
+| `public float fixedDeltaTime { get; }` | Current fixed interval (1 / frequency). |
+
+## Constructors {#constructors}
+
+```csharp
+public DTUpdater()
+```
+
+Creates the updater, using the system time at creation as the base for `timeSinceStartup`.
+
+---
+
+## Methods {#methods}
+
+### Method Overview {#methods-overview}
+
+| Method | Description |
+| :--- | :--- |
+| [Start](#start) | Starts the update loop. |
+| [Stop](#stop) | Stops the update loop. |
+| [IsRunning](#isrunning) | Whether the loop is running. |
+
+---
+
+### Start {#start}
+
+```csharp
+public void Start()
+```
+
+Starts the update loop (UniTask); calling it again while already running has **no effect**.
+
+### Stop {#stop}
+
+```csharp
+public void Stop()
+```
+
+Stops the update loop and cancels the internal CancellationTokenSource; after stopping, [Start](#start) can be called again to restart.
+
+### IsRunning {#isrunning}
+
+```csharp
+public bool IsRunning()
+```
+
+Returns whether the update loop is currently running.
