@@ -4,8 +4,8 @@
   <ShortName>OxGKit</ShortName>
   <Description>Search OxGKit</Description>
   <InputEncoding>UTF-8</InputEncoding>
-  <Image width="16" height="16" type="image/x-icon">https://your-docusaurus-site.example.com/img/oxgkit_logo_v1.png</Image>
-  <Url type="text/html" method="get" template="https://your-docusaurus-site.example.com/search?q={searchTerms}"/>
-  <Url type="application/opensearchdescription+xml" rel="self" template="https://your-docusaurus-site.example.com/opensearch.xml" />
-  <moz:SearchForm>https://your-docusaurus-site.example.com/</moz:SearchForm>
+  <Image width="16" height="16" type="image/x-icon">https://oxgkit.ouhiyo.com/img/oxgkit_logo_v1.png</Image>
+  <Url type="text/html" method="get" template="https://oxgkit.ouhiyo.com/search?q={searchTerms}"/>
+  <Url type="application/opensearchdescription+xml" rel="self" template="https://oxgkit.ouhiyo.com/opensearch.xml" />
+  <moz:SearchForm>https://oxgkit.ouhiyo.com/</moz:SearchForm>
 </OpenSearchDescription>
