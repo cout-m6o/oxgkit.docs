@@ -11,6 +11,10 @@ jobs:
   deploy:
     name: Deploy to GitHub Pages
     runs-on: ubuntu-latest
+    # 新版 GitHub repo 的 GITHUB_TOKEN 預設唯讀，需明確授予寫入權限，
+    # peaceiris/actions-gh-pages 才能推送 gh-pages 分支
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
