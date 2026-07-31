@@ -12,7 +12,7 @@
 <link rel="search" type="application/opensearchdescription+xml" title="OxGKit" href="/en/opensearch.xml">
 
 <meta name="algolia-site-verification" content="75C44350211053A6"><link rel="stylesheet" href="/en/assets/css/styles.c049dc96.css">
-<script src="/en/assets/js/runtime~main.73e8b7cf.js" defer="defer"></script>
+<script src="/en/assets/js/runtime~main.913df1f2.js" defer="defer"></script>
 <script src="/en/assets/js/main.809db7fe.js" defer="defer"></script>
 </head>
 <body>
@@ -51,8 +51,8 @@
 </ul>
 <h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="script-templates-right-click">Script Templates (Right-Click)<a href="#script-templates-right-click" class="hash-link" aria-label="Direct link to Script Templates (Right-Click)" title="Direct link to Script Templates (Right-Click)" translate="no">​</a></h3>
 <ul>
-<li class="">Use Right-Click <strong>Create/OxGKit/Input System/Template Input Action.cs (Input Interface For Any)</strong> to implement the InputAction interface (universal signal dispatcher).</li>
-<li class="">Use Right-Click <strong>Create/OxGKit/Input System/New Input System (Extension)/Template Input Binding Composite.cs (For Unity New Input System)</strong> to create a Binding Composite script for Unity New InputSystem (custom composite input).</li>
+<li class="">Use Right-Click <strong>Create/OxGKit/Input System/Template Input Action.cs (Input Interface For Any)</strong> to implement the InputAction interface (universal signal dispatcher); <strong>after creation, at game startup</strong> register <code>Inputs.CM.RegisterControlMap</code> and then <code>Inputs.IA.RegisterInputAction</code> to activate it (see &quot;Simple Usage&quot; below).</li>
+<li class="">Use Right-Click <strong>Create/OxGKit/Input System/New Input System (Extension)/Template Input Binding Composite.cs (For Unity New Input System)</strong> to <strong>implement your own custom Binding Composite</strong> (combining multiple input parts into a single input value); the template ships with <strong>automatic registration at startup</strong>, so once created it becomes selectable in the <strong>Input Action Asset</strong>&#x27;s binding list (see <a class="" href="/en/docs/inputsystem/API/Runtime/IInputAction#script-templates">IInputAction - Script Templates</a>).</li>
 </ul>
 <p><span style="background-color:#00d679;border-radius:5px;color:#fff;padding:2.5px">Reminder</span> The Editor part of this module only provides the <strong>script-template MenuItems</strong> above (<code>InputSystemCreateScriptEditor</code>) as a script-creation helper; there is no other Editor API.</p>
 <h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="using-the-inputs-api">Using the Inputs API<a href="#using-the-inputs-api" class="hash-link" aria-label="Direct link to Using the Inputs API" title="Direct link to Using the Inputs API" translate="no">​</a></h3>

@@ -4,7 +4,7 @@
         <title>OxGKit Blog</title>
         <link>https://oxgkit.ouhiyo.com/zh-Hans/blog</link>
         <description>OxGKit Blog</description>
-        <lastBuildDate>Fri, 31 Jul 2026 04:42:00 GMT</lastBuildDate>
+        <lastBuildDate>Fri, 31 Jul 2026 06:15:32 GMT</lastBuildDate>
         <docs>https://validator.w3.org/feed/docs/rss2.html</docs>
         <generator>https://github.com/jpmonette/feed</generator>
         <language>zh-Hans</language>
@@ -12,7 +12,7 @@
             <title><![CDATA[Welcome]]></title>
             <link>https://oxgkit.ouhiyo.com/zh-Hans/blog/welcome</link>
             <guid>https://oxgkit.ouhiyo.com/zh-Hans/blog/welcome</guid>
-            <pubDate>Fri, 31 Jul 2026 04:42:00 GMT</pubDate>
+            <pubDate>Fri, 31 Jul 2026 06:15:32 GMT</pubDate>
             <description><![CDATA[欢迎使用 OxGKit Unity 系统工具组。]]></description>
             <content:encoded><![CDATA[<p>欢迎使用 OxGKit Unity 系统工具组。</p>
 <p><strong>OxGKit 皆为独立工具系统，需要什么装什么，若您的项目使用了 OxGKit，欢迎联络作者，作者很乐意将您的作品展示出来。</strong></p>

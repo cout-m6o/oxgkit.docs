@@ -12,7 +12,7 @@
 <link rel="search" type="application/opensearchdescription+xml" title="OxGKit" href="/opensearch.xml">
 
 <meta name="algolia-site-verification" content="75C44350211053A6"><link rel="stylesheet" href="/assets/css/styles.c049dc96.css">
-<script src="/assets/js/runtime~main.5850b774.js" defer="defer"></script>
+<script src="/assets/js/runtime~main.e7753d0e.js" defer="defer"></script>
 <script src="/assets/js/main.5526b95f.js" defer="defer"></script>
 </head>
 <body>
@@ -51,8 +51,8 @@
 </ul>
 <h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="腳本模板-right-click">腳本模板 (Right-Click)<a href="#腳本模板-right-click" class="hash-link" aria-label="腳本模板 (Right-Click)的直接連結" title="腳本模板 (Right-Click)的直接連結" translate="no">​</a></h3>
 <ul>
-<li class="">透過 Right-Click <strong>Create/OxGKit/Input System/Template Input Action.cs (Input Interface For Any)</strong> 實作 InputAction 介面 (通用訊號派送者)。</li>
-<li class="">透過 Right-Click <strong>Create/OxGKit/Input System/New Input System (Extension)/Template Input Binding Composite.cs (For Unity New Input System)</strong> 建立 Unity New InputSystem 的 Binding Composite 腳本 (自定義組合輸入)。</li>
+<li class="">透過 Right-Click <strong>Create/OxGKit/Input System/Template Input Action.cs (Input Interface For Any)</strong> 實作 InputAction 介面 (通用訊號派送者)；<strong>建立後於遊戲開始時</strong>依序註冊 <code>Inputs.CM.RegisterControlMap</code> 與 <code>Inputs.IA.RegisterInputAction</code> 即可生效 (參考下方「簡單使用」)。</li>
+<li class="">透過 Right-Click <strong>Create/OxGKit/Input System/New Input System (Extension)/Template Input Binding Composite.cs (For Unity New Input System)</strong> 可<strong>自行實現自定義的 Binding Composite</strong> (將多個輸入部件組合成單一輸入值)；模板已內建<strong>啟動時自動註冊</strong>機制，建立後即可於 <strong>Input Action Asset</strong> 的 Binding 清單中選用 (詳見 <a class="" href="/docs/inputsystem/API/Runtime/IInputAction#script-templates">IInputAction - 腳本模板</a>)。</li>
 </ul>
 <p><span style="background-color:#00d679;border-radius:5px;color:#fff;padding:2.5px">提醒</span> 本模組的 Editor 部分僅提供以上<strong>腳本模板 MenuItems</strong> (<code>InputSystemCreateScriptEditor</code>)，作為腳本建立輔助，無其他 Editor API。</p>
 <h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="調用-inputs-api">調用 Inputs API<a href="#調用-inputs-api" class="hash-link" aria-label="調用 Inputs API的直接連結" title="調用 Inputs API的直接連結" translate="no">​</a></h3>
