@@ -23,6 +23,17 @@ const config = {
   tagline: 'Unity Toolkit',
   favicon: 'img/oxgkit_logo_v1.png',
 
+  // Algolia Crawler 網域所有權驗證 (meta tag 會注入全站每頁的 <head>)
+  headTags: [
+    {
+      tagName: 'meta',
+      attributes: {
+        name: 'algolia-site-verification',
+        content: '75C44350211053A6',
+      },
+    },
+  ],
+
   // Set the production url of your site here
   url: 'https://your-docusaurus-site.example.com',
   // Set the /<baseUrl>/ pathname under which your site is served
@@ -206,15 +217,24 @@ const config = {
         darkTheme: prismThemes.dracula,
         additionalLanguages: ['csharp', 'cpp'],
       },
-      // TODO: 申請 Algolia DocSearch (https://docsearch.algolia.com/apply/) 後，
-      // 填入 oxgkit.docs 專屬的 appId / apiKey / indexName 再啟用搜尋。
-      // algolia: {
-      //   appId: '',
-      //   apiKey: '',
-      //   indexName: '',
-      //   contextualSearch: true,
-      //   searchPagePath: 'search',
-      // },
+      algolia: {
+        // The application ID provided by Algolia
+        appId: 'EX73BZFPFR',
+
+        // Public API key: it is safe to commit it
+        apiKey: '86fa4af760d5d41d558779bf64fcc813',
+
+        indexName: 'oxgkit-ouhiyo',
+
+        // Optional: see doc section below
+        contextualSearch: true,
+
+        // Optional: Algolia search parameters
+        searchParameters: {},
+
+        // Optional: path for search page that enabled by default (`false` to disable it)
+        searchPagePath: 'search',
+      },
     }),
 
   // Custom scripts
