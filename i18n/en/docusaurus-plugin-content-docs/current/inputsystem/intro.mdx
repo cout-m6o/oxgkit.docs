@@ -47,8 +47,8 @@ Input control system that supports **Unity New InputSystem**. When using Unity N
 
 ### Script Templates (Right-Click)
 
-- Use Right-Click **Create/OxGKit/Input System/Template Input Action.cs (Input Interface For Any)** to implement the InputAction interface (universal signal dispatcher).
-- Use Right-Click **Create/OxGKit/Input System/New Input System (Extension)/Template Input Binding Composite.cs (For Unity New Input System)** to create a Binding Composite script for Unity New InputSystem (custom composite input).
+- Use Right-Click **Create/OxGKit/Input System/Template Input Action.cs (Input Interface For Any)** to implement the InputAction interface (universal signal dispatcher); **after creation, at game startup** register `Inputs.CM.RegisterControlMap` and then `Inputs.IA.RegisterInputAction` to activate it (see "Simple Usage" below).
+- Use Right-Click **Create/OxGKit/Input System/New Input System (Extension)/Template Input Binding Composite.cs (For Unity New Input System)** to **implement your own custom Binding Composite** (combining multiple input parts into a single input value); the template ships with **automatic registration at startup**, so once created it becomes selectable in the **Input Action Asset**'s binding list (see [IInputAction - Script Templates](/docs/inputsystem/API/Runtime/IInputAction#script-templates)).
 
 <Highlight color="#00d679">Reminder</Highlight> The Editor part of this module only provides the **script-template MenuItems** above (`InputSystemCreateScriptEditor`) as a script-creation helper; there is no other Editor API.
 

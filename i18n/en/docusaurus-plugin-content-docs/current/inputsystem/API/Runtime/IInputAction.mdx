@@ -135,6 +135,12 @@ Inputs.IA.GetInputAction<PlayerAction>().RemoveAllListeners();
 
 Use Right-Click **Create/OxGKit/Input System/Template Input Action.cs (Input Interface For Any)** to quickly create an `IInputAction` implementation script (universal signal dispatcher — any input source can be implemented freely).
 
+**Activation flow after creation (at game startup):**
+
+1. (If using Unity New InputSystem) register the control map first via `Inputs.CM.RegisterControlMap`.
+2. Register the Input Action via `Inputs.IA.RegisterInputAction` (automatically triggers `OnCreate` for event binding).
+3. Drive updates from your main loop (Main MonoBehaviour) via `Inputs.IA.DriveUpdate(dt)` (see the [Module Intro](../../intro.mdx) for a complete example).
+
 ### Template Input Binding Composite.cs {#tpl-input-binding-composite}
 
 Use Right-Click **Create/OxGKit/Input System/New Input System (Extension)/Template Input Binding Composite.cs (For Unity New Input System)** to create a **Binding Composite** script for **Unity New InputSystem**, synthesizing several input parts into a single custom input value (e.g., "modifier key + direction keys" combined into a move input):
@@ -143,6 +149,12 @@ Use Right-Click **Create/OxGKit/Input System/New Input System (Extension)/Templa
 - Composite parts are declared with `[InputControl(layout = "...")]` (Button / Integer / Vector2 / Axis).
 - `ReadValue` reads each part, processes them, and returns the custom value.
 - `[InitializeOnLoad]` (Editor) and `[RuntimeInitializeOnLoadMethod]` trigger the static constructor that calls `InputSystem.RegisterBindingComposite` for automatic registration.
+
+**Activation flow after creation:**
+
+1. The template's static constructor **registers automatically at startup** (`InputSystem.RegisterBindingComposite`) — **no manual call needed**.
+2. Open the **Input Action Asset**, **Add Binding** on the target Action, pick your custom Composite from the composite list, and assign keys to each part.
+3. Read the custom value with `context.ReadValue` inside the Input Action's callback (see below).
 
 ```csharp
 // Read the custom composite value inside the Input Action's callback (demo's MoveInputComposite as an example)
