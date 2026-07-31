@@ -36,7 +36,7 @@ using Cysharp.Threading.Tasks;
 using OxGKit.Utilities.Requester;
 ```
 
-<Highlight color="#0373fc">注意</Highlight> 本页列出的 **static** 方法皆通过**内部懒汉式单例**运作；各方法皆有对应 **Self** 前缀的**实例方法** (例如 `SelfRequestTexture2D`)，可自行 `new Requester()` 创建**独立缓存范围**的实例使用。
+<Highlight color="#0373fc">注意</Highlight> 本页列出的 **static** 方法皆通过**内部懒汉式单例**运作；各方法皆有对应 **Self** 前缀的**实例方法** (例如 `SelfRequestTexture2D`)，可自行 `new Requester()` 创建**独立缓存范围**的实例使用 (详见[静态调用与实例调用](#static-vs-instance))。
 
 ## 快速上手 {#quick-start}
 
@@ -70,6 +70,34 @@ cts.Cancel();
 ```
 
 ## 通用规则 {#general-rules}
+
+### 静态调用与实例调用 (Self 系列) {#static-vs-instance}
+
+`Requester` 的**每个静态方法皆有对应 `Self` 前缀的实例方法** (`RequestTexture2D` ↔ `SelfRequestTexture2D`、`InitLRUCacheCapacityForText` ↔ `SelfInitLRUCacheCapacityForText` 等)，参数与行为完全相同，差别只在**缓存范围**：
+
+- **静态调用**：通过内部单例运作，全项目**共用同一组全局缓存**，一般情境使用这个即可。
+- **实例调用 (`new` 方式)**：自行 `new Requester()` 创建实例后调用 `Self*` 方法，该实例拥有**完全独立的缓存范围** (容量设置、清除、释放皆互不影响)，适合特定功能需要**自管缓存生命周期**的情境 (例如聊天室头像、活动页图片，离场时整批释放)。
+
+```csharp
+using OxGKit.Utilities.Requester;
+
+// 静态调用 (全局共用缓存)
+var tex = await Requester.RequestTexture2D(url);
+
+// 实例调用 (new 方式，创建独立缓存范围)
+var chatRequester = new Requester();
+
+// 为该实例初始独立的 LRU 缓存容量
+chatRequester.SelfInitLRUCacheCapacityForTexture2d(30);
+
+// 以 Self 方法发出请求 (缓存只进这个实例)
+var avatar = await chatRequester.SelfRequestTexture2D(avatarUrl);
+
+// 离场时整批释放该实例的缓存 (不影响全局缓存)
+chatRequester.SelfRelease();
+```
+
+<Highlight color="#00d679">提醒</Highlight> 本页后续章节以**静态签名**列出，**所有方法皆有同名的 `Self` 实例版本**，直接加上 `Self` 前缀即可对应调用。
 
 ### 缓存机制 {#cache-mechanism}
 
@@ -121,13 +149,13 @@ public struct ErrorInfo
 
 ### 方法总览 {#request-overview}
 
-| 方法 | 说明 |
-| :--- | :--- |
-| [RequestAudio](#requestaudio) | 请求 AudioClip (可缓存)。 |
-| [RequestTexture2D](#requesttexture2d) | 请求 Texture2D (可缓存)。 |
-| [RequestSprite](#requestsprite) | 请求并创建 Sprite (底层缓存 Texture2D)。 |
-| [RequestBytes](#requestbytes) | 请求文件 byte[] (不缓存)。 |
-| [RequestText](#requesttext) | 请求文本内容 (可缓存)。 |
+| 方法 (static) | Self 实例版本 (new 方式) | 说明 |
+| :--- | :--- | :--- |
+| [RequestAudio](#requestaudio) | `SelfRequestAudio` | 请求 AudioClip (可缓存)。 |
+| [RequestTexture2D](#requesttexture2d) | `SelfRequestTexture2D` | 请求 Texture2D (可缓存)。 |
+| [RequestSprite](#requestsprite) | `SelfRequestSprite` | 请求并创建 Sprite (底层缓存 Texture2D)。 |
+| [RequestBytes](#requestbytes) | `SelfRequestBytes` | 请求文件 byte[] (不缓存)。 |
+| [RequestText](#requesttext) | `SelfRequestText` | 请求文本内容 (可缓存)。 |
 
 ---
 
@@ -213,17 +241,17 @@ string json = await Requester.RequestText("https://example.com/config.json");
 
 ### 方法总览 {#cache-overview}
 
-| 方法 | 说明 |
-| :--- | :--- |
-| [InitARCCacheCapacityFor...](#init-arc) | 初始指定资源类型的 **ARC 缓存**容量 (会停用该类型的 LRU 缓存)。 |
-| [InitLRUCacheCapacityFor...](#init-lru) | 初始指定资源类型的 **LRU 缓存**容量 (会停用该类型的 ARC 缓存)。 |
-| [RemoveFromARCCacheFor...](#remove-arc) | 从指定资源类型的 ARC 缓存中移除 URL。 |
-| [RemoveFromLRUCacheFor...](#remove-lru) | 从指定资源类型的 LRU 缓存中移除 URL。 |
-| [ClearARCCacheCapacityFor...](#clear-arc) | 清空指定资源类型的 ARC 缓存。 |
-| [ClearLRUCacheCapacityFor...](#clear-lru) | 清空指定资源类型的 LRU 缓存。 |
-| [AutoRemoveFromCaches](#autoremovefromcaches) | 搜索所有缓存并移除指定 URL。 |
-| [ClearAllCaches](#clearallcaches) | 清空所有缓存。 |
-| [Release](#release) | 清空并释放所有缓存容器。 |
+| 方法 (static) | Self 实例版本 (new 方式) | 说明 |
+| :--- | :--- | :--- |
+| [InitARCCacheCapacityFor...](#init-arc) | `SelfInitARCCacheCapacityFor...` | 初始指定资源类型的 **ARC 缓存**容量 (会停用该类型的 LRU 缓存)。 |
+| [InitLRUCacheCapacityFor...](#init-lru) | `SelfInitLRUCacheCapacityFor...` | 初始指定资源类型的 **LRU 缓存**容量 (会停用该类型的 ARC 缓存)。 |
+| [RemoveFromARCCacheFor...](#remove-arc) | `SelfRemoveFromARCCacheFor...` | 从指定资源类型的 ARC 缓存中移除 URL。 |
+| [RemoveFromLRUCacheFor...](#remove-lru) | `SelfRemoveFromLRUCacheFor...` | 从指定资源类型的 LRU 缓存中移除 URL。 |
+| [ClearARCCacheCapacityFor...](#clear-arc) | `SelfClearARCCacheCapacityFor...` | 清空指定资源类型的 ARC 缓存。 |
+| [ClearLRUCacheCapacityFor...](#clear-lru) | `SelfClearLRUCacheCapacityFor...` | 清空指定资源类型的 LRU 缓存。 |
+| [AutoRemoveFromCaches](#autoremovefromcaches) | `SelfAutoRemoveFromCaches` | 搜索所有缓存并移除指定 URL。 |
+| [ClearAllCaches](#clearallcaches) | `SelfClearAllCaches` | 清空所有缓存。 |
+| [Release](#release) | `SelfRelease` | 清空并释放所有缓存容器。 |
 
 ---
 

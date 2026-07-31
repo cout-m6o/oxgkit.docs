@@ -47,8 +47,8 @@ export const Highlight = ({ children, color }) => (
 
 ### 脚本模板 (Right-Click)
 
-- 通过 Right-Click **Create/OxGKit/Input System/Template Input Action.cs (Input Interface For Any)** 实现 InputAction 接口 (通用信号派送者)。
-- 通过 Right-Click **Create/OxGKit/Input System/New Input System (Extension)/Template Input Binding Composite.cs (For Unity New Input System)** 创建 Unity New InputSystem 的 Binding Composite 脚本 (自定义组合输入)。
+- 通过 Right-Click **Create/OxGKit/Input System/Template Input Action.cs (Input Interface For Any)** 实现 InputAction 接口 (通用信号派送者)；**创建后于游戏开始时**依序注册 `Inputs.CM.RegisterControlMap` 与 `Inputs.IA.RegisterInputAction` 即可生效 (参考下方「简单使用」)。
+- 通过 Right-Click **Create/OxGKit/Input System/New Input System (Extension)/Template Input Binding Composite.cs (For Unity New Input System)** 可**自行实现自定义的 Binding Composite** (将多个输入部件组合成单一输入值)；模板已内置**启动时自动注册**机制，创建后即可在 **Input Action Asset** 的 Binding 列表中选用 (详见 [IInputAction - 脚本模板](/docs/inputsystem/API/Runtime/IInputAction#script-templates))。
 
 <Highlight color="#00d679">提醒</Highlight> 本模块的 Editor 部分仅提供以上**脚本模板 MenuItems** (`InputSystemCreateScriptEditor`)，作为脚本创建辅助，无其他 Editor API。
 

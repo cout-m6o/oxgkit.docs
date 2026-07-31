@@ -36,7 +36,7 @@ using Cysharp.Threading.Tasks;
 using OxGKit.Utilities.Requester;
 ```
 
-<Highlight color="#0373fc">Attention</Highlight> The **static** methods listed on this page operate through an **internal lazy singleton**; every method also has a **Self**-prefixed **instance counterpart** (e.g. `SelfRequestTexture2D`), so you can `new Requester()` to create an instance with an **isolated cache scope**.
+<Highlight color="#0373fc">Attention</Highlight> The **static** methods listed on this page operate through an **internal lazy singleton**; every method also has a **Self**-prefixed **instance counterpart** (e.g. `SelfRequestTexture2D`), so you can `new Requester()` to create an instance with an **isolated cache scope** (see [Static vs. Instance Calls](#static-vs-instance)).
 
 ## Quick Start {#quick-start}
 
@@ -70,6 +70,34 @@ cts.Cancel();
 ```
 
 ## General Rules {#general-rules}
+
+### Static vs. Instance Calls (Self Series) {#static-vs-instance}
+
+**Every static method of `Requester` has a `Self`-prefixed instance counterpart** (`RequestTexture2D` ↔ `SelfRequestTexture2D`, `InitLRUCacheCapacityForText` ↔ `SelfInitLRUCacheCapacityForText`, etc.) with identical parameters and behavior — the only difference is the **cache scope**:
+
+- **Static calls**: operate through an internal singleton, so the whole project **shares one set of global caches**. Use this for most scenarios.
+- **Instance calls (via `new`)**: create your own instance with `new Requester()` and call the `Self*` methods on it — that instance owns a **fully isolated cache scope** (capacity settings, clearing, and releasing never affect others). Ideal when a specific feature needs to **manage its own cache lifecycle** (e.g. chat avatars or event-page images that get released in one batch on exit).
+
+```csharp
+using OxGKit.Utilities.Requester;
+
+// Static call (global shared caches)
+var tex = await Requester.RequestTexture2D(url);
+
+// Instance call (via new, with an isolated cache scope)
+var chatRequester = new Requester();
+
+// Initialize an independent LRU cache capacity for this instance
+chatRequester.SelfInitLRUCacheCapacityForTexture2d(30);
+
+// Request through the Self method (cached only inside this instance)
+var avatar = await chatRequester.SelfRequestTexture2D(avatarUrl);
+
+// Release this instance's caches in one batch on exit (global caches unaffected)
+chatRequester.SelfRelease();
+```
+
+<Highlight color="#00d679">Reminder</Highlight> The following sections list the **static signatures**; **every method has an identically named `Self` instance version** — just add the `Self` prefix to call it on an instance.
 
 ### Caching {#cache-mechanism}
 
@@ -121,13 +149,13 @@ The error information delivered through `errorAction` when a request fails.
 
 ### Method Overview {#request-overview}
 
-| Method | Description |
-| :--- | :--- |
-| [RequestAudio](#requestaudio) | Requests an AudioClip (cacheable). |
-| [RequestTexture2D](#requesttexture2d) | Requests a Texture2D (cacheable). |
-| [RequestSprite](#requestsprite) | Requests and creates a Sprite (caches the underlying Texture2D). |
-| [RequestBytes](#requestbytes) | Requests file bytes (no caching). |
-| [RequestText](#requesttext) | Requests text content (cacheable). |
+| Method (static) | Self Instance Version (via new) | Description |
+| :--- | :--- | :--- |
+| [RequestAudio](#requestaudio) | `SelfRequestAudio` | Requests an AudioClip (cacheable). |
+| [RequestTexture2D](#requesttexture2d) | `SelfRequestTexture2D` | Requests a Texture2D (cacheable). |
+| [RequestSprite](#requestsprite) | `SelfRequestSprite` | Requests and creates a Sprite (caches the underlying Texture2D). |
+| [RequestBytes](#requestbytes) | `SelfRequestBytes` | Requests file bytes (no caching). |
+| [RequestText](#requesttext) | `SelfRequestText` | Requests text content (cacheable). |
 
 ---
 
@@ -213,17 +241,17 @@ string json = await Requester.RequestText("https://example.com/config.json");
 
 ### Method Overview {#cache-overview}
 
-| Method | Description |
-| :--- | :--- |
-| [InitARCCacheCapacityFor...](#init-arc) | Initializes the **ARC cache** capacity for a resource type (disables that type's LRU cache). |
-| [InitLRUCacheCapacityFor...](#init-lru) | Initializes the **LRU cache** capacity for a resource type (disables that type's ARC cache). |
-| [RemoveFromARCCacheFor...](#remove-arc) | Removes a URL from a resource type's ARC cache. |
-| [RemoveFromLRUCacheFor...](#remove-lru) | Removes a URL from a resource type's LRU cache. |
-| [ClearARCCacheCapacityFor...](#clear-arc) | Clears a resource type's ARC cache. |
-| [ClearLRUCacheCapacityFor...](#clear-lru) | Clears a resource type's LRU cache. |
-| [AutoRemoveFromCaches](#autoremovefromcaches) | Searches all caches and removes the given URL. |
-| [ClearAllCaches](#clearallcaches) | Clears all caches. |
-| [Release](#release) | Clears and releases all cache containers. |
+| Method (static) | Self Instance Version (via new) | Description |
+| :--- | :--- | :--- |
+| [InitARCCacheCapacityFor...](#init-arc) | `SelfInitARCCacheCapacityFor...` | Initializes the **ARC cache** capacity for a resource type (disables that type's LRU cache). |
+| [InitLRUCacheCapacityFor...](#init-lru) | `SelfInitLRUCacheCapacityFor...` | Initializes the **LRU cache** capacity for a resource type (disables that type's ARC cache). |
+| [RemoveFromARCCacheFor...](#remove-arc) | `SelfRemoveFromARCCacheFor...` | Removes a URL from a resource type's ARC cache. |
+| [RemoveFromLRUCacheFor...](#remove-lru) | `SelfRemoveFromLRUCacheFor...` | Removes a URL from a resource type's LRU cache. |
+| [ClearARCCacheCapacityFor...](#clear-arc) | `SelfClearARCCacheCapacityFor...` | Clears a resource type's ARC cache. |
+| [ClearLRUCacheCapacityFor...](#clear-lru) | `SelfClearLRUCacheCapacityFor...` | Clears a resource type's LRU cache. |
+| [AutoRemoveFromCaches](#autoremovefromcaches) | `SelfAutoRemoveFromCaches` | Searches all caches and removes the given URL. |
+| [ClearAllCaches](#clearallcaches) | `SelfClearAllCaches` | Clears all caches. |
+| [Release](#release) | `SelfRelease` | Clears and releases all cache containers. |
 
 ---
 

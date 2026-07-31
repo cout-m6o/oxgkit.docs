@@ -135,6 +135,12 @@ Inputs.IA.GetInputAction<PlayerAction>().RemoveAllListeners();
 
 通过 Right-Click **Create/OxGKit/Input System/Template Input Action.cs (Input Interface For Any)** 快速创建 `IInputAction` 实现脚本 (通用信号派送者，可自由实现任何输入来源)。
 
+**创建后的启用流程 (于游戏开始时)：**
+
+1. (若使用 Unity New InputSystem) 先以 `Inputs.CM.RegisterControlMap` 注册控制表。
+2. 以 `Inputs.IA.RegisterInputAction` 注册 Input Action (自动触发 `OnCreate` 进行事件绑定)。
+3. 由主循环 (Main MonoBehaviour) 调用 `Inputs.IA.DriveUpdate(dt)` 驱动更新 (完整示例参考[模块介绍](../../intro.mdx))。
+
 ### Template Input Binding Composite.cs {#tpl-input-binding-composite}
 
 通过 Right-Click **Create/OxGKit/Input System/New Input System (Extension)/Template Input Binding Composite.cs (For Unity New Input System)** 创建 **Unity New InputSystem** 的 **Binding Composite** 脚本，将多个输入部件合成单一自定义输入值 (例如「修饰键 + 方向键」合成移动输入)：
@@ -143,6 +149,12 @@ Inputs.IA.GetInputAction<PlayerAction>().RemoveAllListeners();
 - 通过 `[InputControl(layout = "...")]` 声明组合部件 (Button / Integer / Vector2 / Axis)。
 - 在 `ReadValue` 中读取各部件数值，运算后返回自定义值。
 - 通过 `[InitializeOnLoad]` (Editor) 与 `[RuntimeInitializeOnLoadMethod]` 触发静态构造函数执行 `InputSystem.RegisterBindingComposite` 自动注册。
+
+**创建后的启用流程：**
+
+1. 模板的静态构造函数会于**启动时自动注册** (`InputSystem.RegisterBindingComposite`)，**无需手动调用**。
+2. 打开 **Input Action Asset**，对目标 Action **Add Binding**，在 Composite 列表中选择你的自定义 Composite 并指派各部件按键。
+3. 在 Input Action 的事件回调中以 `context.ReadValue` 读取自定义值 (如下例)。
 
 ```csharp
 // 在 Input Action 的事件回调中读取自定义 Composite 值 (以 Demo 的 MoveInputComposite 为例)
