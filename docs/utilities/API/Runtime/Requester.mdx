@@ -36,7 +36,7 @@ using Cysharp.Threading.Tasks;
 using OxGKit.Utilities.Requester;
 ```
 
-<Highlight color="#0373fc">注意</Highlight> 本頁列出的 **static** 方法皆透過**內部懶漢式單例**運作；各方法皆有對應 **Self** 前綴的**實例方法** (例如 `SelfRequestTexture2D`)，可自行 `new Requester()` 建立**獨立快取範圍**的實例使用。
+<Highlight color="#0373fc">注意</Highlight> 本頁列出的 **static** 方法皆透過**內部懶漢式單例**運作；各方法皆有對應 **Self** 前綴的**實例方法** (例如 `SelfRequestTexture2D`)，可自行 `new Requester()` 建立**獨立快取範圍**的實例使用 (詳見[靜態調用與實例調用](#static-vs-instance))。
 
 ## 快速上手 {#quick-start}
 
@@ -70,6 +70,34 @@ cts.Cancel();
 ```
 
 ## 通用規則 {#general-rules}
+
+### 靜態調用與實例調用 (Self 系列) {#static-vs-instance}
+
+`Requester` 的**每個靜態方法皆有對應 `Self` 前綴的實例方法** (`RequestTexture2D` ↔ `SelfRequestTexture2D`、`InitLRUCacheCapacityForText` ↔ `SelfInitLRUCacheCapacityForText` 等)，參數與行為完全相同，差別只在**快取範圍**：
+
+- **靜態調用**：透過內部單例運作，全專案**共用同一組全域快取**，一般情境使用這個即可。
+- **實例調用 (`new` 方式)**：自行 `new Requester()` 建立實例後調用 `Self*` 方法，該實例擁有**完全獨立的快取範圍** (容量設定、清除、釋放皆互不影響)，適合特定功能需要**自管快取生命週期**的情境 (例如聊天室頭像、活動頁圖片，離場時整批釋放)。
+
+```csharp
+using OxGKit.Utilities.Requester;
+
+// 靜態調用 (全域共用快取)
+var tex = await Requester.RequestTexture2D(url);
+
+// 實例調用 (new 方式，建立獨立快取範圍)
+var chatRequester = new Requester();
+
+// 為該實例初始獨立的 LRU 快取容量
+chatRequester.SelfInitLRUCacheCapacityForTexture2d(30);
+
+// 以 Self 方法發出請求 (快取只進這個實例)
+var avatar = await chatRequester.SelfRequestTexture2D(avatarUrl);
+
+// 離場時整批釋放該實例的快取 (不影響全域快取)
+chatRequester.SelfRelease();
+```
+
+<Highlight color="#00d679">提醒</Highlight> 本頁後續章節以**靜態簽名**列出，**所有方法皆有同名的 `Self` 實例版本**，直接加上 `Self` 前綴即可對應調用。
 
 ### 快取機制 {#cache-mechanism}
 
