@@ -23,6 +23,17 @@ const config = {
   tagline: 'Unity Toolkit',
   favicon: 'img/oxgkit_logo_v1.png',
 
+  // Algolia Crawler 網域所有權驗證 (meta tag 會注入全站每頁的 <head>)
+  headTags: [
+    {
+      tagName: 'meta',
+      attributes: {
+        name: 'algolia-site-verification',
+        content: '75C44350211053A6',
+      },
+    },
+  ],
+
   // Set the production url of your site here
   url: 'https://your-docusaurus-site.example.com',
   // Set the /<baseUrl>/ pathname under which your site is served
