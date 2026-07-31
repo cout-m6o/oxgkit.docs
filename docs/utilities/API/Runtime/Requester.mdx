@@ -149,13 +149,13 @@ public struct ErrorInfo
 
 ### 方法總覽 {#request-overview}
 
-| 方法 | 說明 |
-| :--- | :--- |
-| [RequestAudio](#requestaudio) | 請求 AudioClip (可快取)。 |
-| [RequestTexture2D](#requesttexture2d) | 請求 Texture2D (可快取)。 |
-| [RequestSprite](#requestsprite) | 請求並建立 Sprite (底層快取 Texture2D)。 |
-| [RequestBytes](#requestbytes) | 請求檔案 byte[] (不快取)。 |
-| [RequestText](#requesttext) | 請求文字內容 (可快取)。 |
+| 方法 (static) | Self 實例版本 (new 方式) | 說明 |
+| :--- | :--- | :--- |
+| [RequestAudio](#requestaudio) | `SelfRequestAudio` | 請求 AudioClip (可快取)。 |
+| [RequestTexture2D](#requesttexture2d) | `SelfRequestTexture2D` | 請求 Texture2D (可快取)。 |
+| [RequestSprite](#requestsprite) | `SelfRequestSprite` | 請求並建立 Sprite (底層快取 Texture2D)。 |
+| [RequestBytes](#requestbytes) | `SelfRequestBytes` | 請求檔案 byte[] (不快取)。 |
+| [RequestText](#requesttext) | `SelfRequestText` | 請求文字內容 (可快取)。 |
 
 ---
 
@@ -241,17 +241,17 @@ string json = await Requester.RequestText("https://example.com/config.json");
 
 ### 方法總覽 {#cache-overview}
 
-| 方法 | 說明 |
-| :--- | :--- |
-| [InitARCCacheCapacityFor...](#init-arc) | 初始指定資源類型的 **ARC 快取**容量 (會停用該類型的 LRU 快取)。 |
-| [InitLRUCacheCapacityFor...](#init-lru) | 初始指定資源類型的 **LRU 快取**容量 (會停用該類型的 ARC 快取)。 |
-| [RemoveFromARCCacheFor...](#remove-arc) | 從指定資源類型的 ARC 快取中移除 URL。 |
-| [RemoveFromLRUCacheFor...](#remove-lru) | 從指定資源類型的 LRU 快取中移除 URL。 |
-| [ClearARCCacheCapacityFor...](#clear-arc) | 清空指定資源類型的 ARC 快取。 |
-| [ClearLRUCacheCapacityFor...](#clear-lru) | 清空指定資源類型的 LRU 快取。 |
-| [AutoRemoveFromCaches](#autoremovefromcaches) | 搜尋所有快取並移除指定 URL。 |
-| [ClearAllCaches](#clearallcaches) | 清空所有快取。 |
-| [Release](#release) | 清空並釋放所有快取容器。 |
+| 方法 (static) | Self 實例版本 (new 方式) | 說明 |
+| :--- | :--- | :--- |
+| [InitARCCacheCapacityFor...](#init-arc) | `SelfInitARCCacheCapacityFor...` | 初始指定資源類型的 **ARC 快取**容量 (會停用該類型的 LRU 快取)。 |
+| [InitLRUCacheCapacityFor...](#init-lru) | `SelfInitLRUCacheCapacityFor...` | 初始指定資源類型的 **LRU 快取**容量 (會停用該類型的 ARC 快取)。 |
+| [RemoveFromARCCacheFor...](#remove-arc) | `SelfRemoveFromARCCacheFor...` | 從指定資源類型的 ARC 快取中移除 URL。 |
+| [RemoveFromLRUCacheFor...](#remove-lru) | `SelfRemoveFromLRUCacheFor...` | 從指定資源類型的 LRU 快取中移除 URL。 |
+| [ClearARCCacheCapacityFor...](#clear-arc) | `SelfClearARCCacheCapacityFor...` | 清空指定資源類型的 ARC 快取。 |
+| [ClearLRUCacheCapacityFor...](#clear-lru) | `SelfClearLRUCacheCapacityFor...` | 清空指定資源類型的 LRU 快取。 |
+| [AutoRemoveFromCaches](#autoremovefromcaches) | `SelfAutoRemoveFromCaches` | 搜尋所有快取並移除指定 URL。 |
+| [ClearAllCaches](#clearallcaches) | `SelfClearAllCaches` | 清空所有快取。 |
+| [Release](#release) | `SelfRelease` | 清空並釋放所有快取容器。 |
 
 ---
 
