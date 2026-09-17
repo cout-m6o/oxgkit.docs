@@ -2,7 +2,7 @@
 
 OxGKit 官方文檔網站，使用 [Docusaurus](https://docusaurus.io/) 建置。
 
-- OxGKit Repo: https://github.com/michael811125/OxGKit
+- OxGKit Repo: https://github.com/cout-m6o/OxGKit
 - 語言版本：繁體中文 (預設)、簡體中文、English
 
 ## Installation

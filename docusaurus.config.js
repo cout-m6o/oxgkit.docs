@@ -43,7 +43,7 @@ const config = {
 
   // GitHub pages deployment config.
   // If you aren't using GitHub pages, you don't need these.
-  organizationName: 'michael811125', // Usually your GitHub org/user name.
+  organizationName: 'cout-m6o', // Usually your GitHub org/user name.
   projectName: 'oxgkit.docs', // Usually your repo name.
 
   onBrokenLinks: 'throw',
@@ -84,7 +84,7 @@ const config = {
         docs: {
           sidebarPath: require.resolve('./sidebars.js'),
           editUrl:
-            'https://github.com/michael811125/oxgkit.docs/tree/master/',
+            'https://github.com/cout-m6o/oxgkit.docs/tree/master/',
           lastVersion: 'current',
           versions: {
             current: {
@@ -95,7 +95,7 @@ const config = {
         blog: {
           showReadingTime: true,
           editUrl:
-            'https://github.com/michael811125/oxgkit.docs/tree/master/',
+            'https://github.com/cout-m6o/oxgkit.docs/tree/master/',
         },
         theme: {
           customCss: require.resolve('./src/css/custom.css'),
@@ -152,7 +152,7 @@ const config = {
             position: 'left'
           },
           {
-            href: 'https://github.com/michael811125/OxGKit',
+            href: 'https://github.com/cout-m6o/OxGKit',
             label: 'GitHub',
             position: 'right',
           },
@@ -175,15 +175,15 @@ const config = {
             items: [
               {
                 label: 'OxGFrame',
-                href: 'https://github.com/michael811125/OxGFrame',
+                href: 'https://github.com/cout-m6o/OxGFrame',
               },
               {
                 label: 'OxGKit',
-                href: 'https://github.com/michael811125/OxGKit',
+                href: 'https://github.com/cout-m6o/OxGKit',
               },
               {
                 label: 'LWMyBox',
-                href: 'https://github.com/michael811125/LWMyBox',
+                href: 'https://github.com/cout-m6o/LWMyBox',
               }
             ],
           },
@@ -205,12 +205,12 @@ const config = {
               },
               {
                 label: 'GitHub',
-                href: 'https://github.com/michael811125/OxGKit',
+                href: 'https://github.com/cout-m6o/OxGKit',
               },
             ],
           },
         ],
-        copyright: `Copyright © ${new Date().getFullYear()} <a href="https://github.com/michael811125">MichaelO</a>.`,
+        copyright: `Copyright © ${new Date().getFullYear()} <a href="https://github.com/cout-m6o">MichaelO</a>.`,
       },
       prism: {
         theme: prismThemes.github,
